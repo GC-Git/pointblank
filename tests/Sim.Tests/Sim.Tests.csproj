@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Sim\Sim.csproj" />
+    <ProjectReference Include="..\..\tools\Runner\Runner.csproj" />
   </ItemGroup>
 
 </Project>
