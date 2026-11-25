@@ -79,7 +79,7 @@ Status: draft, awaiting owner sign-off
   *Done when:* when a leader dies, the next in command takes over after a delay, and the
   squad loses its leader bonus during that delay.
 
-- [ ] **1.4 Pathfinding and movement** (S)
+- [x] **1.4 Pathfinding and movement** (S)
   A* on tiles with terrain costs. Orders `Move`, `MoveFast`, `Sneak` with posture and
   speed from data. Squad members keep a spread formation.
   *Done when:* units take the cheaper route around woods, `Sneak` is slower and lower

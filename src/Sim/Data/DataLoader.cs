@@ -11,7 +11,7 @@ public static class DataLoader
 {
     /// <summary>The tables, in the fixed order used by reports.</summary>
     public static readonly string[] TableNames =
-        ["units", "weapons", "ammo", "materials", "organisation", "terrain", "postures", "sight", "movement", "formation"];
+        ["units", "weapons", "ammo", "materials", "organisation", "terrain", "postures", "sight", "movement", "formation", "command"];
 
     private const int MaxIntegerDigits = 9;
     private const int MaxFractionDigits = 9;
@@ -40,6 +40,12 @@ public static class DataLoader
         ["sight"] = [("name", T), ("floor_height", N), ("block_threshold", N)],
         ["movement"] = [("name", T), ("speed", N), ("posture", T), ("terrain_cost", T)],
         ["formation"] = [("name", T), ("spacing", N), ("lateral", N), ("leash", N), ("replan_ticks", N)],
+        ["command"] =
+        [
+            ("name", T), ("base_delay", N), ("no_leader_delay", N), ("out_of_contact_delay", N), ("shaken_delay", N),
+            ("broken_delay", N), ("spread_min", N), ("spread_max", N), ("command_radius", N), ("hesitate_chance", N),
+            ("hesitate_delay", N), ("shaken_refuse_chance", N), ("broken_refuse_chance", N),
+        ],
     };
 
     public static DataSet LoadDirectory(string directory)

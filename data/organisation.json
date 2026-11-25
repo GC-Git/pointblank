@@ -43,6 +43,22 @@
             "kind": "placeholder",
             "note": "Placeholder, not a historical value."
           }
+        },
+        "unit_type": {
+          "value": "squad",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "radio": {
+          "value": "0",
+          "unit": "flag",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: rifle squads have no radio or field phone."
+          }
         }
       }
     },
@@ -916,6 +932,22 @@
             "kind": "placeholder",
             "note": "Placeholder, not a historical value."
           }
+        },
+        "unit_type": {
+          "value": "squad",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "radio": {
+          "value": "0",
+          "unit": "flag",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: rifle squads have no radio or field phone."
+          }
         }
       }
     },
@@ -1601,6 +1633,542 @@
         },
         "succession": {
           "value": "9",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "us_platoon_hq",
+      "values": {
+        "name": {
+          "value": "US platoon HQ (placeholder)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "squad",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "side": {
+          "value": "us",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession_delay": {
+          "value": "5",
+          "unit": "s",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "leader_bonus": {
+          "value": "0.25",
+          "unit": "fraction",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "unit_type": {
+          "value": "hq",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "radio": {
+          "value": "1",
+          "unit": "flag",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: assumes the HQ has a radio or field phone."
+          }
+        }
+      }
+    },
+    {
+      "id": "us_platoon_hq.pl",
+      "values": {
+        "name": {
+          "value": "squad_leader (pl)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "us_platoon_hq",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "command",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "squad_leader",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "us_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "6",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "0",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "us_platoon_hq.psg",
+      "values": {
+        "name": {
+          "value": "assistant_leader (psg)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "us_platoon_hq",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "command",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "assistant_leader",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "us_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "5",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "1",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "us_platoon_hq.runner",
+      "values": {
+        "name": {
+          "value": "rifleman (runner)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "us_platoon_hq",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "command",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "rifleman",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "us_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "1",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "2",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "de_zugtrupp",
+      "values": {
+        "name": {
+          "value": "German Zugtrupp (placeholder)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "squad",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "side": {
+          "value": "de",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession_delay": {
+          "value": "5",
+          "unit": "s",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "leader_bonus": {
+          "value": "0.25",
+          "unit": "fraction",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "unit_type": {
+          "value": "hq",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "radio": {
+          "value": "1",
+          "unit": "flag",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: assumes the HQ has a radio or field phone."
+          }
+        }
+      }
+    },
+    {
+      "id": "de_zugtrupp.zf",
+      "values": {
+        "name": {
+          "value": "squad_leader (zf)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "de_zugtrupp",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "command",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "squad_leader",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "de_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "6",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "0",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "de_zugtrupp.ztf",
+      "values": {
+        "name": {
+          "value": "assistant_leader (ztf)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "de_zugtrupp",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "command",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "assistant_leader",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "de_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "5",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "1",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "de_zugtrupp.melder",
+      "values": {
+        "name": {
+          "value": "rifleman (melder)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "de_zugtrupp",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "command",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "rifleman",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "de_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "1",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "2",
           "unit": "order",
           "source": {
             "kind": "placeholder",

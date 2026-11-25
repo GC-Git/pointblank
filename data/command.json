@@ -1,0 +1,23 @@
+{
+  "table": "command",
+  "entries": [
+    {
+      "id": "chain_of_command",
+      "values": {
+        "name": { "value": "Chain of command (placeholder)", "unit": "text", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
+        "base_delay": { "value": "2", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: delay for a steady squad with its leader, in contact with its HQ." } },
+        "no_leader_delay": { "value": "6", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: extra delay while the squad has no effective leader." } },
+        "out_of_contact_delay": { "value": "4", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: extra delay when the squad has no contact with an HQ of its side." } },
+        "shaken_delay": { "value": "2", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: extra delay for a shaken squad." } },
+        "broken_delay": { "value": "4", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: extra delay for a broken squad." } },
+        "spread_min": { "value": "0.75", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: lowest random factor applied to the delay." } },
+        "spread_max": { "value": "1.25", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: highest random factor applied to the delay." } },
+        "command_radius": { "value": "200", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: a squad this close to an HQ of its side is in contact by voice or runner." } },
+        "hesitate_chance": { "value": "0.4", "unit": "probability", "source": { "kind": "placeholder", "note": "Placeholder: chance that a shaken squad hesitates when an order reaches it." } },
+        "hesitate_delay": { "value": "5", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: how long a hesitating squad waits before it obeys." } },
+        "shaken_refuse_chance": { "value": "0.15", "unit": "probability", "source": { "kind": "placeholder", "note": "Placeholder: chance that a shaken squad refuses an advance-type order." } },
+        "broken_refuse_chance": { "value": "0.6", "unit": "probability", "source": { "kind": "placeholder", "note": "Placeholder: chance that a broken squad refuses an advance-type order." } }
+      }
+    }
+  ]
+}
