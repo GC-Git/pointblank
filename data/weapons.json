@@ -51,6 +51,54 @@
             "kind": "placeholder",
             "note": "Not a historical value."
           }
+        },
+        "dispersion": {
+          "value": "2.5",
+          "unit": "mrad",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder for item 1.7; not a historical value."
+          }
+        },
+        "max_range": {
+          "value": "800",
+          "unit": "m",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder for item 1.7; not a historical value."
+          }
+        },
+        "burst_length": {
+          "value": "1",
+          "unit": "rounds",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder for item 1.7; not a historical value."
+          }
+        },
+        "burst_pause": {
+          "value": "0",
+          "unit": "s",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder for item 1.7; not a historical value."
+          }
+        },
+        "reload_time": {
+          "value": "3",
+          "unit": "s",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder for item 1.7; not a historical value."
+          }
+        },
+        "carried_rounds": {
+          "value": "80",
+          "unit": "rounds",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder for item 1.7; not a historical value."
+          }
         }
       }
     },
@@ -103,6 +151,54 @@
           "source": {
             "kind": "placeholder",
             "note": "Not a historical value."
+          }
+        },
+        "dispersion": {
+          "value": "2.5",
+          "unit": "mrad",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder for item 1.7; not a historical value."
+          }
+        },
+        "max_range": {
+          "value": "800",
+          "unit": "m",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder for item 1.7; not a historical value."
+          }
+        },
+        "burst_length": {
+          "value": "1",
+          "unit": "rounds",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder for item 1.7; not a historical value."
+          }
+        },
+        "burst_pause": {
+          "value": "0",
+          "unit": "s",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder for item 1.7; not a historical value."
+          }
+        },
+        "reload_time": {
+          "value": "4",
+          "unit": "s",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder for item 1.7; not a historical value."
+          }
+        },
+        "carried_rounds": {
+          "value": "60",
+          "unit": "rounds",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder for item 1.7; not a historical value."
           }
         }
       }
@@ -157,6 +253,54 @@
             "kind": "placeholder",
             "note": "Sample row; not researched."
           }
+        },
+        "dispersion": {
+          "value": "3.5",
+          "unit": "mrad",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder for item 1.7; not a historical value."
+          }
+        },
+        "max_range": {
+          "value": "800",
+          "unit": "m",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder for item 1.7; not a historical value."
+          }
+        },
+        "burst_length": {
+          "value": "4",
+          "unit": "rounds",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder for item 1.7; not a historical value."
+          }
+        },
+        "burst_pause": {
+          "value": "1",
+          "unit": "s",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder for item 1.7; not a historical value."
+          }
+        },
+        "reload_time": {
+          "value": "4",
+          "unit": "s",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder for item 1.7; not a historical value."
+          }
+        },
+        "carried_rounds": {
+          "value": "240",
+          "unit": "rounds",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder for item 1.7; not a historical value."
+          }
         }
       }
     },
@@ -209,6 +353,54 @@
           "source": {
             "kind": "placeholder",
             "note": "Sample row; not researched."
+          }
+        },
+        "dispersion": {
+          "value": "4",
+          "unit": "mrad",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder for item 1.7; not a historical value."
+          }
+        },
+        "max_range": {
+          "value": "1000",
+          "unit": "m",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder for item 1.7; not a historical value."
+          }
+        },
+        "burst_length": {
+          "value": "8",
+          "unit": "rounds",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder for item 1.7; not a historical value."
+          }
+        },
+        "burst_pause": {
+          "value": "1",
+          "unit": "s",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder for item 1.7; not a historical value."
+          }
+        },
+        "reload_time": {
+          "value": "6",
+          "unit": "s",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder for item 1.7; not a historical value."
+          }
+        },
+        "carried_rounds": {
+          "value": "300",
+          "unit": "rounds",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder for item 1.7; not a historical value."
           }
         }
       }

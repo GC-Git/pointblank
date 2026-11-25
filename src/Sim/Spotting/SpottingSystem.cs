@@ -163,6 +163,19 @@ public sealed class SpottingSystem : ISimSystem
     /// <summary>Every side's knowledge, ordered by side name.</summary>
     internal IReadOnlyCollection<SideKnowledge> Sides => _sides.Count == 0 ? NoSides : _sides.Values;
 
+    /// <summary>What <paramref name="side"/> knows of one enemy soldier, or null (fire control, item 1.7).</summary>
+    internal ContactView? ContactOf(string side, int enemyId) =>
+        _sides.TryGetValue(side, out var k) && k.Contacts.TryGetValue(enemyId, out var c)
+            ? new ContactView(c.EnemyId, c.Kind, c.Quality, c.X, c.Y, c.LastSeen, c.FirstSeen, c.SeenBy)
+            : null;
+
+    /// <summary>The tick a soldier was last noted firing, or a large negative number.</summary>
+    internal long LastFiredTick(int soldierId)
+    {
+        Sync();
+        return _indexOf.TryGetValue(soldierId, out var i) ? _entries[i].LastFired : long.MinValue / 2;
+    }
+
     /// <summary>Records that a soldier fired (item 1.7 calls this); it is easier to spot for the firing window.</summary>
     internal void NoteFired(int soldierId, long tick)
     {

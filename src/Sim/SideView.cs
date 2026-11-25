@@ -1,3 +1,4 @@
+using PointBlank.Sim.Fire;
 using PointBlank.Sim.Movement;
 using PointBlank.Sim.Orders;
 using PointBlank.Sim.Org;
@@ -6,11 +7,14 @@ using PointBlank.Sim.Spotting;
 
 namespace PointBlank.Sim;
 
-/// <summary>A copy of one of the side's own soldiers.</summary>
+/// <summary>A copy of one of the side's own soldiers. <see cref="Rounds"/> is what he has left (-1 without fire rules or a known weapon).</summary>
 public readonly record struct SoldierView(
-    int Id, string Key, Role Role, int Rank, string WeaponId, int TeamIndex, Fixed X, Fixed Y, Posture Posture, HealthState Health);
+    int Id, string Key, Role Role, int Rank, string WeaponId, int TeamIndex, Fixed X, Fixed Y, Posture Posture, HealthState Health, int Rounds);
 
-/// <summary>A copy of one of the side's own squads. <see cref="LeaderId"/> is -1 while the post is vacant.</summary>
+/// <summary>
+/// A copy of one of the side's own squads. <see cref="LeaderId"/> is -1 while the post is vacant. <see cref="Ammo"/>
+/// reads <see cref="AmmoState.OutOfAmmo"/> when none of its able, armed men has a round left.
+/// </summary>
 public readonly record struct SquadView(
     int Id,
     string OrgId,
@@ -20,6 +24,7 @@ public readonly record struct SquadView(
     int LeaderId,
     int TicksToSuccession,
     bool IsMoving,
+    AmmoState Ammo,
     IReadOnlyList<SoldierView> Soldiers);
 
 /// <summary>
@@ -36,6 +41,7 @@ public sealed class SideView
     private readonly MovementSystem? _move;
     private readonly CommandSystem? _command;
     private readonly SpottingSystem? _spotting;
+    private readonly FireSystem? _fire;
 
     internal SideView(World world, string side)
     {
@@ -45,6 +51,7 @@ public sealed class SideView
         _move = world.FindSystem<MovementSystem>();
         _command = world.FindSystem<CommandSystem>();
         _spotting = world.FindSystem<SpottingSystem>();
+        _fire = world.FindSystem<FireSystem>();
     }
 
     public string Side { get; }
@@ -109,5 +116,7 @@ public sealed class SideView
         q.Leader?.Id ?? -1,
         q.TicksToSuccession,
         _move?.IsMoving(q.Id) ?? false,
-        q.Soldiers.Select(s => new SoldierView(s.Id, s.Key, s.Role, s.Rank, s.WeaponId, s.TeamIndex, s.X, s.Y, s.Posture, s.Health)).ToArray());
+        _fire?.AmmoOf(q) ?? AmmoState.Ok,
+        q.Soldiers.Select(s => new SoldierView(
+            s.Id, s.Key, s.Role, s.Rank, s.WeaponId, s.TeamIndex, s.X, s.Y, s.Posture, s.Health, _fire?.RoundsOf(s.Id) ?? -1)).ToArray());
 }

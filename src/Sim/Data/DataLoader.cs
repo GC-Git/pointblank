@@ -11,7 +11,7 @@ public static class DataLoader
 {
     /// <summary>The tables, in the fixed order used by reports.</summary>
     public static readonly string[] TableNames =
-        ["units", "weapons", "ammo", "materials", "organisation", "terrain", "postures", "sight", "movement", "formation", "command", "spotting"];
+        ["units", "weapons", "ammo", "materials", "organisation", "terrain", "postures", "sight", "movement", "formation", "command", "spotting", "fire"];
 
     private const int MaxIntegerDigits = 9;
     private const int MaxFractionDigits = 9;
@@ -26,9 +26,10 @@ public static class DataLoader
         ["weapons"] =
         [
             ("name", T), ("ammo", T), ("muzzle_velocity", N), ("rate_of_fire", N),
-            ("magazine_capacity", N), ("mass", N),
+            ("magazine_capacity", N), ("mass", N), ("dispersion", N), ("max_range", N), ("burst_length", N),
+            ("burst_pause", N), ("reload_time", N), ("carried_rounds", N),
         ],
-        ["ammo"] = [("caliber", N), ("bullet_mass", N)],
+        ["ammo"] = [("caliber", N), ("bullet_mass", N), ("calibre_class", T)],
         ["materials"] = [("name", T), ("cover_protection", N), ("penetration_resistance", N)],
         ["organisation"] = [("name", T), ("kind", T)],
         ["terrain"] =
@@ -52,6 +53,13 @@ public static class DataLoader
             ("posture_standing", N), ("posture_kneeling", N), ("posture_prone", N), ("motion_still", N),
             ("motion_sneak", N), ("motion_move", N), ("motion_move_fast", N), ("firing_factor", N),
             ("firing_window", N), ("lost_after", N), ("forget_after", N),
+        ],
+        ["fire"] =
+        [
+            ("name", T), ("near_miss_radius", N), ("hedge_block_chance", N), ("body_width", N),
+            ("body_height_standing", N), ("body_height_kneeling", N), ("body_height_prone", N),
+            ("dispersion_standing", N), ("dispersion_kneeling", N), ("dispersion_prone", N), ("moving_factor", N),
+            ("dispersion_per_100m", N), ("area_aim_height", N), ("kill_chance", N), ("incapacitate_chance", N), ("mask_clearance", N),
         ],
     };
 

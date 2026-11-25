@@ -4,7 +4,7 @@ namespace PointBlank.Sim.Orders;
 
 /// <summary>
 /// The one order vocabulary, shared by the player and the AI. Values are hashed and stored in
-/// replays, so never renumber. Implemented today: the four moves and <see cref="Hold"/>; the others
+/// replays, so never renumber. Implemented today: the four moves, <see cref="Fire"/> and <see cref="Hold"/>; the others
 /// are delivered through the chain of command and acknowledged as <see cref="OrderNote.NotImplemented"/>.
 /// </summary>
 public enum OrderKind : byte
@@ -17,6 +17,7 @@ public enum OrderKind : byte
     FallBack = 3,
     Defend = 4,
     Ambush = 5,
+    /// <summary>Fire at a known contact (<see cref="Order.TargetId"/>) or at a point (area fire, TargetId -1).</summary>
     Fire = 6,
     Smoke = 7,
 
@@ -37,8 +38,11 @@ public enum OrderClass : byte
     FallBack = 2,
 }
 
-/// <summary>An order. X and Y are the target point in metres from the map's north-west corner (ignored by Hold).</summary>
-public sealed record Order(OrderKind Kind, Fixed X, Fixed Y);
+/// <summary>
+/// An order. X and Y are the target point in metres from the map's north-west corner (ignored by Hold).
+/// <see cref="TargetId"/> is the enemy soldier a Fire order aims at (a contact of the side), or -1.
+/// </summary>
+public sealed record Order(OrderKind Kind, Fixed X, Fixed Y, int TargetId = -1);
 
 public static class OrderKinds
 {
@@ -116,6 +120,18 @@ public enum OrderNote : byte
 
     /// <summary>No man in the unit can carry the order out.</summary>
     NoAbleMen = 4,
+
+    /// <summary>A Fire order's target is not a contact the unit's side knows.</summary>
+    UnknownTarget = 5,
+
+    /// <summary>No able, armed man in the unit has a round left.</summary>
+    OutOfAmmo = 6,
+
+    /// <summary>A Fire order's target fell or was forgotten.</summary>
+    TargetGone = 7,
+
+    /// <summary>A Fire order's target is beyond every armed man's range.</summary>
+    OutOfRange = 8,
 }
 
 /// <summary>What <see cref="CommandSystem.Issue"/> did with an order. Values are hashed, so never renumber.</summary>

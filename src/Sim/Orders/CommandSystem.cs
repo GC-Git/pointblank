@@ -1,3 +1,4 @@
+using PointBlank.Sim.Fire;
 using PointBlank.Sim.Movement;
 using PointBlank.Sim.Org;
 
@@ -18,11 +19,13 @@ namespace PointBlank.Sim.Orders;
 /// squads; never a fall-back or neutral order). A shaken squad may then hesitate (never over a fall-back)
 /// for the hesitate delay. Otherwise the order executes.</item>
 /// <item>Execution: moves start in <see cref="MovementSystem"/> and stay Executing until it finishes;
-/// Hold stops the squad; kinds without behaviour are Done with <see cref="OrderNote.NotImplemented"/>.</item>
+/// Hold stops the squad; Fire starts in <see cref="FireSystem"/> (Rejected with its note if it cannot) and stays
+/// Executing until fire ends, then Done with the end note; any other delivered order stops the squad's fire;
+/// kinds without behaviour (and Fire without a FireSystem) are Done with <see cref="OrderNote.NotImplemented"/>.</item>
 /// </list>
 /// Register after <see cref="OrgSystem"/> and before <see cref="MovementSystem"/>.
 /// </summary>
-public sealed class CommandSystem(OrgSystem org, MovementSystem move, CommandRules rules) : ISimSystem
+public sealed class CommandSystem(OrgSystem org, MovementSystem move, CommandRules rules, FireSystem? fire = null) : ISimSystem
 {
     private readonly Dictionary<int, Ticket> _tickets = [];
     private readonly List<IssueRejection> _rejections = [];
@@ -106,7 +109,7 @@ public sealed class CommandSystem(OrgSystem org, MovementSystem move, CommandRul
 
         var t = new Ticket(order, world.Tick);
         _tickets[unitId] = t;
-        if (OrderKinds.IsMove(order.Kind) && !move.IsOnMap(order.X, order.Y))
+        if ((OrderKinds.IsMove(order.Kind) || (order.Kind == OrderKind.Fire && order.TargetId < 0)) && !move.IsOnMap(order.X, order.Y))
         {
             t.Status = OrderStatus.Rejected;
             t.Note = OrderNote.OffMap;
@@ -137,16 +140,24 @@ public sealed class CommandSystem(OrgSystem org, MovementSystem move, CommandRul
 
             switch (t.Status)
             {
+                case OrderStatus.Executing when t.Order.Kind == OrderKind.Fire:
+                    if (fire?.IsFiring(squad.Id) != true)
+                    {
+                        t.Status = OrderStatus.Done;
+                        t.Note = fire?.EndNoteOf(squad.Id) ?? OrderNote.None;
+                    }
+
+                    break;
                 case OrderStatus.Executing when !move.IsMoving(squad.Id):
                     t.Status = OrderStatus.Done;
                     break;
                 case OrderStatus.Pending when --t.Remaining <= 0:
                     t.Remaining = 0;
-                    Deliver(world.Rng, squad, t);
+                    Deliver(world, squad, t);
                     break;
                 case OrderStatus.Hesitating when --t.Remaining <= 0:
                     t.Remaining = 0;
-                    Execute(squad, t);
+                    Execute(world, squad, t);
                     break;
             }
         }
@@ -167,6 +178,7 @@ public sealed class CommandSystem(OrgSystem org, MovementSystem move, CommandRul
             hasher.Add((byte)t!.Order.Kind);
             hasher.Add(t.Order.X);
             hasher.Add(t.Order.Y);
+            hasher.Add(t.Order.TargetId);
             hasher.Add(t.Issued);
             hasher.Add((byte)t.Status);
             hasher.Add(t.Remaining);
@@ -222,8 +234,9 @@ public sealed class CommandSystem(OrgSystem org, MovementSystem move, CommandRul
         return r;
     }
 
-    private void Deliver(SimRng rng, Squad squad, Ticket t)
+    private void Deliver(World world, Squad squad, Ticket t)
     {
+        var rng = world.Rng;
         var cls = OrderKinds.ClassOf(t.Order.Kind);
         var refuse = cls != OrderClass.Advance
             ? Fixed.Zero
@@ -247,12 +260,21 @@ public sealed class CommandSystem(OrgSystem org, MovementSystem move, CommandRul
             return;
         }
 
-        Execute(squad, t);
+        Execute(world, squad, t);
     }
 
-    private void Execute(Squad squad, Ticket t)
+    private void Execute(World world, Squad squad, Ticket t)
     {
         var kind = t.Order.Kind;
+        fire?.Stop(squad.Id);
+        if (kind == OrderKind.Fire && fire != null)
+        {
+            var note = fire.Start(world, squad, t.Order);
+            t.Status = note == OrderNote.None ? OrderStatus.Executing : OrderStatus.Rejected;
+            t.Note = note;
+            return;
+        }
+
         if (OrderKinds.IsMove(kind))
         {
             var result = move.Execute(new MoveOrder(squad.Id, t.Order.X, t.Order.Y, OrderKinds.MoveModeOf(kind)));

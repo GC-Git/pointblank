@@ -1,0 +1,138 @@
+{
+  "table": "fire",
+  "entries": [
+    {
+      "id": "default",
+      "values": {
+        "name": {
+          "value": "Small-arms fire (placeholder)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "near_miss_radius": {
+          "value": "2",
+          "unit": "m",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: a shot passing this close to a soldier is a near miss (item 2.1 suppression)."
+          }
+        },
+        "hedge_block_chance": {
+          "value": "0.5",
+          "unit": "ratio",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: chance a hedge stops a shot crossing it below its top."
+          }
+        },
+        "body_width": {
+          "value": "0.5",
+          "unit": "m",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: width of a soldier's body as a target."
+          }
+        },
+        "body_height_standing": {
+          "value": "1.7",
+          "unit": "m",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: target height, standing."
+          }
+        },
+        "body_height_kneeling": {
+          "value": "1.1",
+          "unit": "m",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: target height, kneeling."
+          }
+        },
+        "body_height_prone": {
+          "value": "0.4",
+          "unit": "m",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: target height, prone."
+          }
+        },
+        "dispersion_standing": {
+          "value": "1",
+          "unit": "factor",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: firer posture factor on dispersion, standing."
+          }
+        },
+        "dispersion_kneeling": {
+          "value": "0.75",
+          "unit": "factor",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: firer posture factor on dispersion, kneeling."
+          }
+        },
+        "dispersion_prone": {
+          "value": "0.5",
+          "unit": "factor",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: firer posture factor on dispersion, prone."
+          }
+        },
+        "moving_factor": {
+          "value": "2.5",
+          "unit": "factor",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: dispersion factor for a firer who moved in the last tick."
+          }
+        },
+        "dispersion_per_100m": {
+          "value": "0.1",
+          "unit": "factor",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: extra dispersion per 100 m of range (aiming error grows with range)."
+          }
+        },
+        "area_aim_height": {
+          "value": "0.5",
+          "unit": "m",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: aim height above the ground for area fire."
+          }
+        },
+        "mask_clearance": {
+          "value": "0.5",
+          "unit": "m",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: a soldier holds fire while a friendly is this close to his line of fire, short of the target."
+          }
+        },
+        "kill_chance": {
+          "value": "0.25",
+          "unit": "ratio",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: chance a hit kills."
+          }
+        },
+        "incapacitate_chance": {
+          "value": "0.35",
+          "unit": "ratio",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: chance a hit incapacitates (else it wounds)."
+          }
+        }
+      }
+    }
+  ]
+}
