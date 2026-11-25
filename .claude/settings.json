@@ -1,6 +1,56 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
+    "allow": [
+      "Edit(/**)",
+
+      "Bash(dotnet build *)",
+      "Bash(dotnet test *)",
+      "Bash(dotnet restore *)",
+      "Bash(dotnet new *)",
+      "Bash(dotnet sln *)",
+      "Bash(dotnet add *)",
+      "Bash(dotnet list *)",
+      "Bash(dotnet format *)",
+      "PowerShell(dotnet build *)",
+      "PowerShell(dotnet test *)",
+      "PowerShell(dotnet restore *)",
+      "PowerShell(dotnet new *)",
+      "PowerShell(dotnet sln *)",
+      "PowerShell(dotnet add *)",
+      "PowerShell(dotnet list *)",
+      "PowerShell(dotnet format *)",
+
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git ls-files *)",
+      "Bash(git fetch *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git switch *)",
+      "Bash(git push -u origin claude/*)",
+      "Bash(git push origin claude/*)",
+      "Bash(git push -u origin item/*)",
+      "Bash(git push origin item/*)",
+      "PowerShell(git status *)",
+      "PowerShell(git diff *)",
+      "PowerShell(git log *)",
+      "PowerShell(git show *)",
+      "PowerShell(git ls-files *)",
+      "PowerShell(git fetch *)",
+      "PowerShell(git add *)",
+      "PowerShell(git commit *)",
+      "PowerShell(git switch *)",
+      "PowerShell(git push -u origin claude/*)",
+      "PowerShell(git push origin claude/*)",
+      "PowerShell(git push -u origin item/*)",
+      "PowerShell(git push origin item/*)",
+
+      "Bash(\"/c/Godot_v4.7-stable_mono_win64/Godot_v4.7-stable_mono_win64_console.exe\" *)",
+      "PowerShell(& \"C:\\Godot_v4.7-stable_mono_win64\\Godot_v4.7-stable_mono_win64_console.exe\" *)"
+    ],
     "deny": [
       "Bash(git push * main)",
       "Bash(git push * main *)",
@@ -89,4 +139,5 @@
       "Edit(/.claude/settings*.json)"
     ]
   }
+  
 }
