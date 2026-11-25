@@ -11,7 +11,7 @@ public static class DataLoader
 {
     /// <summary>The tables, in the fixed order used by reports.</summary>
     public static readonly string[] TableNames =
-        ["units", "weapons", "ammo", "materials", "organisation"];
+        ["units", "weapons", "ammo", "materials", "organisation", "terrain"];
 
     private const int MaxIntegerDigits = 9;
     private const int MaxFractionDigits = 9;
@@ -31,6 +31,11 @@ public static class DataLoader
         ["ammo"] = [("caliber", N), ("bullet_mass", N)],
         ["materials"] = [("name", T), ("cover_protection", N), ("penetration_resistance", N)],
         ["organisation"] = [("name", T), ("unit", T), ("count", N)],
+        ["terrain"] =
+        [
+            ("name", T), ("cover", N), ("concealment", N), ("move_cost_walk", N),
+            ("move_cost_fast", N), ("move_cost_sneak", N), ("block_height", N),
+        ],
     };
 
     public static DataSet LoadDirectory(string directory)

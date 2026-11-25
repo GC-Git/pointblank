@@ -48,7 +48,7 @@ Status: draft, awaiting owner sign-off
   *Done when:* running a scenario twice yields byte-identical stats. A saved replay
   re-runs to the same final hash.
 
-- [ ] **0.4 Data files with sources** (S)
+- [x] **0.4 Data files with sources** (S)
   JSON schema and loader for units, weapons, ammo, materials and organisation tables.
   Every value carries `source`, which is a reference, `estimated` (with reasoning), or
   `placeholder`.

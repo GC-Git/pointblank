@@ -213,7 +213,7 @@ public class DataLoaderTests
         var set = DataLoader.LoadDirectory(DataPaths.DataDirectory());
         Assert.Equal(2, set.Table("weapons").Entries.Count);
         Assert.Equal(2, set.Table("ammo").Entries.Count);
-        Assert.Single(set.Table("materials").Entries);
+        Assert.Equal(2, set.Table("materials").Entries.Count);
         Assert.NotEmpty(set.Table("units").Entries);
         Assert.NotEmpty(set.Table("organisation").Entries);
         Assert.All(

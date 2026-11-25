@@ -123,11 +123,17 @@ The authoritative list is the report: `dotnet run --project tools/Runner -- --da
 (it lists every placeholder as `table/entry/value`). Currently every value in `data/` is a
 sample placeholder, added by item 0.4 to exercise the loader; none is historical.
 
-Data file format: `data/<table>.json` = `{"table": "...", "entries": [{"id": "...", "values":
+Data file format: `data/<table>.json` (tables: units, weapons, ammo, materials, organisation, terrain) = `{"table": "...", "entries": [{"id": "...", "values":
 {"<name>": {"value": "853", "unit": "m/s", "source": {...}}}}]}`. `source` is
 `{"kind":"reference","ref":"title, author/publisher, page or URL"}`,
 `{"kind":"estimated","reasoning":"..."}` or `{"kind":"placeholder","note":"..."}`. The loader
-(in `Sim`, so the banned-API scan covers it) rejects a value without a valid source.
+(in `Sim`, so the banned-API scan covers it) rejects a value without a valid source. Each table
+lists its required values with a type: `n` (numeric: strict decimal, at most 9 integer and 9
+fractional digits, so it always fits Q31.32) or `t` (text, kept as written); a value the schema
+doesn't list is numeric unless its unit is `"text"`. Maps are not data tables: they live in
+`data/maps/*.map.json` (format in `src/Sim/Map/MapFile.cs`; wall materials must be ids in
+`materials.json`). To regenerate the test map after editing `TestMapBuilder`, run the tests once
+with `PB_WRITE_TEST_MAP=1`.
 
 **Switching on the no-placeholders test (item 7.7):** in
 `tests/Sim.Tests/Data/NoPlaceholdersTests.cs`, change the one line
