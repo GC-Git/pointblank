@@ -10,9 +10,15 @@ public class TestMapTests
     private static string MapPath() =>
         Path.Combine(DataPaths.DataDirectory(), "maps", "test_300.map.json");
 
-    private static IReadOnlySet<string> MaterialIds() =>
-        DataLoader.LoadDirectory(DataPaths.DataDirectory())
-            .Table("materials").Entries.Select(e => e.Id).ToHashSet();
+    private static readonly DataSet Data = DataLoader.LoadDirectory(DataPaths.DataDirectory());
+
+    [Fact]
+    public void MapLoader_RejectsAWallMaterialThatIsNotInTheData()
+    {
+        var text = File.ReadAllText(MapPath());
+        var e = Assert.Throws<MapException>(() => MapLoader.Parse(text.Replace("brick_wall_sample", "no_such_material"), Data));
+        Assert.Contains("no_such_material", e.Message);
+    }
 
     [Fact]
     public void TestMapFile_IsThe300MetreMapAndMatchesTheGenerator()
@@ -27,7 +33,7 @@ public class TestMapTests
         var text = File.ReadAllText(MapPath());
         Assert.Equal(expected, text);
 
-        var map = MapFile.Parse(text, MaterialIds());
+        var map = MapLoader.Parse(text, Data);
         Assert.Equal(150, map.Width);
         Assert.Equal(150, map.Height);
         Assert.Equal(Fixed.FromInt(300), map.TileSize * Fixed.FromInt(map.Width));
@@ -37,7 +43,7 @@ public class TestMapTests
     [Fact]
     public void TestMap_HasEveryFeature()
     {
-        var map = MapFile.Parse(File.ReadAllText(MapPath()), MaterialIds());
+        var map = MapLoader.Load(MapPath(), Data);
         var types = new HashSet<TerrainType>();
         var elevations = new HashSet<int>();
         for (var y = 0; y < map.Height; y++)

@@ -7,7 +7,7 @@ public class ReplayJsonTests
     private static readonly Replay Sample = new(
         "tally",
         Seed: ulong.MaxValue,
-        Map: new("flat", 1),
+        Map: new("flat", 1, 0xfeedUL),
         Forces: [new("counters", 2)],
         Ticks: 50,
         Orders: [new(0, "add", [5, -3]), new(10, "double", [])],
@@ -16,17 +16,19 @@ public class ReplayJsonTests
     private const string SampleText =
         """
         {
-          "version": 1,
+          "version": 2,
           "scenario": "tally",
           "seed": 18446744073709551615,
           "map": {
             "id": "flat",
-            "version": 1
+            "version": 1,
+            "hash": "000000000000feed"
           },
           "forces": [
             {
               "id": "counters",
-              "version": 2
+              "version": 2,
+              "hash": "0000000000000000"
             }
           ],
           "ticks": 50,
@@ -76,7 +78,7 @@ public class ReplayJsonTests
     }
 
     [Theory]
-    [InlineData("\"version\": 1,\n  \"scenario\"", "\"version\": 2,\n  \"scenario\"")]
+    [InlineData("\"version\": 2,\n  \"scenario\"", "\"version\": 3,\n  \"scenario\"")]
     [InlineData("\"scenario\": \"tally\",", "")]
     [InlineData("\"scenario\": \"tally\"", "\"scenario\": null")]
     [InlineData("\"scenario\": \"tally\"", "\"scenario\": 3")]

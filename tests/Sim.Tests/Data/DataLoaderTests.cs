@@ -211,7 +211,7 @@ public class DataLoaderTests
     public void Sample_data_has_the_required_content()
     {
         var set = DataLoader.LoadDirectory(DataPaths.DataDirectory());
-        Assert.Equal(2, set.Table("weapons").Entries.Count);
+        Assert.Equal(4, set.Table("weapons").Entries.Count);
         Assert.Equal(2, set.Table("ammo").Entries.Count);
         Assert.Equal(2, set.Table("materials").Entries.Count);
         Assert.NotEmpty(set.Table("units").Entries);

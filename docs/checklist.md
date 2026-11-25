@@ -65,7 +65,7 @@ Status: draft, awaiting owner sign-off
   *Done when:* round-trip load/save tests pass, and terrain lookups return the spec'd
   values.
 
-- [ ] **1.2 Line of sight (3D on a 2D map)** (O)
+- [x] **1.2 Line of sight (3D on a 2D map)** (O)
   Eye height by posture (standing, kneeling, prone) and by floor. Blocking and partial
   blocking by hedges, woods, elevation and buildings.
   *Done when:* a prone soldier behind a hedge is unseen from 100 m on flat ground; a

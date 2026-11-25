@@ -30,7 +30,7 @@ public static class DataLoader
         ],
         ["ammo"] = [("caliber", N), ("bullet_mass", N)],
         ["materials"] = [("name", T), ("cover_protection", N), ("penetration_resistance", N)],
-        ["organisation"] = [("name", T), ("unit", T), ("count", N)],
+        ["organisation"] = [("name", T), ("kind", T)],
         ["terrain"] =
         [
             ("name", T), ("cover", N), ("concealment", N), ("move_cost_walk", N),

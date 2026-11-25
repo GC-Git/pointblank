@@ -1,7 +1,11 @@
 namespace PointBlank.Sim.Replays;
 
-/// <summary>A versioned reference to content such as a map or a force list.</summary>
-public sealed record ContentRef(string Id, int Version);
+/// <summary>
+/// A versioned reference to content such as a map or a force list. <paramref name="Hash"/> is
+/// the content's own hash (for a map, <c>GameMap.ComputeContentHash</c>), 0 when there is none;
+/// a replay only plays against content with the same hash.
+/// </summary>
+public sealed record ContentRef(string Id, int Version, ulong Hash = 0);
 
 /// <summary>
 /// An order and the tick it takes effect. The scenario turns <paramref name="Type"/> and

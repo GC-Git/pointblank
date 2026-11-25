@@ -3,8 +3,7 @@ using PointBlank.Sim.Map;
 namespace PointBlank.Sim.Sight;
 
 /// <summary>
-/// Line of sight in 3D over a 2D tile map. The rules are in
-/// <c>docs/superpowers/plans/2026-11-25-item-1.2-los.md</c>; in short:
+/// Line of sight in 3D over a 2D tile map. The rules:
 /// <list type="bullet">
 /// <item>The ray runs eye to eye. Eye height = tile ground + floor × floor height + posture eye height.</item>
 /// <item>The walk always starts from the smaller endpoint (by x, y, eye height), so a check is
@@ -23,6 +22,13 @@ namespace PointBlank.Sim.Sight;
 /// is used, so a continuous hedge line never leaks.</item>
 /// </list>
 /// The map's tiles are copied when this is built: build a new one after the map changes.
+/// <para>
+/// Scheduling (for the spotting system, item 1.6): a check is not run for every pair on every
+/// tick. Each pair is refreshed once every N ticks on a stagger (pair index modulo N picks the
+/// tick), and the last result is used in between. A full 300 × 300 pass costs about 220 ms in a
+/// Release build, far over the 100 ms tick budget, so a pass must be spread over at least 3
+/// ticks (N of 3 or more, more as the pair count grows).
+/// </para>
 /// </summary>
 public sealed class LineOfSight
 {

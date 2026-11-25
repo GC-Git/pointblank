@@ -93,6 +93,7 @@ public class BattleTests
             replay with { Scenario = "other" },
             replay with { Map = new("flat", 2) },
             replay with { Map = new("hills", 1) },
+            replay with { Map = new("flat", 1, 99) },
             replay with { Forces = [] },
             replay with { Forces = [new("counters", 1)] },
         ];

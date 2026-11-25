@@ -24,6 +24,17 @@ public sealed class StateHasher
 
     public void Add(Fixed value) => Add(value.Raw);
 
+    /// <summary>The UTF-8 length, then the bytes.</summary>
+    public void Add(string value)
+    {
+        var bytes = System.Text.Encoding.UTF8.GetBytes(value);
+        Add(bytes.Length);
+        foreach (var b in bytes)
+        {
+            Add(b);
+        }
+    }
+
     private void AddLittleEndian(ulong value, int byteCount)
     {
         for (int i = 0; i < byteCount; i++)
