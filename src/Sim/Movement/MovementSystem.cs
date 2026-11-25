@@ -1,0 +1,551 @@
+using PointBlank.Sim.Map;
+using PointBlank.Sim.Org;
+
+namespace PointBlank.Sim.Movement;
+
+/// <summary>An order to move a squad to a point (metres from the map's north-west corner).</summary>
+public sealed record MoveOrder(int SquadId, Fixed X, Fixed Y, MoveMode Mode);
+
+/// <summary>Delivers a move order to the movement system when it applies.</summary>
+public sealed class MoveOrderInput(MoveOrder order) : ISimInput
+{
+    public MoveOrder Order { get; } = order;
+
+    public void Apply(World world) => world.GetSystem<MovementSystem>().Deliver(Order);
+}
+
+/// <summary>
+/// Moves squads. A squad has one path (A* from the centre of its able men to the target tile) and a
+/// "guide" that walks it at the mode's speed, slowed by terrain and hedges exactly as the path cost
+/// assumes. Each able man has a slot in a staggered column behind the guide along the path (the
+/// leader's slot is the guide); he picks the nearest free tile to his slot, finds his own path
+/// there and walks it. The guide waits while a man is further than the leash from his slot. Men do
+/// not share a final tile: a tile that another squad's idle man holds, or an earlier man of the same
+/// squad has claimed, is skipped. Dead and incapacitated men do not move. Register after
+/// <see cref="OrgSystem"/>.
+/// </summary>
+public sealed class MovementSystem : ISimSystem
+{
+    private const int SnapRadius = 6;
+
+    private static readonly Fixed HalfTile = Fixed.FromRatio(1, 2);
+    private static readonly Fixed InvSqrt2 = Fixed.One / Fixed.Sqrt(Fixed.FromInt(2));
+
+    private readonly GameMap _map;
+    private readonly OrgSystem _org;
+    private readonly Dictionary<int, Guide> _guides = [];
+    private readonly Dictionary<int, Member> _members = [];
+
+    public MovementSystem(GameMap map, OrgSystem org, MovementRules rules)
+    {
+        _map = map;
+        _org = org;
+        Rules = rules;
+        Paths = new PathFinder(map, rules);
+    }
+
+    public MovementRules Rules { get; }
+
+    public PathFinder Paths { get; }
+
+    /// <summary>Whether the squad has a move order it has not finished.</summary>
+    public bool IsMoving(int squadId) => _guides.ContainsKey(squadId);
+
+    /// <summary>
+    /// Where an order enters the movement system. Item 1.5 puts the chain-of-command delay in front
+    /// of this: it will hold orders and call <see cref="Execute"/> when they are due. Today the
+    /// order executes at once.
+    /// </summary>
+    public void Deliver(MoveOrder order) => Execute(order);
+
+    /// <summary>
+    /// Starts the order: plans the squad's path and sets every able man's posture to the mode's.
+    /// Returns false (and changes nothing) when no able man is left or the target cannot be reached.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">There is no such squad.</exception>
+    public bool Execute(MoveOrder order)
+    {
+        var squad = _org.Squads.FirstOrDefault(s => s.Id == order.SquadId)
+            ?? throw new InvalidOperationException($"No squad {order.SquadId}.");
+        var active = squad.Soldiers.Where(IsAble).ToList();
+        if (active.Count == 0)
+        {
+            return false;
+        }
+
+        var sumX = Fixed.Zero;
+        var sumY = Fixed.Zero;
+        foreach (var s in active)
+        {
+            sumX += s.X;
+            sumY += s.Y;
+        }
+
+        var count = Fixed.FromInt(active.Count);
+        var path = Paths.FindPath(TileOf(sumX / count, sumY / count), TileOf(order.X, order.Y), order.Mode);
+        if (path == null)
+        {
+            return false;
+        }
+
+        _guides[squad.Id] = new Guide(order.Mode, path, TileOf(order.X, order.Y))
+        {
+            Seg = path.Count == 1 ? 0 : 1,
+            Done = path.Count == 1,
+        };
+        foreach (var s in active)
+        {
+            _members[s.Id] = new Member { SinceReplan = int.MaxValue / 2 };
+            s.Posture = Rules.PostureOf(order.Mode);
+        }
+
+        return true;
+    }
+
+    public void Tick(World world)
+    {
+        if (_guides.Count == 0)
+        {
+            return;
+        }
+
+        var idle = IdleTiles();
+        foreach (var squad in _org.Squads)
+        {
+            if (_guides.TryGetValue(squad.Id, out var guide))
+            {
+                Step(squad, guide, idle);
+            }
+        }
+    }
+
+    public void AppendState(StateHasher hasher)
+    {
+        hasher.Add(_org.Squads.Count);
+        foreach (var squad in _org.Squads)
+        {
+            var has = _guides.TryGetValue(squad.Id, out var g);
+            hasher.Add(has);
+            if (has)
+            {
+                hasher.Add((byte)g!.Mode);
+                hasher.Add(g.Target.X);
+                hasher.Add(g.Target.Y);
+                hasher.Add(g.Path.Count);
+                foreach (var t in g.Path)
+                {
+                    hasher.Add(t.X);
+                    hasher.Add(t.Y);
+                }
+
+                hasher.Add(g.Seg);
+                hasher.Add(g.P);
+                hasher.Add(g.Done);
+            }
+
+            foreach (var soldier in squad.Soldiers)
+            {
+                var hm = _members.TryGetValue(soldier.Id, out var m);
+                hasher.Add(hm);
+                if (!hm)
+                {
+                    continue;
+                }
+
+                hasher.Add(m!.HasGoal);
+                hasher.Add(m.Goal.X);
+                hasher.Add(m.Goal.Y);
+                hasher.Add(m.Stuck);
+                hasher.Add(m.SinceReplan);
+                hasher.Add(m.Path?.Count ?? -1);
+                if (m.Path != null)
+                {
+                    foreach (var t in m.Path)
+                    {
+                        hasher.Add(t.X);
+                        hasher.Add(t.Y);
+                    }
+
+                    hasher.Add(m.Seg);
+                    hasher.Add(m.P);
+                    hasher.Add(m.StartX);
+                    hasher.Add(m.StartY);
+                    hasher.Add(m.FirstFraction);
+                }
+            }
+        }
+    }
+
+    private static bool IsAble(Soldier s) => s.Health is HealthState.Ok or HealthState.Wounded;
+
+    private static Fixed Square(Fixed v) => v * v;
+
+    private static Fixed Lerp(Fixed a, Fixed b, Fixed t) => a + ((b - a) * t);
+
+    private void Step(Squad squad, Guide guide, Dictionary<int, int> idle)
+    {
+        var active = new List<Soldier>();
+        foreach (var s in squad.Soldiers)
+        {
+            if (IsAble(s))
+            {
+                active.Add(s);
+            }
+            else
+            {
+                _members.Remove(s.Id);
+            }
+        }
+
+        if (active.Count == 0)
+        {
+            _guides.Remove(squad.Id);
+            return;
+        }
+
+        var targetBuilding = _map.BuildingAt(guide.Target.X, guide.Target.Y);
+        var claimed = new HashSet<int>();
+        var slots = new (Fixed X, Fixed Y)[active.Count];
+        var goals = new TilePos[active.Count];
+        for (var i = 0; i < active.Count; i++)
+        {
+            slots[i] = SlotPoint(guide, i);
+            goals[i] = PickGoal(slots[i], targetBuilding, claimed, idle, squad.Id);
+            claimed.Add((goals[i].Y * _map.Width) + goals[i].X);
+        }
+
+        if (!guide.Done && !AnyBeyondLeash(active, slots))
+        {
+            AdvanceGuide(guide);
+        }
+
+        var finished = guide.Done;
+        for (var i = 0; i < active.Count; i++)
+        {
+            var soldier = active[i];
+            if (!_members.TryGetValue(soldier.Id, out var m))
+            {
+                _members[soldier.Id] = m = new Member { SinceReplan = int.MaxValue / 2 };
+            }
+
+            m.SinceReplan = Math.Min(m.SinceReplan + 1, int.MaxValue / 2);
+            if (!m.HasGoal || (m.Goal != goals[i] && m.SinceReplan >= Rules.ReplanTicks))
+            {
+                Replan(m, soldier, goals[i], guide.Mode);
+            }
+
+            MoveMember(m, soldier, guide.Mode);
+            finished &= m.Path == null && m.HasGoal && m.Goal == goals[i];
+        }
+
+        if (finished)
+        {
+            _guides.Remove(squad.Id);
+            foreach (var s in active)
+            {
+                _members.Remove(s.Id);
+            }
+        }
+    }
+
+    private bool AnyBeyondLeash(List<Soldier> active, (Fixed X, Fixed Y)[] slots)
+    {
+        var leash2 = Square(Rules.Leash);
+        for (var i = 0; i < active.Count; i++)
+        {
+            if (_members.TryGetValue(active[i].Id, out var m) && m.Stuck)
+            {
+                continue;
+            }
+
+            if (Square(active[i].X - slots[i].X) + Square(active[i].Y - slots[i].Y) > leash2)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void AdvanceGuide(Guide g)
+    {
+        var tile = _map.TileSize;
+        var budget = Rules.Speed(g.Mode) * World.TickDuration;
+        while (budget > Fixed.Zero && !g.Done)
+        {
+            var cost = Paths.StepCost(g.Path[g.Seg - 1], g.Path[g.Seg], g.Mode) * tile;
+            var need = cost * (Fixed.One - g.P);
+            if (budget >= need)
+            {
+                budget -= need;
+                if (g.Seg == g.Path.Count - 1)
+                {
+                    g.P = Fixed.One;
+                    g.Done = true;
+                }
+                else
+                {
+                    g.Seg++;
+                    g.P = Fixed.Zero;
+                }
+            }
+            else
+            {
+                g.P += budget / cost;
+                budget = Fixed.Zero;
+            }
+        }
+    }
+
+    private void Replan(Member m, Soldier s, TilePos goal, MoveMode mode)
+    {
+        m.Goal = goal;
+        m.HasGoal = true;
+        m.SinceReplan = 0;
+        m.Stuck = false;
+        m.Path = null;
+        var start = TileOf(s.X, s.Y);
+        var path = Paths.FindPath(start, goal, mode);
+        if (path == null)
+        {
+            m.Stuck = true;
+            return;
+        }
+
+        if (path.Count == 1)
+        {
+            path.Add(start);
+        }
+
+        var target = Centre(path[1]);
+        var dx = target.X - s.X;
+        var dy = target.Y - s.Y;
+        if (dx == Fixed.Zero && dy == Fixed.Zero && path.Count == 2)
+        {
+            return;
+        }
+
+        var full = StepLength(path[0], path[1]) * _map.TileSize;
+        m.Path = path;
+        m.Seg = 1;
+        m.P = Fixed.Zero;
+        m.StartX = s.X;
+        m.StartY = s.Y;
+        m.FirstFraction = Fixed.Sqrt(Square(dx) + Square(dy)) / full;
+    }
+
+    private void MoveMember(Member m, Soldier s, MoveMode mode)
+    {
+        if (m.Path == null)
+        {
+            return;
+        }
+
+        var tile = _map.TileSize;
+        var budget = Rules.Speed(mode) * World.TickDuration;
+        while (budget > Fixed.Zero && m.Path != null)
+        {
+            var b = m.Path[m.Seg];
+            var cost = Paths.StepCost(m.Path[m.Seg - 1], b, mode) * tile * (m.Seg == 1 ? m.FirstFraction : Fixed.One);
+            var need = cost * (Fixed.One - m.P);
+            if (cost <= Fixed.Zero || budget >= need)
+            {
+                budget -= need;
+                var c = Centre(b);
+                s.X = c.X;
+                s.Y = c.Y;
+                m.Seg++;
+                m.P = Fixed.Zero;
+                if (m.Seg >= m.Path.Count)
+                {
+                    m.Path = null;
+                }
+            }
+            else
+            {
+                m.P += budget / cost;
+                budget = Fixed.Zero;
+                var from = m.Seg == 1 ? (m.StartX, m.StartY) : Centre(m.Path[m.Seg - 1]);
+                var to = Centre(b);
+                s.X = Lerp(from.Item1, to.X, m.P);
+                s.Y = Lerp(from.Item2, to.Y, m.P);
+            }
+        }
+    }
+
+    /// <summary>Tiles held by idle men, mapped to the squad whose man is there (the lowest squad id wins).</summary>
+    private Dictionary<int, int> IdleTiles()
+    {
+        var idle = new Dictionary<int, int>();
+        foreach (var squad in _org.Squads)
+        {
+            foreach (var s in squad.Soldiers)
+            {
+                if (IsAble(s) && (!_members.TryGetValue(s.Id, out var m) || m.Path == null))
+                {
+                    var t = TileOf(s.X, s.Y);
+                    idle.TryAdd((t.Y * _map.Width) + t.X, squad.Id);
+                }
+            }
+        }
+
+        return idle;
+    }
+
+    private TilePos PickGoal(
+        (Fixed X, Fixed Y) point, Building? targetBuilding, HashSet<int> claimed, Dictionary<int, int> idle, int squadId)
+    {
+        var centre = TileOf(point.X, point.Y);
+        for (var r = 0; r <= SnapRadius; r++)
+        {
+            TilePos? best = null;
+            var bestDist = Fixed.MaxValue;
+            for (var y = centre.Y - r; y <= centre.Y + r; y++)
+            {
+                for (var x = centre.X - r; x <= centre.X + r; x++)
+                {
+                    if (Math.Max(Math.Abs(x - centre.X), Math.Abs(y - centre.Y)) != r || !_map.InBounds(x, y))
+                    {
+                        continue;
+                    }
+
+                    var b = _map.BuildingAt(x, y);
+                    var index = (y * _map.Width) + x;
+                    if ((b != null && b != targetBuilding) || claimed.Contains(index)
+                        || (idle.TryGetValue(index, out var owner) && owner != squadId))
+                    {
+                        continue;
+                    }
+
+                    var c = Centre(new TilePos(x, y));
+                    var d = Square(c.X - point.X) + Square(c.Y - point.Y);
+                    if (d < bestDist)
+                    {
+                        bestDist = d;
+                        best = new TilePos(x, y);
+                    }
+                }
+            }
+
+            if (best != null)
+            {
+                return best.Value;
+            }
+        }
+
+        return centre;
+    }
+
+    /// <summary>
+    /// A man's slot: slot 0 is the guide; slot n sits (n+1)/2 ranks behind it along the path, left
+    /// for odd n and right for even n, offset sideways from the path's direction there. Before the
+    /// start of the path a slot stays at the start tile (the column unwinds as the guide moves).
+    /// </summary>
+    private (Fixed X, Fixed Y) SlotPoint(Guide g, int slot)
+    {
+        var row = (slot + 1) / 2;
+        var back = Rules.Spacing * Fixed.FromInt(row);
+        var lateral = slot == 0 ? Fixed.Zero : (slot % 2 == 1 ? -Rules.Lateral : Rules.Lateral);
+        var path = g.Path;
+        Fixed x;
+        Fixed y;
+        (Fixed X, Fixed Y) dir = (Fixed.One, Fixed.Zero);
+        if (path.Count == 1)
+        {
+            var c = Centre(path[0]);
+            (x, y) = (c.X, c.Y);
+        }
+        else
+        {
+            var k = g.Seg;
+            var travelled = g.P * (StepLength(path[k - 1], path[k]) * _map.TileSize);
+            var rest = back;
+            while (true)
+            {
+                dir = Unit(path[k - 1], path[k]);
+                if (rest <= travelled)
+                {
+                    var a = Centre(path[k - 1]);
+                    var d = travelled - rest;
+                    (x, y) = (a.X + (dir.X * d), a.Y + (dir.Y * d));
+                    break;
+                }
+
+                rest -= travelled;
+                k--;
+                if (k < 1)
+                {
+                    var a = Centre(path[0]);
+                    (x, y) = (a.X, a.Y);
+                    break;
+                }
+
+                travelled = StepLength(path[k - 1], path[k]) * _map.TileSize;
+            }
+        }
+
+        return (x + (-dir.Y * lateral), y + (dir.X * lateral));
+    }
+
+    private static Fixed StepLength(TilePos a, TilePos b) =>
+        a.X != b.X && a.Y != b.Y ? PathFinder.Diagonal : Fixed.One;
+
+    private static (Fixed X, Fixed Y) Unit(TilePos a, TilePos b)
+    {
+        var dx = Math.Sign(b.X - a.X);
+        var dy = Math.Sign(b.Y - a.Y);
+        var scale = dx != 0 && dy != 0 ? InvSqrt2 : Fixed.One;
+        return (Fixed.FromInt(dx) * scale, Fixed.FromInt(dy) * scale);
+    }
+
+    private (Fixed X, Fixed Y) Centre(TilePos t) =>
+        (_map.TileSize * (Fixed.FromInt(t.X) + HalfTile), _map.TileSize * (Fixed.FromInt(t.Y) + HalfTile));
+
+    private TilePos TileOf(Fixed x, Fixed y)
+    {
+        var tx = x < Fixed.Zero ? 0 : (x / _map.TileSize).ToInt();
+        var ty = y < Fixed.Zero ? 0 : (y / _map.TileSize).ToInt();
+        return new TilePos(Math.Min(tx, _map.Width - 1), Math.Min(ty, _map.Height - 1));
+    }
+
+    private sealed class Guide(MoveMode mode, List<TilePos> path, TilePos target)
+    {
+        public MoveMode Mode { get; } = mode;
+
+        public List<TilePos> Path { get; } = path;
+
+        public TilePos Target { get; } = target;
+
+        /// <summary>The guide is on the segment from <c>Path[Seg - 1]</c> to <c>Path[Seg]</c>, P of the way along.</summary>
+        public int Seg { get; set; }
+
+        public Fixed P { get; set; }
+
+        public bool Done { get; set; }
+    }
+
+    private sealed class Member
+    {
+        public bool HasGoal { get; set; }
+
+        public TilePos Goal { get; set; }
+
+        public bool Stuck { get; set; }
+
+        public int SinceReplan { get; set; }
+
+        /// <summary>The man's own path, or null when he is idle. He walks from his start point to <c>Path[Seg]</c>.</summary>
+        public List<TilePos>? Path { get; set; }
+
+        public int Seg { get; set; }
+
+        public Fixed P { get; set; }
+
+        public Fixed StartX { get; set; }
+
+        public Fixed StartY { get; set; }
+
+        /// <summary>How much of a full first step the walk from the start point to <c>Path[1]</c> is.</summary>
+        public Fixed FirstFraction { get; set; }
+    }
+}

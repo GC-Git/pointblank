@@ -123,7 +123,7 @@ The authoritative list is the report: `dotnet run --project tools/Runner -- --da
 (it lists every placeholder as `table/entry/value`). Currently every value in `data/` is a
 sample placeholder, added by item 0.4 to exercise the loader; none is historical.
 
-Data file format: `data/<table>.json` (tables: units, weapons, ammo, materials, organisation, terrain, postures, sight) = `{"table": "...", "entries": [{"id": "...", "values":
+Data file format: `data/<table>.json` (tables: units, weapons, ammo, materials, organisation, terrain, postures, sight, movement, formation) = `{"table": "...", "entries": [{"id": "...", "values":
 {"<name>": {"value": "853", "unit": "m/s", "source": {...}}}}]}`. `source` is
 `{"kind":"reference","ref":"title, author/publisher, page or URL"}`,
 `{"kind":"estimated","reasoning":"..."}` or `{"kind":"placeholder","note":"..."}`. The loader

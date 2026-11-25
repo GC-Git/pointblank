@@ -1,0 +1,32 @@
+{
+  "table": "movement",
+  "entries": [
+    {
+      "id": "move",
+      "values": {
+        "name": { "value": "Move", "unit": "text", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
+        "speed": { "value": "1.5", "unit": "m/s", "source": { "kind": "placeholder", "note": "Placeholder: speed on open ground." } },
+        "posture": { "value": "standing", "unit": "text", "source": { "kind": "placeholder", "note": "Placeholder: an id in postures.json." } },
+        "terrain_cost": { "value": "walk", "unit": "text", "source": { "kind": "placeholder", "note": "Placeholder: which terrain move_cost_* column applies (walk, fast or sneak)." } }
+      }
+    },
+    {
+      "id": "move_fast",
+      "values": {
+        "name": { "value": "Move fast", "unit": "text", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
+        "speed": { "value": "3", "unit": "m/s", "source": { "kind": "placeholder", "note": "Placeholder: speed on open ground." } },
+        "posture": { "value": "standing", "unit": "text", "source": { "kind": "placeholder", "note": "Placeholder: an id in postures.json." } },
+        "terrain_cost": { "value": "fast", "unit": "text", "source": { "kind": "placeholder", "note": "Placeholder: which terrain move_cost_* column applies (walk, fast or sneak)." } }
+      }
+    },
+    {
+      "id": "sneak",
+      "values": {
+        "name": { "value": "Sneak", "unit": "text", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
+        "speed": { "value": "0.6", "unit": "m/s", "source": { "kind": "placeholder", "note": "Placeholder: speed on open ground (a crouched walk)." } },
+        "posture": { "value": "kneeling", "unit": "text", "source": { "kind": "placeholder", "note": "Placeholder: crouched walk, so kneeling; an id in postures.json." } },
+        "terrain_cost": { "value": "sneak", "unit": "text", "source": { "kind": "placeholder", "note": "Placeholder: which terrain move_cost_* column applies (walk, fast or sneak)." } }
+      }
+    }
+  ]
+}

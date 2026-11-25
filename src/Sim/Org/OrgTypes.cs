@@ -126,6 +126,13 @@ public sealed class Squad
     /// <summary>Ticks until the next leader takes over, 0 when none is pending.</summary>
     public int TicksToSuccession { get; private set; }
 
+    /// <summary>
+    /// Sets a soldier's health. Command is never handed back: once a leader has gone down (dead or
+    /// incapacitated) the post is vacant and passes down the line of succession, so a soldier
+    /// restored to Ok or Wounded afterwards stays a follower. A restored former leader (succession
+    /// order 0) is not in the line and never leads again; a restored deputy can lead only if the
+    /// post is vacant again later.
+    /// </summary>
     public void SetHealth(int soldierId, HealthState health)
     {
         var soldier = Soldiers.FirstOrDefault(s => s.Id == soldierId)
