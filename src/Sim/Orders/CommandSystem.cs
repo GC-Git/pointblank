@@ -30,21 +30,21 @@ public sealed class CommandSystem(OrgSystem org, MovementSystem move, CommandRul
     public CommandRules Rules { get; } = rules;
 
     /// <summary>The unit's latest order and its state, for the UI. Status None when it has had none.</summary>
-    public OrderView StatusOf(int unitId) =>
+    internal OrderView StatusOf(int unitId) =>
         _tickets.TryGetValue(unitId, out var t)
             ? new OrderView(unitId, t.Order, t.Status, t.Remaining, t.Total, t.Reasons, t.Note, t.Issued)
             : new OrderView(unitId, null, OrderStatus.None, 0, 0, DelayReason.None, OrderNote.None, -1);
 
     /// <summary>The reasons an order issued now would be delayed (a UI preview).</summary>
     /// <exception cref="InvalidOperationException">There is no such unit.</exception>
-    public DelayReason ReasonsFor(int unitId) => Reasons(Find(unitId));
+    internal DelayReason ReasonsFor(int unitId) => Reasons(Find(unitId));
 
     /// <summary>
     /// An HQ is always in contact. A squad is in contact when an HQ of its side that has an able man
     /// is within the command radius (between the centres of their able men), or when both the squad
     /// and that HQ have a radio. With no such HQ on the map it is out of contact.
     /// </summary>
-    public bool InContact(Squad squad)
+    internal bool InContact(Squad squad)
     {
         if (squad.IsHq)
         {
@@ -80,7 +80,7 @@ public sealed class CommandSystem(OrgSystem org, MovementSystem move, CommandRul
     /// Orders rejected before reaching a ticket (unknown unit, wrong side, unknown kind), oldest first.
     /// Part of the state hash.
     /// </summary>
-    public IReadOnlyList<IssueRejection> Rejections => _rejections;
+    internal IReadOnlyList<IssueRejection> Rejections => _rejections;
 
     /// <summary>
     /// Puts an order into the chain of command (called by <see cref="IssueOrderInput"/>). Never throws
@@ -91,7 +91,7 @@ public sealed class CommandSystem(OrgSystem org, MovementSystem move, CommandRul
     /// here, at issue: if the leader falls (or morale changes) while the order is Pending it is not
     /// re-rolled.
     /// </summary>
-    public IssueResult Issue(World world, string side, int unitId, Order order)
+    internal IssueResult Issue(World world, string side, int unitId, Order order)
     {
         var squad = org.Squads.FirstOrDefault(s => s.Id == unitId);
         var refused = squad == null ? IssueResult.UnknownUnit

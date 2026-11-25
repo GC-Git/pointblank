@@ -7,4 +7,14 @@
     <RootNamespace>PointBlank.Sim</RootNamespace>
   </PropertyGroup>
 
+  <!-- The fog-of-war boundary: raw state of both sides is internal. Only the tests and the headless
+       runner (a sim-side harness, not UI or AI) see it; the game uses World.ViewFor. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Sim.Tests" />
+    <InternalsVisibleTo Include="runner" />
+  </ItemGroup>
+
+  <PropertyGroup>
+  </PropertyGroup>
+
 </Project>

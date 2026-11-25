@@ -42,7 +42,7 @@ public readonly record struct ContactView(
     int SeenBy);
 
 /// <summary>One side's knowledge of enemy contacts, keyed by enemy soldier id.</summary>
-public sealed class SideKnowledge
+internal sealed class SideKnowledge
 {
     internal SideKnowledge(string side) => Side = side;
 
@@ -157,14 +157,14 @@ public sealed class SpottingSystem : ISimSystem
     /// The only way the UI and the AI read enemies: what <paramref name="side"/> knows, last-known
     /// data only, as a copy ordered by enemy id. Empty for a side with no knowledge.
     /// </summary>
-    public IReadOnlyList<ContactView> KnownEnemies(string side) =>
+    internal IReadOnlyList<ContactView> KnownEnemies(string side) =>
         _sides.TryGetValue(side, out var k) ? k.Snapshot() : [];
 
     /// <summary>Every side's knowledge, ordered by side name.</summary>
-    public IReadOnlyCollection<SideKnowledge> Sides => _sides.Count == 0 ? NoSides : _sides.Values;
+    internal IReadOnlyCollection<SideKnowledge> Sides => _sides.Count == 0 ? NoSides : _sides.Values;
 
     /// <summary>Records that a soldier fired (item 1.7 calls this); it is easier to spot for the firing window.</summary>
-    public void NoteFired(int soldierId, long tick)
+    internal void NoteFired(int soldierId, long tick)
     {
         Sync();
         if (_indexOf.TryGetValue(soldierId, out var i))

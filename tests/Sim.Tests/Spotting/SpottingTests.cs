@@ -245,8 +245,8 @@ public class SpottingTests(ITestOutputHelper output)
             Assert.True(t.IsPrimitive || t.IsEnum || t == typeof(Fixed), $"{t.Name} could leak live state");
         }
 
-        var query = typeof(SpottingSystem).GetMethod(nameof(SpottingSystem.KnownEnemies))!;
-        Assert.Equal(typeof(IReadOnlyList<ContactView>), query.ReturnType);
+        var query = typeof(SideView).GetProperty(nameof(SideView.KnownEnemies))!;
+        Assert.Equal(typeof(IReadOnlyList<ContactView>), query.PropertyType);
     }
 
     [Fact]

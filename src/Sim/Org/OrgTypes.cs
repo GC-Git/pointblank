@@ -69,11 +69,11 @@ public sealed class Soldier
     public int TeamIndex { get; }
 
     /// <summary>Metres from the map's north-west corner (x east, y south).</summary>
-    public Fixed X { get; set; }
+    public Fixed X { get; internal set; }
 
-    public Fixed Y { get; set; }
+    public Fixed Y { get; internal set; }
 
-    public Posture Posture { get; set; }
+    public Posture Posture { get; internal set; }
 
     public HealthState Health { get; internal set; }
 
