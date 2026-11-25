@@ -16,8 +16,9 @@ owner wants to sell it someday.
 |---|---|
 | `src/Sim/` | Pure C# deterministic simulation core. All game rules. |
 | `tests/Sim.Tests/` | xUnit tests, run headless. |
+| `tools/Runner/` | Headless battle runner CLI and its scenarios. References `Sim`. |
 | `game/` | Godot 4.7 .NET project. Rendering and input only. References `Sim`. |
-| `PointBlank.sln` | All three projects. Godot builds this one (`solution_directory=".."`). |
+| `PointBlank.sln` | All four projects. Godot builds this one (`solution_directory=".."`). |
 | `docs/` | Spec, checklist, plans, process prompts. |
 
 Requires .NET SDK 9 and the .NET 8 runtime (projects target `net8.0`, the default of
@@ -35,6 +36,20 @@ Test:
 
 ```powershell
 dotnet test PointBlank.sln
+```
+
+Run battles headless and save their stats (add `--replays <directory>` to keep one
+replay file per seed):
+
+```powershell
+dotnet run --project tools/Runner -- --scenario wander --seeds 1..100 --out TestResults/stats.json
+```
+
+Re-run a saved replay and check its final hash (exit code 0 match, 1 mismatch, 2 bad
+input):
+
+```powershell
+dotnet run --project tools/Runner -- --replay TestResults/replays/wander-seed1.replay.json
 ```
 
 Build the C# project through Godot (headless):
@@ -61,7 +76,8 @@ lines.
    Use `Fixed` (Q31.32) for numbers, `World.Rng` for randomness, `World.Tick` for time,
    and add every new piece of state to the state hash (`ISimSystem.AppendState`). A text
    scan fails the tests on banned APIs; its rules and allow list are in
-   `tests/Sim.Tests/Determinism/`. It can't see unnamed types, so check what new
+   `tests/Sim.Tests/Determinism/`. It covers `tools/Runner/Scenarios/` too, because
+   scenarios advance the battle. It can't see unnamed types, so check what new
    library calls return.
 3. **No hard-coded historical numbers.** They belong in data files.
 4. **Every data value has a source tag**: a reference (title, author/publisher, page or
@@ -73,8 +89,17 @@ lines.
 7. **One checklist item per session, branch and pull request.** Tests from the item's
    "Done when" list are written first. Tick the item only when its PR is merged.
 8. **Never push to `main`**, never force push, never merge your own PR. The owner's
-   merge is the sign-off.
+   merge is the sign-off, except where the merge rule below applies.
 9. **Delete only inside the repo**, using relative paths.
+10. **Run `git push` and `gh pr create` as separate commands.** Combined in one line,
+    `--base main` trips the push-to-main deny rule.
+
+## Merge rule (owner's standing instruction, 2026-11-25)
+
+The coordinating session may merge a checklist item's PR when the independent evaluator's
+verdict is MERGE and all tests pass, then start the next item. It stops and waits for the
+owner at every ⛳ sign-off item, on any evaluator FAIL or DON'T MERGE, or if a build
+session is blocked. Build sessions never merge their own PR.
 
 ## Permissions
 

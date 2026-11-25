@@ -34,7 +34,7 @@ Status: draft, awaiting owner sign-off
   runs headless (`--headless --quit`) with no errors. Settings deny `git push origin
   main`.
 
-- [ ] **0.2 Deterministic clock and RNG** (S)
+- [x] **0.2 Deterministic clock and RNG** (S)
   Fixed-timestep world loop (10 ticks per simulated second), one seeded RNG, and a world
   state hash.
   *Done when:* the same seed and the same scripted inputs give an identical state hash
