@@ -1,0 +1,19 @@
+# Godot
+.godot/
+exports/
+game/export/
+*.pck
+
+# .NET
+bin/
+obj/
+*.user
+TestResults/
+
+# IDEs
+.vs/
+.idea/
+
+# Claude Code (machine-local)
+.claude/settings.local.json
+.claude/worktrees/
