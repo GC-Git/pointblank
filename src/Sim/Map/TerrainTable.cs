@@ -47,6 +47,7 @@ public sealed class TerrainTable
             Num("move_cost_walk"),
             Num("move_cost_fast"),
             Num("move_cost_sneak"),
-            Num("block_height"));
+            Num("block_height"),
+            Num("los_obscurement"));
     }
 }

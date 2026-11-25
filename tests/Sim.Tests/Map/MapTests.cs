@@ -53,7 +53,7 @@ public class MapTests
 
         var hedge = table.Hedge;
         Assert.Equal(Fixed.FromRatio(3, 5), hedge.Cover);
-        Assert.Equal(Fixed.FromInt(2), hedge.BlockHeight);
+        Assert.Equal(Fixed.FromRatio(14, 10), hedge.BlockHeight);
     }
 
     [Fact]
