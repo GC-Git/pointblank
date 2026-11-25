@@ -58,7 +58,7 @@ Status: draft, awaiting owner sign-off
 
 ## Milestone 1 — Core simulation (first playable, part 1)
 
-- [ ] **1.1 Map model** (S)
+- [x] **1.1 Map model** (S)
   Tile map: elevation per tile, terrain type (open, road, hedge, light woods to start),
   and per-type cover, concealment and movement cost. Buildings as footprints with 1–3
   floors. Map file format and a 300 × 300 m test map.

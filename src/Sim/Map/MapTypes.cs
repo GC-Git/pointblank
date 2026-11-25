@@ -50,11 +50,15 @@ public readonly record struct TilePos(int X, int Y) : IComparable<TilePos>
 /// <summary>A door or window on one edge of a building tile, on one floor.</summary>
 public sealed record Opening(TilePos Tile, WallSide Side, OpeningKind Kind, int Floor);
 
-/// <summary>The cover, concealment and movement cost of one terrain type, from the data file.</summary>
+/// <summary>
+/// The cover, concealment, movement cost, block height and line-of-sight obscurement of one
+/// terrain type, from the data file. Obscurement is per metre for tiles, per crossing for hedges.
+/// </summary>
 public sealed record TerrainProperties(
     Fixed Cover,
     Fixed Concealment,
     Fixed MoveCostWalk,
     Fixed MoveCostFast,
     Fixed MoveCostSneak,
-    Fixed BlockHeight);
+    Fixed BlockHeight,
+    Fixed LosObscurement);

@@ -1,0 +1,26 @@
+{
+  "table": "postures",
+  "entries": [
+    {
+      "id": "standing",
+      "values": {
+        "name": { "value": "Standing", "unit": "text", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
+        "eye_height": { "value": "1.6", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: eye height above the ground or floor." } }
+      }
+    },
+    {
+      "id": "kneeling",
+      "values": {
+        "name": { "value": "Kneeling", "unit": "text", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
+        "eye_height": { "value": "1", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: eye height above the ground or floor." } }
+      }
+    },
+    {
+      "id": "prone",
+      "values": {
+        "name": { "value": "Prone", "unit": "text", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
+        "eye_height": { "value": "0.3", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: eye height above the ground or floor." } }
+      }
+    }
+  ]
+}

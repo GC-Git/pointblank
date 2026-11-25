@@ -10,7 +10,8 @@
         "move_cost_walk": { "value": "1", "unit": "multiplier", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
         "move_cost_fast": { "value": "1.5", "unit": "multiplier", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
         "move_cost_sneak": { "value": "3", "unit": "multiplier", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
-        "block_height": { "value": "0", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } }
+        "block_height": { "value": "0", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
+        "los_obscurement": { "value": "0", "unit": "per m", "source": { "kind": "placeholder", "note": "Placeholder: line-of-sight obscurement per metre of ray below block_height." } }
       }
     },
     {
@@ -22,7 +23,8 @@
         "move_cost_walk": { "value": "0.8", "unit": "multiplier", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
         "move_cost_fast": { "value": "1.2", "unit": "multiplier", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
         "move_cost_sneak": { "value": "2.5", "unit": "multiplier", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
-        "block_height": { "value": "0", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } }
+        "block_height": { "value": "0", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
+        "los_obscurement": { "value": "0", "unit": "per m", "source": { "kind": "placeholder", "note": "Placeholder: line-of-sight obscurement per metre of ray below block_height." } }
       }
     },
     {
@@ -34,7 +36,8 @@
         "move_cost_walk": { "value": "2", "unit": "multiplier", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
         "move_cost_fast": { "value": "3", "unit": "multiplier", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
         "move_cost_sneak": { "value": "4", "unit": "multiplier", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
-        "block_height": { "value": "8", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } }
+        "block_height": { "value": "8", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
+        "los_obscurement": { "value": "0.04", "unit": "per m", "source": { "kind": "placeholder", "note": "Placeholder: line-of-sight obscurement per metre of ray below block_height (25 m of woods blocks)." } }
       }
     },
     {
@@ -46,7 +49,8 @@
         "move_cost_walk": { "value": "3", "unit": "multiplier", "source": { "kind": "placeholder", "note": "Placeholder: cost of crossing the edge." } },
         "move_cost_fast": { "value": "6", "unit": "multiplier", "source": { "kind": "placeholder", "note": "Placeholder: cost of crossing the edge." } },
         "move_cost_sneak": { "value": "6", "unit": "multiplier", "source": { "kind": "placeholder", "note": "Placeholder: cost of crossing the edge." } },
-        "block_height": { "value": "2", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } }
+        "block_height": { "value": "1.4", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: below a standing man's eye (1.6 m), above a kneeling one's." } },
+        "los_obscurement": { "value": "1", "unit": "per crossing", "source": { "kind": "placeholder", "note": "Placeholder: line-of-sight obscurement per crossing below the hedge top (opaque)." } }
       }
     }
   ]

@@ -1,0 +1,13 @@
+{
+  "table": "sight",
+  "entries": [
+    {
+      "id": "default",
+      "values": {
+        "name": { "value": "Line-of-sight rules", "unit": "text", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
+        "floor_height": { "value": "3", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: storey height of a building; its walls are floors x this." } },
+        "block_threshold": { "value": "1", "unit": "ratio", "source": { "kind": "placeholder", "note": "Placeholder: accumulated obscurement at which a ray is blocked." } }
+      }
+    }
+  ]
+}
