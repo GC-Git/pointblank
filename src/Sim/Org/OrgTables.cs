@@ -5,7 +5,8 @@ namespace PointBlank.Sim.Org;
 public sealed record SlotTemplate(string Key, string TeamId, Role Role, string WeaponId, int Rank, int SuccessionOrder);
 
 public sealed record SquadTemplate(
-    string Id, string Name, string Side, int DelayTicks, Fixed LeaderBonus, IReadOnlyList<SlotTemplate> Slots);
+    string Id, string Name, string Side, int DelayTicks, Fixed LeaderBonus, IReadOnlyList<SlotTemplate> Slots,
+    bool IsHq = false, bool HasRadio = false);
 
 /// <summary>The squad structures from the <c>organisation</c> table, checked.</summary>
 public sealed class OrgTables
@@ -57,6 +58,18 @@ public sealed class OrgTables
                 throw new DataException($"organisation/{row.Id}: succession_delay cannot be negative.");
             }
 
+            var unitType = row.Values.TryGetValue("unit_type", out var ut) ? ut.Text : "squad";
+            if (unitType is not ("squad" or "hq"))
+            {
+                throw new DataException($"organisation/{row.Id}: unit_type must be 'squad' or 'hq', not '{unitType}'.");
+            }
+
+            var radio = row.Values.ContainsKey("radio") ? Whole(row, "radio") : 0;
+            if (radio is not (0 or 1))
+            {
+                throw new DataException($"organisation/{row.Id}: radio must be 0 or 1.");
+            }
+
             long ticks = (delay.Raw * World.TicksPerSecond + Fixed.One.Raw - 1) / Fixed.One.Raw;
             var slots = new List<SlotTemplate>();
             foreach (var slot in table.Entries.Where(e => e.Get("kind").Text == "slot" && e.Get("squad").Text == row.Id))
@@ -80,7 +93,8 @@ public sealed class OrgTables
             }
 
             Validate(row.Id, slots);
-            var template = new SquadTemplate(row.Id, row.Get("name").Text, side, (int)ticks, bonus, slots);
+            var template = new SquadTemplate(
+                row.Id, row.Get("name").Text, side, (int)ticks, bonus, slots, unitType == "hq", radio == 1);
             tables._squads[row.Id] = template;
             list.Add(template);
         }

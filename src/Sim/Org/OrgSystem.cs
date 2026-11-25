@@ -49,7 +49,7 @@ public sealed class OrgSystem(OrgTables tables) : ISimSystem
 
         var teams = teamIds.Select((id, t) => new Team(id, soldiers.Where(s => s.TeamIndex == t).ToList())).ToList();
         var leader = soldiers.First(s => s.Role == Role.SquadLeader);
-        var squad = new Squad(_squads.Count, orgId, template.Side, soldiers, teams, template.DelayTicks, template.LeaderBonus, leader);
+        var squad = new Squad(_squads.Count, orgId, template.Side, soldiers, teams, template.DelayTicks, template.LeaderBonus, leader, template.IsHq, template.HasRadio);
         _squads.Add(squad);
         return squad;
     }
@@ -75,6 +75,9 @@ public sealed class OrgSystem(OrgTables tables) : ISimSystem
             hasher.Add(q.LeaderBonus);
             hasher.Add(q.Leader?.Id ?? -1);
             hasher.Add(q.TicksToSuccession);
+            hasher.Add(q.IsHq);
+            hasher.Add(q.HasRadio);
+            hasher.Add((byte)q.Morale);
             hasher.Add(q.Soldiers.Count);
             foreach (var s in q.Soldiers)
             {
@@ -109,5 +112,16 @@ public sealed class SetHealthInput(int soldierId, HealthState health) : ISimInpu
         var squad = org.FindSquadOf(soldierId)
             ?? throw new InvalidOperationException($"No soldier {soldierId}.");
         squad.SetHealth(soldierId, health);
+    }
+}
+
+/// <summary>Sets a squad's morale state when it applies (a stub until the morale model, item 2.2).</summary>
+public sealed class SetMoraleInput(int squadId, MoraleState morale) : ISimInput
+{
+    public void Apply(World world)
+    {
+        var squad = world.GetSystem<OrgSystem>().Squads.FirstOrDefault(s => s.Id == squadId)
+            ?? throw new InvalidOperationException($"No squad {squadId}.");
+        squad.SetMorale(morale);
     }
 }

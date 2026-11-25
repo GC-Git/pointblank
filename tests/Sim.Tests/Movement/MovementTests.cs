@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using PointBlank.Sim.Map;
 using PointBlank.Sim.Movement;
+using PointBlank.Sim.Orders;
 using PointBlank.Sim.Org;
 using PointBlank.Sim.Replays;
 using PointBlank.Sim.Sight;
@@ -41,7 +42,7 @@ public class MovementTests(ITestOutputHelper output)
         var (world, org, move) = Setup(map);
         var squad = org.SpawnSquad("us_rifle_squad", M(20), M(30));
 
-        world.Schedule(0, new MoveOrderInput(new MoveOrder(squad.Id, M(90), M(30), MoveMode.Move)));
+        Assert.Equal(MoveResult.Started, move.Execute(new MoveOrder(squad.Id, M(90), M(30), MoveMode.Move)));
         world.Step();
         var ticks = RunUntilArrived(world, move, squad.Id);
 
@@ -169,25 +170,24 @@ public class MovementTests(ITestOutputHelper output)
         var squad = org.SpawnSquad("us_rifle_squad", M(10), M(20));
         var before = world.ComputeStateHash();
 
-        Assert.False(move.Execute(new MoveOrder(squad.Id, M(41), M(21), MoveMode.Move)));
+        Assert.Equal(MoveResult.Unreachable, move.Execute(new MoveOrder(squad.Id, M(41), M(21), MoveMode.Move)));
         Assert.False(move.IsMoving(squad.Id));
         Assert.Equal(before, world.ComputeStateHash());
         Assert.Throws<InvalidOperationException>(() => move.Execute(new MoveOrder(9, M(1), M(1), MoveMode.Move)));
     }
 
     [Fact]
-    public void An_order_input_is_delivered_when_scheduled_and_then_executed()
+    public void A_target_off_the_map_is_rejected_not_clamped()
     {
         var (world, org, move) = Setup(new GameMap("open", 40, 20));
         var squad = org.SpawnSquad("us_rifle_squad", M(10), M(20));
-        world.Schedule(3, new MoveOrderInput(new MoveOrder(squad.Id, M(60), M(20), MoveMode.Move)));
+        var before = world.ComputeStateHash();
 
-        world.Run(3);
+        Assert.Equal(MoveResult.OffMap, move.Execute(new MoveOrder(squad.Id, M(80), M(20), MoveMode.Move)));
+        Assert.Equal(MoveResult.OffMap, move.Execute(new MoveOrder(squad.Id, M(10), -Fixed.One, MoveMode.Move)));
         Assert.False(move.IsMoving(squad.Id));
-        world.Step();
-        Assert.True(move.IsMoving(squad.Id));
-        world.Run(50);
-        Assert.True(squad.Leader!.X > M(11));
+        Assert.Equal(before, world.ComputeStateHash());
+        Assert.Equal(MoveResult.Started, move.Execute(new MoveOrder(squad.Id, M(79), M(39), MoveMode.Move)));
     }
 
     [Fact]
@@ -228,7 +228,14 @@ public class MovementTests(ITestOutputHelper output)
 
             var move = world.GetSystem<MovementSystem>();
             var org = world.GetSystem<OrgSystem>();
-            world.Step(); // applies the tick-0 orders
+            // The tick-0 orders go through the chain of command (no HQ on the map, so a few seconds).
+            var command = world.GetSystem<CommandSystem>();
+            do
+            {
+                world.Step();
+            }
+            while (world.Tick < 200 && org.Squads.Any(s => command.StatusOf(s.Id).Status == OrderStatus.Pending));
+
             Assert.True(org.Squads.All(s => move.IsMoving(s.Id)), "both squads got their orders");
             while (world.Tick < scenario.Ticks && org.Squads.Any(s => move.IsMoving(s.Id)))
             {

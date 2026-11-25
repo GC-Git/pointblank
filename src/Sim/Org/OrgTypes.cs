@@ -25,6 +25,17 @@ public enum HealthState : byte
     Dead = 3,
 }
 
+/// <summary>
+/// A squad's morale. A stub for item 1.5 (set by <see cref="SetMoraleInput"/>); item 2.2 adds the
+/// morale model and more states. Values are hashed, so never renumber.
+/// </summary>
+public enum MoraleState : byte
+{
+    Steady = 0,
+    Shaken = 1,
+    Broken = 2,
+}
+
 public sealed class Soldier
 {
     internal Soldier(int id, string key, Role role, int rank, int successionOrder, string weaponId, int teamIndex)
@@ -88,8 +99,10 @@ public sealed class Squad
 
     internal Squad(
         int id, string orgId, string side, IReadOnlyList<Soldier> soldiers, IReadOnlyList<Team> teams,
-        int delayTicks, Fixed leaderBonus, Soldier leader)
+        int delayTicks, Fixed leaderBonus, Soldier leader, bool isHq, bool hasRadio)
     {
+        IsHq = isHq;
+        HasRadio = hasRadio;
         Id = id;
         OrgId = orgId;
         Side = side;
@@ -111,6 +124,17 @@ public sealed class Squad
     public IReadOnlyList<Team> Teams { get; }
 
     public int SuccessionDelayTicks { get; }
+
+    /// <summary>Whether this is a headquarters (a platoon HQ) that puts squads of its side in contact.</summary>
+    public bool IsHq { get; }
+
+    /// <summary>Whether the unit has a radio or field phone (from data).</summary>
+    public bool HasRadio { get; }
+
+    public MoraleState Morale { get; private set; }
+
+    /// <summary>Sets the morale state. Item 1.5 has no morale model; tests and item 2.2 call this.</summary>
+    public void SetMorale(MoraleState morale) => Morale = morale;
 
     /// <summary>The soldier in command, or null while the post is vacant.</summary>
     public Soldier? Leader { get; private set; }

@@ -6,12 +6,19 @@ namespace PointBlank.Sim.Movement;
 /// <summary>An order to move a squad to a point (metres from the map's north-west corner).</summary>
 public sealed record MoveOrder(int SquadId, Fixed X, Fixed Y, MoveMode Mode);
 
-/// <summary>Delivers a move order to the movement system when it applies.</summary>
-public sealed class MoveOrderInput(MoveOrder order) : ISimInput
+/// <summary>What <see cref="MovementSystem.Execute"/> did with an order. Values are hashed, so never renumber.</summary>
+public enum MoveResult : byte
 {
-    public MoveOrder Order { get; } = order;
+    Started = 0,
 
-    public void Apply(World world) => world.GetSystem<MovementSystem>().Deliver(Order);
+    /// <summary>The squad has no man able to move.</summary>
+    NoAbleMen = 1,
+
+    /// <summary>The target point is outside the map.</summary>
+    OffMap = 2,
+
+    /// <summary>No path leads to the target tile.</summary>
+    Unreachable = 3,
 }
 
 /// <summary>
@@ -51,26 +58,31 @@ public sealed class MovementSystem : ISimSystem
     /// <summary>Whether the squad has a move order it has not finished.</summary>
     public bool IsMoving(int squadId) => _guides.ContainsKey(squadId);
 
-    /// <summary>
-    /// Where an order enters the movement system. Item 1.5 puts the chain-of-command delay in front
-    /// of this: it will hold orders and call <see cref="Execute"/> when they are due. Today the
-    /// order executes at once.
-    /// </summary>
-    public void Deliver(MoveOrder order) => Execute(order);
+    /// <summary>Whether a point (metres from the north-west corner) lies on the map.</summary>
+    public bool IsOnMap(Fixed x, Fixed y) =>
+        x >= Fixed.Zero && y >= Fixed.Zero
+        && x < _map.TileSize * Fixed.FromInt(_map.Width) && y < _map.TileSize * Fixed.FromInt(_map.Height);
 
     /// <summary>
     /// Starts the order: plans the squad's path and sets every able man's posture to the mode's.
-    /// Returns false (and changes nothing) when no able man is left or the target cannot be reached.
+    /// Orders reach this through the chain of command (<c>Orders.CommandSystem</c>); tests may call it
+    /// directly. Changes nothing unless the result is <see cref="MoveResult.Started"/>: a target off
+    /// the map is rejected, never clamped to the edge.
     /// </summary>
     /// <exception cref="InvalidOperationException">There is no such squad.</exception>
-    public bool Execute(MoveOrder order)
+    public MoveResult Execute(MoveOrder order)
     {
         var squad = _org.Squads.FirstOrDefault(s => s.Id == order.SquadId)
             ?? throw new InvalidOperationException($"No squad {order.SquadId}.");
+        if (!IsOnMap(order.X, order.Y))
+        {
+            return MoveResult.OffMap;
+        }
+
         var active = squad.Soldiers.Where(IsAble).ToList();
         if (active.Count == 0)
         {
-            return false;
+            return MoveResult.NoAbleMen;
         }
 
         var sumX = Fixed.Zero;
@@ -85,7 +97,7 @@ public sealed class MovementSystem : ISimSystem
         var path = Paths.FindPath(TileOf(sumX / count, sumY / count), TileOf(order.X, order.Y), order.Mode);
         if (path == null)
         {
-            return false;
+            return MoveResult.Unreachable;
         }
 
         _guides[squad.Id] = new Guide(order.Mode, path, TileOf(order.X, order.Y))
@@ -99,7 +111,20 @@ public sealed class MovementSystem : ISimSystem
             s.Posture = Rules.PostureOf(order.Mode);
         }
 
-        return true;
+        return MoveResult.Started;
+    }
+
+    /// <summary>Ends the squad's move where its men stand now (a Hold order). Does nothing if it is not moving.</summary>
+    /// <exception cref="InvalidOperationException">There is no such squad.</exception>
+    public void Stop(int squadId)
+    {
+        var squad = _org.Squads.FirstOrDefault(s => s.Id == squadId)
+            ?? throw new InvalidOperationException($"No squad {squadId}.");
+        _guides.Remove(squadId);
+        foreach (var s in squad.Soldiers)
+        {
+            _members.Remove(s.Id);
+        }
     }
 
     public void Tick(World world)
