@@ -24,7 +24,7 @@ Status: draft, awaiting owner sign-off
 
 ## Milestone 0 — Foundation
 
-- [ ] **0.1 Repo, rules and skeleton** (S)
+- [x] **0.1 Repo, rules and skeleton** (S)
   Solution with `Sim` (C# class library, no Godot references), `Sim.Tests` (xUnit), and a
   `Game` Godot 4.7 .NET project that references `Sim`. Add `CLAUDE.md` (build and test
   commands, spec link, rules), `.claude/settings.json` (repo-only edits; deny push to

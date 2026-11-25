@@ -58,6 +58,11 @@ lines.
    go in `Sim`; `game/` only draws state and turns input into orders.
 2. **`Sim` stays deterministic**: same seed and same orders give the same battle. No
    wall-clock time, no unseeded randomness, no machine-dependent floating point.
+   Use `Fixed` (Q31.32) for numbers, `World.Rng` for randomness, `World.Tick` for time,
+   and add every new piece of state to the state hash (`ISimSystem.AppendState`). A text
+   scan fails the tests on banned APIs; its rules and allow list are in
+   `tests/Sim.Tests/Determinism/`. It can't see unnamed types, so check what new
+   library calls return.
 3. **No hard-coded historical numbers.** They belong in data files.
 4. **Every data value has a source tag**: a reference (title, author/publisher, page or
    URL), `estimated` (with reasoning), or `placeholder`. Never present a made-up value
