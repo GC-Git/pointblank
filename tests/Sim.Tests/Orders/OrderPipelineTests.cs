@@ -244,14 +244,36 @@ public class OrderPipelineTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void An_order_for_another_sides_unit_or_no_unit_throws()
+    public void An_order_for_another_sides_unit_or_no_unit_is_rejected_without_a_throw()
     {
         var (rig, squad) = Scene(1);
         rig.World.Schedule(0, new IssueOrderInput("de", squad.Id, new Order(OrderKind.Move, M(30), M(60))));
-        Assert.Throws<InvalidOperationException>(() => rig.World.Step());
-        var (rig2, _) = Scene(1);
-        rig2.World.Schedule(0, new IssueOrderInput("us", 99, new Order(OrderKind.Move, M(30), M(60))));
-        Assert.Throws<InvalidOperationException>(() => rig2.World.Step());
+        rig.World.Schedule(0, new IssueOrderInput("us", 99, new Order(OrderKind.Move, M(30), M(60))));
+        rig.World.Schedule(0, new IssueOrderInput("us", squad.Id, new Order((OrderKind)200, M(30), M(60))));
+        rig.World.Step();
+        Assert.Equal(OrderStatus.None, rig.Command.StatusOf(squad.Id).Status); // the other side's order touched nothing
+        Assert.Equal(
+            [new IssueRejection(0, "de", squad.Id, IssueResult.WrongSide), new IssueRejection(0, "us", 99, IssueResult.UnknownUnit),
+             new IssueRejection(0, "us", squad.Id, IssueResult.UnknownKind)],
+            rig.Command.Rejections);
+        Assert.Equal(IssueResult.WrongSide, rig.Command.Issue(rig.World, "de", squad.Id, new Order(OrderKind.Hold, M(0), M(0))));
+        Assert.Equal(IssueResult.Accepted, rig.Command.Issue(rig.World, "us", squad.Id, new Order(OrderKind.Hold, M(0), M(0))));
+    }
+
+    [Fact]
+    public void An_order_to_a_squad_with_no_able_men_is_rejected_at_issue()
+    {
+        var (rig, squad) = Scene(1);
+        foreach (var s in squad.Soldiers)
+        {
+            squad.SetHealth(s.Id, HealthState.Dead);
+        }
+
+        var view = IssueAndStep(rig, squad, new Order(OrderKind.Move, M(30), M(60)));
+        Assert.Equal(OrderStatus.Rejected, view.Status);
+        Assert.Equal(OrderNote.NoAbleMen, view.Note);
+        Assert.Equal(0, view.TotalDelayTicks);
+        Assert.Equal(IssueResult.NoAbleMen, rig.Command.Issue(rig.World, "us", squad.Id, new Order(OrderKind.Hold, M(0), M(0))));
     }
 
     [Fact]

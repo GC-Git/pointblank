@@ -1,0 +1,26 @@
+{
+  "table": "spotting",
+  "entries": [
+    {
+      "id": "default",
+      "values": {
+        "name": { "value": "Spotting (placeholder)", "unit": "text", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
+        "refresh_ticks": { "value": "5", "unit": "ticks", "source": { "kind": "placeholder", "note": "Placeholder: each observer re-checks every enemy once per this many ticks (stagger)." } },
+        "base_rate": { "value": "1", "unit": "1/s", "source": { "kind": "placeholder", "note": "Placeholder: spotting progress per second for a standing, unconcealed target within near range; spotted at progress 1." } },
+        "near_range": { "value": "50", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: inside this range distance does not slow spotting." } },
+        "max_range": { "value": "800", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: beyond this range nothing is spotted." } },
+        "posture_standing": { "value": "1", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: rate factor for a standing target." } },
+        "posture_kneeling": { "value": "0.6", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: rate factor for a kneeling target." } },
+        "posture_prone": { "value": "0.25", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: rate factor for a prone target." } },
+        "motion_still": { "value": "0.4", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: rate factor for a target that has not moved within the refresh window." } },
+        "motion_sneak": { "value": "0.7", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: rate factor for a sneaking target." } },
+        "motion_move": { "value": "1.2", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: rate factor for a target moving at walking pace." } },
+        "motion_move_fast": { "value": "2", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: rate factor for a target moving fast." } },
+        "firing_factor": { "value": "3", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: rate factor for a target that fired within the firing window." } },
+        "firing_window": { "value": "3", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: how long after a shot the firer counts as firing." } },
+        "lost_after": { "value": "30", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: an unseen contact degrades to Lost after this long." } },
+        "forget_after": { "value": "120", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: an unseen contact is forgotten after this long." } }
+      }
+    }
+  ]
+}

@@ -58,6 +58,9 @@ public sealed class MovementSystem : ISimSystem
     /// <summary>Whether the squad has a move order it has not finished.</summary>
     public bool IsMoving(int squadId) => _guides.ContainsKey(squadId);
 
+    /// <summary>The mode of the squad's unfinished move order, or null when it is not moving.</summary>
+    public MoveMode? ModeOf(int squadId) => _guides.TryGetValue(squadId, out var g) ? g.Mode : null;
+
     /// <summary>Whether a point (metres from the north-west corner) lies on the map.</summary>
     public bool IsOnMap(Fixed x, Fixed y) =>
         x >= Fixed.Zero && y >= Fixed.Zero

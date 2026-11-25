@@ -118,6 +118,31 @@ public enum OrderNote : byte
     NoAbleMen = 4,
 }
 
+/// <summary>What <see cref="CommandSystem.Issue"/> did with an order. Values are hashed, so never renumber.</summary>
+public enum IssueResult : byte
+{
+    /// <summary>The order entered the chain of command (Pending).</summary>
+    Accepted = 0,
+
+    /// <summary>No unit has that id; nothing changed.</summary>
+    UnknownUnit = 1,
+
+    /// <summary>The unit belongs to the other side; its orders were not touched.</summary>
+    WrongSide = 2,
+
+    /// <summary>The order kind is not in the vocabulary; nothing changed.</summary>
+    UnknownKind = 3,
+
+    /// <summary>The move's target is off the map; the unit's ticket is Rejected (<see cref="OrderNote.OffMap"/>).</summary>
+    OffMap = 4,
+
+    /// <summary>The unit has no able man; its ticket is Rejected (<see cref="OrderNote.NoAbleMen"/>).</summary>
+    NoAbleMen = 5,
+}
+
+/// <summary>An order rejected before it reached any unit's ticket (unknown unit, wrong side, unknown kind).</summary>
+public readonly record struct IssueRejection(long Tick, string Side, int UnitId, IssueResult Reason);
+
 /// <summary>
 /// What the UI shows for a unit: its latest order, where it is, and why it is slow. TicksRemaining is
 /// the number of further steps until the order is delivered (Pending) or obeyed (Hesitating), else 0.

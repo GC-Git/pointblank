@@ -7,9 +7,11 @@ namespace PointBlank.Sim.Orders;
 /// The chain of command: every order, from the player or the AI, enters here through
 /// <see cref="IssueOrderInput"/> and reaches its unit after a delay.
 /// <list type="bullet">
-/// <item>Issue: a move to a point off the map is <see cref="OrderStatus.Rejected"/> at once
-/// (<see cref="OrderNote.OffMap"/>). Otherwise the delay reasons are read (no effective leader,
-/// shaken, broken, out of HQ contact) and the delay rolled (one RNG draw); the order is Pending. A new
+/// <item>Issue (see <see cref="Issue"/>; never throws): an unknown unit, wrong side or unknown kind is
+/// refused and recorded; a move to a point off the map, or an order to a unit with no able man, is <see cref="OrderStatus.Rejected"/> at once
+/// (<see cref="OrderNote.OffMap"/>, <see cref="OrderNote.NoAbleMen"/>). Otherwise the delay reasons are read (no effective leader,
+/// shaken, broken, out of HQ contact) and the delay rolled (one RNG draw); the order is Pending. Reasons
+/// and delay are fixed at issue: a leader who falls while the order is Pending does not re-roll it. A new
 /// order to a unit replaces its ticket; a move already under way carries on until the new order is
 /// delivered.</item>
 /// <item>Delivery (when the count reaches 0): an advance-type order may be refused (broken or shaken
@@ -23,6 +25,7 @@ namespace PointBlank.Sim.Orders;
 public sealed class CommandSystem(OrgSystem org, MovementSystem move, CommandRules rules) : ISimSystem
 {
     private readonly Dictionary<int, Ticket> _tickets = [];
+    private readonly List<IssueRejection> _rejections = [];
 
     public CommandRules Rules { get; } = rules;
 
@@ -73,20 +76,32 @@ public sealed class CommandSystem(OrgSystem org, MovementSystem move, CommandRul
         return false;
     }
 
-    /// <summary>Puts an order into the chain of command (called by <see cref="IssueOrderInput"/>).</summary>
-    /// <exception cref="InvalidOperationException">There is no such unit, or it belongs to the other side.</exception>
-    /// <exception cref="ArgumentException">The order kind is not in the vocabulary.</exception>
-    public void Issue(World world, string side, int unitId, Order order)
-    {
-        var squad = Find(unitId);
-        if (squad.Side != side)
-        {
-            throw new InvalidOperationException($"Unit {unitId} belongs to '{squad.Side}', not '{side}'.");
-        }
+    /// <summary>
+    /// Orders rejected before reaching a ticket (unknown unit, wrong side, unknown kind), oldest first.
+    /// Part of the state hash.
+    /// </summary>
+    public IReadOnlyList<IssueRejection> Rejections => _rejections;
 
-        if (!Enum.IsDefined(order.Kind))
+    /// <summary>
+    /// Puts an order into the chain of command (called by <see cref="IssueOrderInput"/>). Never throws
+    /// for a bad order, so an AI or UI caller cannot crash the sim: an unknown unit, a unit of the other
+    /// side or an unknown kind is refused without touching any ticket and recorded in
+    /// <see cref="Rejections"/>; a move off the map, or any order to a unit with no able man, replaces the
+    /// unit's ticket with a Rejected one carrying the note. The delay reasons and duration are fixed
+    /// here, at issue: if the leader falls (or morale changes) while the order is Pending it is not
+    /// re-rolled.
+    /// </summary>
+    public IssueResult Issue(World world, string side, int unitId, Order order)
+    {
+        var squad = org.Squads.FirstOrDefault(s => s.Id == unitId);
+        var refused = squad == null ? IssueResult.UnknownUnit
+            : squad.Side != side ? IssueResult.WrongSide
+            : !Enum.IsDefined(order.Kind) ? IssueResult.UnknownKind
+            : IssueResult.Accepted;
+        if (refused != IssueResult.Accepted)
         {
-            throw new ArgumentException($"Unknown order kind {(byte)order.Kind}.", nameof(order));
+            _rejections.Add(new IssueRejection(world.Tick, side, unitId, refused));
+            return refused;
         }
 
         var t = new Ticket(order, world.Tick);
@@ -95,12 +110,20 @@ public sealed class CommandSystem(OrgSystem org, MovementSystem move, CommandRul
         {
             t.Status = OrderStatus.Rejected;
             t.Note = OrderNote.OffMap;
-            return;
+            return IssueResult.OffMap;
+        }
+
+        if (!squad!.Soldiers.Any(s => s.CanLead))
+        {
+            t.Status = OrderStatus.Rejected;
+            t.Note = OrderNote.NoAbleMen;
+            return IssueResult.NoAbleMen;
         }
 
         t.Reasons = Reasons(squad);
         t.Total = t.Remaining = Rules.RollDelayTicks(t.Reasons, world.Rng);
         t.Status = OrderStatus.Pending;
+        return IssueResult.Accepted;
     }
 
     public void Tick(World world)
@@ -150,6 +173,15 @@ public sealed class CommandSystem(OrgSystem org, MovementSystem move, CommandRul
             hasher.Add(t.Total);
             hasher.Add((byte)t.Reasons);
             hasher.Add((byte)t.Note);
+        }
+
+        hasher.Add(_rejections.Count);
+        foreach (var r in _rejections)
+        {
+            hasher.Add(r.Tick);
+            hasher.Add(r.Side);
+            hasher.Add(r.UnitId);
+            hasher.Add((byte)r.Reason);
         }
     }
 
