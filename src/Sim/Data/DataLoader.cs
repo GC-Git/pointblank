@@ -13,15 +13,24 @@ public static class DataLoader
     public static readonly string[] TableNames =
         ["units", "weapons", "ammo", "materials", "organisation"];
 
-    private const int MaxDigits = 15;
+    private const int MaxIntegerDigits = 9;
+    private const int MaxFractionDigits = 9;
 
-    private static readonly Dictionary<string, string[]> Required = new()
+    private const string N = "n"; // numeric field: strict decimal, converted to Fixed
+    private const string T = "t"; // text field: kept as written
+
+    /// <summary>Required values per table, each with its declared type (n or t).</summary>
+    private static readonly Dictionary<string, (string Name, string Type)[]> Required = new()
     {
-        ["units"] = ["name", "side", "weapon", "crew"],
-        ["weapons"] = ["name", "ammo", "muzzle_velocity", "rate_of_fire", "magazine_capacity", "mass"],
-        ["ammo"] = ["caliber", "bullet_mass"],
-        ["materials"] = ["name", "cover_protection", "penetration_resistance"],
-        ["organisation"] = ["name", "unit", "count"],
+        ["units"] = [("name", T), ("side", T), ("weapon", T), ("crew", N)],
+        ["weapons"] =
+        [
+            ("name", T), ("ammo", T), ("muzzle_velocity", N), ("rate_of_fire", N),
+            ("magazine_capacity", N), ("mass", N),
+        ],
+        ["ammo"] = [("caliber", N), ("bullet_mass", N)],
+        ["materials"] = [("name", T), ("cover_protection", N), ("penetration_resistance", N)],
+        ["organisation"] = [("name", T), ("unit", T), ("count", N)],
     };
 
     public static DataSet LoadDirectory(string directory)
@@ -35,7 +44,14 @@ public static class DataLoader
                 throw new DataException($"Data file not found: {path}");
             }
 
-            tables.Add(ParseTable(File.ReadAllText(path), name));
+            try
+            {
+                tables.Add(ParseTable(File.ReadAllText(path), name));
+            }
+            catch (DataException e)
+            {
+                throw new DataException($"{name}.json: {e.Message}");
+            }
         }
 
         return new DataSet(tables);
@@ -92,7 +108,7 @@ public static class DataLoader
         }
     }
 
-    private static DataEntry ParseEntry(string table, JsonElement e, string[] required)
+    private static DataEntry ParseEntry(string table, JsonElement e, (string Name, string Type)[] required)
     {
         if (e.ValueKind != JsonValueKind.Object
             || !e.TryGetProperty("id", out var idElement)
@@ -111,10 +127,11 @@ public static class DataLoader
         var parsed = new SortedDictionary<string, DataValue>(StringComparer.Ordinal);
         foreach (var p in values.EnumerateObject())
         {
-            parsed[p.Name] = ParseValue($"{table}/{id}/{p.Name}", p.Value);
+            var declared = required.FirstOrDefault(r => r.Name == p.Name).Type;
+            parsed[p.Name] = ParseValue($"{table}/{id}/{p.Name}", p.Value, declared);
         }
 
-        foreach (var name in required)
+        foreach (var (name, _) in required)
         {
             if (!parsed.ContainsKey(name))
             {
@@ -125,7 +142,8 @@ public static class DataLoader
         return new DataEntry(id, parsed);
     }
 
-    private static DataValue ParseValue(string where, JsonElement v)
+    /// <param name="declared">n, t, or null for a value the schema does not list (numeric unless its unit is "text").</param>
+    private static DataValue ParseValue(string where, JsonElement v, string? declared)
     {
         if (v.ValueKind != JsonValueKind.Object)
         {
@@ -153,13 +171,26 @@ public static class DataLoader
             throw new DataException($"{where}: \"unit\" is required (use \"text\" for non-numbers).");
         }
 
-        if (raw.ValueKind == JsonValueKind.Number && !TryParseFixed(text, out _))
+        var unitText = unit.GetString()!;
+        var numeric = (declared ?? (unitText == "text" ? T : N)) == N;
+        if (!numeric)
         {
-            throw new DataException($"{where}: number '{text}' is not a plain decimal.");
+            if (raw.ValueKind != JsonValueKind.String)
+            {
+                throw new DataException($"{where}: a text value must be a JSON string.");
+            }
+
+            return new DataValue(text, unitText, parsedSource, null);
         }
 
-        Fixed? number = TryParseFixed(text, out var f) ? f : null;
-        return new DataValue(text, unit.GetString()!, parsedSource, number);
+        if (!TryParseFixed(text, out var number))
+        {
+            throw new DataException(
+                $"{where}: '{text}' is not a valid number (optional '-', digits, optional '.' and "
+                + $"digits; at most {MaxIntegerDigits} integer and {MaxFractionDigits} fractional digits).");
+        }
+
+        return new DataValue(text, unitText, parsedSource, number);
     }
 
     private static DataSource ParseSource(string where, JsonElement s)
@@ -202,8 +233,12 @@ public static class DataLoader
     }
 
     /// <summary>
-    /// Parses an optionally signed plain decimal (digits, optionally a point and more
-    /// digits) of at most 15 digits into Q31.32 using integers only.
+    /// Strictly parses an optionally negative plain decimal: digits, optionally a point and
+    /// more digits. No plus sign, exponent, comma or whitespace; at most 9 integer and 9
+    /// fractional digits (so the result always fits Q31.32). Integer arithmetic only.
+    /// Rounding rule: the value is divided as an exact ratio and the result is truncated
+    /// toward zero to the nearest Q31.32 step (2^-32), so 0.1 becomes 429496729/2^32 and
+    /// -0.1 becomes -429496729/2^32. Never rounds away from zero.
     /// </summary>
     public static bool TryParseFixed(string text, out Fixed value)
     {
@@ -215,46 +250,36 @@ public static class DataLoader
             s = s[1..];
         }
 
-        long scaled = 0;
-        long denominator = 1;
-        var digits = 0;
-        var seenPoint = false;
-        var fractionDigits = 0;
-        foreach (var c in s)
+        var point = s.IndexOf('.');
+        var whole = point < 0 ? s : s[..point];
+        var fraction = point < 0 ? default : s[(point + 1)..];
+        if (whole.Length is 0 or > MaxIntegerDigits
+            || (point >= 0 && (fraction.Length == 0 || fraction.Length > MaxFractionDigits)))
         {
-            if (c == '.' && !seenPoint)
-            {
-                seenPoint = true;
-            }
-            else if (c is >= '0' and <= '9')
-            {
-                digits++;
-                if (digits > MaxDigits)
-                {
-                    return false;
-                }
+            return false;
+        }
 
-                scaled = (scaled * 10) + (c - '0');
-                if (seenPoint)
-                {
-                    denominator *= 10;
-                    fractionDigits++;
-                }
-            }
-            else
+        long scaled = 0;
+        foreach (var c in whole)
+        {
+            if (c is < '0' or > '9')
             {
                 return false;
             }
+
+            scaled = (scaled * 10) + (c - '0');
         }
 
-        if (digits == 0 || s[0] == '.' || s[^1] == '.')
+        long denominator = 1;
+        foreach (var c in fraction)
         {
-            return false;
-        }
+            if (c is < '0' or > '9')
+            {
+                return false;
+            }
 
-        if (seenPoint && fractionDigits == 0)
-        {
-            return false;
+            scaled = (scaled * 10) + (c - '0');
+            denominator *= 10;
         }
 
         value = Fixed.FromRatio(negative ? -scaled : scaled, denominator);

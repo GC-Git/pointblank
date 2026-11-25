@@ -32,6 +32,14 @@ public class DataLoaderTests
     }
 
     [Fact]
+    public void Largest_accepted_value_fits()
+    {
+        Assert.True(DataLoader.TryParseFixed("999999999.999999999", out var big));
+        Assert.True(big > Fixed.FromInt(999999999));
+        Assert.True(DataLoader.TryParseFixed("-999999999.999999999", out _));
+    }
+
+    [Fact]
     public void Parses_decimals_without_floating_point()
     {
         Assert.True(DataLoader.TryParseFixed("0.5", out var half));
@@ -48,6 +56,12 @@ public class DataLoaderTests
     [InlineData(".5")]
     [InlineData("1,5")]
     [InlineData("1234567890123456")]
+    [InlineData("99999999999")]
+    [InlineData("1.1234567891")]
+    [InlineData("  12 ")]
+    [InlineData(".")]
+    [InlineData("-")]
+    [InlineData("+5")]
     public void Rejects_malformed_numbers(string text) =>
         Assert.False(DataLoader.TryParseFixed(text, out _));
 
@@ -119,12 +133,66 @@ public class DataLoaderTests
     }
 
     [Fact]
-    public void Text_values_have_no_number()
+    public void Text_fields_stay_text()
     {
-        var json = Ammo(Ref).Replace("\"7.62\"", "\"hello\"").Replace("\"mm\"", "\"text\"");
-        var v = DataLoader.ParseTable(json, "ammo").Entries[0].Get("caliber");
-        Assert.Equal("hello", v.Text);
+        var json = Material("\"1e3 not a number\"", "0.5");
+        var v = DataLoader.ParseTable(json, "materials").Entries[0].Get("name");
+        Assert.Equal("1e3 not a number", v.Text);
         Assert.Null(v.Number);
+    }
+
+    private static string Material(string name, string resist) =>
+        "{\"table\":\"materials\",\"entries\":[{\"id\":\"m1\",\"values\":{"
+        + "\"name\":{\"value\":" + name + ",\"unit\":\"text\",\"source\":{\"kind\":\"placeholder\"}},"
+        + "\"cover_protection\":{\"value\":\"" + resist + "\",\"unit\":\"ratio\",\"source\":{\"kind\":\"placeholder\"}},"
+        + "\"penetration_resistance\":{\"value\":\"1\",\"unit\":\"mm\",\"source\":{\"kind\":\"placeholder\"}}}}]}";
+
+    [Theory]
+    [InlineData("1e3")]
+    [InlineData("1,5")]
+    [InlineData(".")]
+    [InlineData("")]
+    [InlineData("  12 ")]
+    [InlineData("99999999999")]
+    [InlineData("0.1234567891")]
+    public void Numeric_fields_reject_bad_numbers_with_a_path(string bad)
+    {
+        var e = Assert.Throws<DataException>(
+            () => DataLoader.ParseTable(Material("\"x\"", bad), "materials"));
+        Assert.Contains("materials/m1/cover_protection", e.Message);
+    }
+
+    [Fact]
+    public void Load_errors_name_the_file()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "pb-data-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            foreach (var f in Directory.GetFiles(DataPaths.DataDirectory()))
+            {
+                File.Copy(f, Path.Combine(dir, Path.GetFileName(f)));
+            }
+
+            File.WriteAllText(Path.Combine(dir, "materials.json"), Material("\"x\"", "99999999999"));
+            var e = Assert.Throws<DataException>(() => DataLoader.LoadDirectory(dir));
+            Assert.Contains("materials.json", e.Message);
+            Assert.Contains("materials/m1/cover_protection", e.Message);
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Theory]
+    [InlineData("0.1", 429496729L)]        // 0.1 * 2^32 = 429496729.6, truncated
+    [InlineData("-3.75", -16106127360L)]   // exact
+    [InlineData("-0.1", -429496729L)]      // truncates toward zero, not down
+    public void Decimals_truncate_toward_zero(string text, long raw)
+    {
+        Assert.True(DataLoader.TryParseFixed(text, out var f));
+        Assert.Equal(raw, f.Raw);
     }
 
     [Fact]
