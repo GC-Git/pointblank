@@ -1,0 +1,23 @@
+{
+  "table": "units",
+  "entries": [
+    {
+      "id": "us_rifleman_sample",
+      "values": {
+        "name": { "value": "US rifleman (sample)", "unit": "text", "source": { "kind": "placeholder", "note": "Sample row." } },
+        "side": { "value": "us", "unit": "text", "source": { "kind": "placeholder", "note": "Sample row." } },
+        "weapon": { "value": "us_rifle_sample", "unit": "text", "source": { "kind": "placeholder", "note": "Sample row." } },
+        "crew": { "value": "1", "unit": "men", "source": { "kind": "placeholder", "note": "Sample row." } }
+      }
+    },
+    {
+      "id": "de_rifleman_sample",
+      "values": {
+        "name": { "value": "German rifleman (sample)", "unit": "text", "source": { "kind": "placeholder", "note": "Sample row." } },
+        "side": { "value": "de", "unit": "text", "source": { "kind": "placeholder", "note": "Sample row." } },
+        "weapon": { "value": "de_rifle_sample", "unit": "text", "source": { "kind": "placeholder", "note": "Sample row." } },
+        "crew": { "value": "1", "unit": "men", "source": { "kind": "placeholder", "note": "Sample row." } }
+      }
+    }
+  ]
+}

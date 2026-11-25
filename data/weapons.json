@@ -1,0 +1,27 @@
+{
+  "table": "weapons",
+  "entries": [
+    {
+      "id": "us_rifle_sample",
+      "values": {
+        "name": { "value": "US semi-automatic rifle (sample)", "unit": "text", "source": { "kind": "placeholder", "note": "Sample row for the loader; not researched." } },
+        "ammo": { "value": "us_rifle_round_sample", "unit": "text", "source": { "kind": "placeholder", "note": "Sample row." } },
+        "muzzle_velocity": { "value": "850", "unit": "m/s", "source": { "kind": "placeholder", "note": "Not a historical value." } },
+        "rate_of_fire": { "value": "30", "unit": "rounds/min", "source": { "kind": "placeholder", "note": "Not a historical value." } },
+        "magazine_capacity": { "value": "8", "unit": "rounds", "source": { "kind": "placeholder", "note": "Not a historical value." } },
+        "mass": { "value": "4.5", "unit": "kg", "source": { "kind": "placeholder", "note": "Not a historical value." } }
+      }
+    },
+    {
+      "id": "de_rifle_sample",
+      "values": {
+        "name": { "value": "German bolt-action rifle (sample)", "unit": "text", "source": { "kind": "placeholder", "note": "Sample row for the loader; not researched." } },
+        "ammo": { "value": "de_rifle_round_sample", "unit": "text", "source": { "kind": "placeholder", "note": "Sample row." } },
+        "muzzle_velocity": { "value": "760", "unit": "m/s", "source": { "kind": "placeholder", "note": "Not a historical value." } },
+        "rate_of_fire": { "value": "15", "unit": "rounds/min", "source": { "kind": "placeholder", "note": "Not a historical value." } },
+        "magazine_capacity": { "value": "5", "unit": "rounds", "source": { "kind": "placeholder", "note": "Not a historical value." } },
+        "mass": { "value": "4", "unit": "kg", "source": { "kind": "placeholder", "note": "Not a historical value." } }
+      }
+    }
+  ]
+}

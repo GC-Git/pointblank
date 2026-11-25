@@ -1,0 +1,13 @@
+{
+  "table": "materials",
+  "entries": [
+    {
+      "id": "hedge_sample",
+      "values": {
+        "name": { "value": "Hedgerow (sample)", "unit": "text", "source": { "kind": "placeholder", "note": "Sample row." } },
+        "cover_protection": { "value": "0.5", "unit": "ratio", "source": { "kind": "placeholder", "note": "Not a historical value." } },
+        "penetration_resistance": { "value": "20", "unit": "mm", "source": { "kind": "placeholder", "note": "Not a historical value." } }
+      }
+    }
+  ]
+}
