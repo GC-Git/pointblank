@@ -2,11 +2,1611 @@
   "table": "organisation",
   "entries": [
     {
-      "id": "us_squad_sample",
+      "id": "us_rifle_squad",
       "values": {
-        "name": { "value": "US rifle squad (sample)", "unit": "text", "source": { "kind": "placeholder", "note": "Sample row; not a real table of organisation." } },
-        "unit": { "value": "us_rifleman_sample", "unit": "text", "source": { "kind": "placeholder", "note": "Sample row." } },
-        "count": { "value": "12", "unit": "men", "source": { "kind": "placeholder", "note": "Not a historical value." } }
+        "name": {
+          "value": "US rifle squad (placeholder)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "squad",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "side": {
+          "value": "us",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession_delay": {
+          "value": "5",
+          "unit": "s",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "leader_bonus": {
+          "value": "0.25",
+          "unit": "fraction",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "us_rifle_squad.sl",
+      "values": {
+        "name": {
+          "value": "squad_leader (sl)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "us_rifle_squad",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "command",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "squad_leader",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "us_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "5",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "0",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "us_rifle_squad.bar1",
+      "values": {
+        "name": {
+          "value": "bar_gunner (bar1)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "us_rifle_squad",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "bar_team",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "bar_gunner",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "us_bar_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "2",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "4",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "us_rifle_squad.bar2",
+      "values": {
+        "name": {
+          "value": "bar_assistant (bar2)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "us_rifle_squad",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "bar_team",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "bar_assistant",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "us_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "1",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "5",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "us_rifle_squad.bar3",
+      "values": {
+        "name": {
+          "value": "ammo_bearer (bar3)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "us_rifle_squad",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "bar_team",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "ammo_bearer",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "us_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "1",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "6",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "us_rifle_squad.asl",
+      "values": {
+        "name": {
+          "value": "assistant_leader (asl)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "us_rifle_squad",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "rifle_team_a",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "assistant_leader",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "us_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "4",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "1",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "us_rifle_squad.ra1",
+      "values": {
+        "name": {
+          "value": "rifleman (ra1)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "us_rifle_squad",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "rifle_team_a",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "rifleman",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "us_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "3",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "2",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "us_rifle_squad.ra2",
+      "values": {
+        "name": {
+          "value": "rifleman (ra2)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "us_rifle_squad",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "rifle_team_a",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "rifleman",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "us_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "2",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "3",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "us_rifle_squad.ra3",
+      "values": {
+        "name": {
+          "value": "rifleman (ra3)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "us_rifle_squad",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "rifle_team_a",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "rifleman",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "us_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "1",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "7",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "us_rifle_squad.rb1",
+      "values": {
+        "name": {
+          "value": "rifleman (rb1)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "us_rifle_squad",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "rifle_team_b",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "rifleman",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "us_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "1",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "8",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "us_rifle_squad.rb2",
+      "values": {
+        "name": {
+          "value": "rifleman (rb2)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "us_rifle_squad",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "rifle_team_b",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "rifleman",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "us_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "1",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "9",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "us_rifle_squad.rb3",
+      "values": {
+        "name": {
+          "value": "rifleman (rb3)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "us_rifle_squad",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "rifle_team_b",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "rifleman",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "us_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "1",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "10",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "us_rifle_squad.rb4",
+      "values": {
+        "name": {
+          "value": "rifleman (rb4)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "us_rifle_squad",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "rifle_team_b",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "rifleman",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "us_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "1",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "11",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "de_gruppe",
+      "values": {
+        "name": {
+          "value": "German Gruppe (placeholder)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "squad",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "side": {
+          "value": "de",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession_delay": {
+          "value": "6",
+          "unit": "s",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "leader_bonus": {
+          "value": "0.25",
+          "unit": "fraction",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "de_gruppe.gf",
+      "values": {
+        "name": {
+          "value": "squad_leader (gf)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "de_gruppe",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "command",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "squad_leader",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "de_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "5",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "0",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "de_gruppe.mg1",
+      "values": {
+        "name": {
+          "value": "mg_gunner (mg1)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "de_gruppe",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "mg_team",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "mg_gunner",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "de_mg_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "2",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "4",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "de_gruppe.mg2",
+      "values": {
+        "name": {
+          "value": "mg_assistant (mg2)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "de_gruppe",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "mg_team",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "mg_assistant",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "de_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "1",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "5",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "de_gruppe.mg3",
+      "values": {
+        "name": {
+          "value": "mg_loader (mg3)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "de_gruppe",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "mg_team",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "mg_loader",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "de_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "1",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "6",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "de_gruppe.dep",
+      "values": {
+        "name": {
+          "value": "assistant_leader (dep)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "de_gruppe",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "rifle_team",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "assistant_leader",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "de_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "4",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "1",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "de_gruppe.r1",
+      "values": {
+        "name": {
+          "value": "rifleman (r1)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "de_gruppe",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "rifle_team",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "rifleman",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "de_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "3",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "2",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "de_gruppe.r2",
+      "values": {
+        "name": {
+          "value": "rifleman (r2)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "de_gruppe",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "rifle_team",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "rifleman",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "de_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "2",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "3",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "de_gruppe.r3",
+      "values": {
+        "name": {
+          "value": "rifleman (r3)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "de_gruppe",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "rifle_team",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "rifleman",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "de_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "1",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "7",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "de_gruppe.r4",
+      "values": {
+        "name": {
+          "value": "rifleman (r4)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "de_gruppe",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "rifle_team",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "rifleman",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "de_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "1",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "8",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
+      }
+    },
+    {
+      "id": "de_gruppe.r5",
+      "values": {
+        "name": {
+          "value": "rifleman (r5)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "kind": {
+          "value": "slot",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "squad": {
+          "value": "de_gruppe",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "team": {
+          "value": "rifle_team",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "role": {
+          "value": "rifleman",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "weapon": {
+          "value": "de_rifle_sample",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "rank": {
+          "value": "1",
+          "unit": "rank",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        },
+        "succession": {
+          "value": "9",
+          "unit": "order",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder, not a historical value."
+          }
+        }
       }
     }
   ]

@@ -8,7 +8,7 @@ namespace PointBlank.Sim.Replays;
 public static class ReplayJson
 {
     /// <summary>Bump when the layout changes.</summary>
-    public const int Version = 1;
+    public const int Version = 2;
 
     private const int HashDigits = 16;
 
@@ -93,11 +93,12 @@ public static class ReplayJson
         writer.WriteStartObject();
         writer.WriteString("id", content.Id);
         writer.WriteNumber("version", content.Version);
+        writer.WriteString("hash", content.Hash.ToString("x16", CultureInfo.InvariantCulture));
         writer.WriteEndObject();
     }
 
     private static ContentRef ReadRef(JsonElement element) =>
-        new(Text(element, "id"), element.GetProperty("version").GetInt32());
+        new(Text(element, "id"), element.GetProperty("version").GetInt32(), ReadHash(Text(element, "hash")));
 
     private static ReplayOrder ReadOrder(JsonElement element) =>
         new(
