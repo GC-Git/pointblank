@@ -19,6 +19,7 @@ public static class RunnerApp
         Usage:
           runner --scenario <id> --seeds <A..B | N> --out <stats.json> [--replays <directory>]
           runner --replay <file.replay.json>
+          runner --data-report [data directory]
 
         Scenarios: {string.Join(", ", ScenarioCatalog.Ids)}
         At most {SeedRange.MaxSeeds.ToString(CultureInfo.InvariantCulture)} seeds per run.
@@ -27,6 +28,11 @@ public static class RunnerApp
 
     public static int Run(string[] args, TextWriter output, TextWriter error)
     {
+        if (args.Length > 0 && args[0] == "--data-report")
+        {
+            return DataReport(args, output, error);
+        }
+
         var options = new Dictionary<string, string>();
         for (int i = 0; i < args.Length; i += 2)
         {
@@ -103,6 +109,42 @@ public static class RunnerApp
         output.WriteLine(
             $"Ran {results.Count} battle(s) of '{scenario.Id}' in {timer.ElapsedMilliseconds} ms.");
         return Success;
+    }
+
+    private static int DataReport(string[] args, TextWriter output, TextWriter error)
+    {
+        if (args.Length > 2)
+        {
+            return BadArguments(error, "--data-report takes at most one directory.");
+        }
+
+        var directory = args.Length == 2 ? args[1] : FindDataDirectory();
+        try
+        {
+            var set = PointBlank.Sim.Data.DataLoader.LoadDirectory(directory);
+            output.Write(PointBlank.Sim.Data.PlaceholderReport.Build(set).Render());
+            return Success;
+        }
+        catch (PointBlank.Sim.Data.DataException e)
+        {
+            error.WriteLine(e.Message);
+            return Failure;
+        }
+    }
+
+    /// <summary>The nearest "data" folder at or above the working directory.</summary>
+    private static string FindDataDirectory()
+    {
+        for (var dir = new DirectoryInfo(Directory.GetCurrentDirectory()); dir != null; dir = dir.Parent)
+        {
+            var candidate = Path.Combine(dir.FullName, "data");
+            if (Directory.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return "data";
     }
 
     private static int Verify(string path, TextWriter output, TextWriter error)

@@ -16,6 +16,7 @@ owner wants to sell it someday.
 |---|---|
 | `src/Sim/` | Pure C# deterministic simulation core. All game rules. |
 | `tests/Sim.Tests/` | xUnit tests, run headless. |
+| `data/` | JSON data tables (units, weapons, ammo, materials, organisation); every value has a `source`. Loader: `src/Sim/Data`. |
 | `tools/Runner/` | Headless battle runner CLI and its scenarios. References `Sim`. |
 | `game/` | Godot 4.7 .NET project. Rendering and input only. References `Sim`. |
 | `PointBlank.sln` | All four projects. Godot builds this one (`solution_directory=".."`). |
@@ -50,6 +51,12 @@ input):
 
 ```powershell
 dotnet run --project tools/Runner -- --replay TestResults/replays/wander-seed1.replay.json
+```
+
+List placeholder counts in the data files (deterministic; optional directory argument):
+
+```powershell
+dotnet run --project tools/Runner -- --data-report
 ```
 
 Build the C# project through Godot (headless):
@@ -112,6 +119,17 @@ and don't rewrite a command to get around one. Optional allow rules:
 
 ## Placeholder values
 
-| Value | Where | Why | Added by item |
-|---|---|---|---|
-| none yet | | | |
+The authoritative list is the report: `dotnet run --project tools/Runner -- --data-report`
+(it lists every placeholder as `table/entry/value`). Currently every value in `data/` is a
+sample placeholder, added by item 0.4 to exercise the loader; none is historical.
+
+Data file format: `data/<table>.json` = `{"table": "...", "entries": [{"id": "...", "values":
+{"<name>": {"value": "853", "unit": "m/s", "source": {...}}}}]}`. `source` is
+`{"kind":"reference","ref":"title, author/publisher, page or URL"}`,
+`{"kind":"estimated","reasoning":"..."}` or `{"kind":"placeholder","note":"..."}`. The loader
+(in `Sim`, so the banned-API scan covers it) rejects a value without a valid source.
+
+**Switching on the no-placeholders test (item 7.7):** in
+`tests/Sim.Tests/Data/NoPlaceholdersTests.cs`, change the one line
+`private const string? SkipUntilItem77 = "...";` to `= null;`. The test then fails while any
+placeholder remains.

@@ -1,0 +1,288 @@
+using System.Text.Json;
+
+namespace PointBlank.Sim.Data;
+
+/// <summary>
+/// Reads the JSON data files (<c>data/&lt;table&gt;.json</c>). Rejects any value without a
+/// valid source tag. Numbers go from decimal text to <see cref="Fixed"/> with integer
+/// arithmetic only.
+/// </summary>
+public static class DataLoader
+{
+    /// <summary>The tables, in the fixed order used by reports.</summary>
+    public static readonly string[] TableNames =
+        ["units", "weapons", "ammo", "materials", "organisation"];
+
+    private const int MaxIntegerDigits = 9;
+    private const int MaxFractionDigits = 9;
+
+    private const string N = "n"; // numeric field: strict decimal, converted to Fixed
+    private const string T = "t"; // text field: kept as written
+
+    /// <summary>Required values per table, each with its declared type (n or t).</summary>
+    private static readonly Dictionary<string, (string Name, string Type)[]> Required = new()
+    {
+        ["units"] = [("name", T), ("side", T), ("weapon", T), ("crew", N)],
+        ["weapons"] =
+        [
+            ("name", T), ("ammo", T), ("muzzle_velocity", N), ("rate_of_fire", N),
+            ("magazine_capacity", N), ("mass", N),
+        ],
+        ["ammo"] = [("caliber", N), ("bullet_mass", N)],
+        ["materials"] = [("name", T), ("cover_protection", N), ("penetration_resistance", N)],
+        ["organisation"] = [("name", T), ("unit", T), ("count", N)],
+    };
+
+    public static DataSet LoadDirectory(string directory)
+    {
+        var tables = new List<DataTable>();
+        foreach (var name in TableNames)
+        {
+            var path = Path.Combine(directory, name + ".json");
+            if (!File.Exists(path))
+            {
+                throw new DataException($"Data file not found: {path}");
+            }
+
+            try
+            {
+                tables.Add(ParseTable(File.ReadAllText(path), name));
+            }
+            catch (DataException e)
+            {
+                throw new DataException($"{name}.json: {e.Message}");
+            }
+        }
+
+        return new DataSet(tables);
+    }
+
+    public static DataTable ParseTable(string json, string expectedTable)
+    {
+        if (!Required.TryGetValue(expectedTable, out var required))
+        {
+            throw new DataException($"Unknown table '{expectedTable}'.");
+        }
+
+        JsonDocument document;
+        try
+        {
+            document = JsonDocument.Parse(json);
+        }
+        catch (JsonException e)
+        {
+            throw new DataException($"{expectedTable}: invalid JSON: {e.Message}");
+        }
+
+        using (document)
+        {
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object
+                || !root.TryGetProperty("table", out var t)
+                || t.ValueKind != JsonValueKind.String
+                || t.GetString() != expectedTable)
+            {
+                throw new DataException($"Expected a file with \"table\": \"{expectedTable}\".");
+            }
+
+            if (!root.TryGetProperty("entries", out var entries)
+                || entries.ValueKind != JsonValueKind.Array)
+            {
+                throw new DataException($"{expectedTable}: missing \"entries\" array.");
+            }
+
+            var ids = new HashSet<string>();
+            var list = new List<DataEntry>();
+            foreach (var e in entries.EnumerateArray())
+            {
+                var entry = ParseEntry(expectedTable, e, required);
+                if (!ids.Add(entry.Id))
+                {
+                    throw new DataException($"{expectedTable}: duplicate id '{entry.Id}'.");
+                }
+
+                list.Add(entry);
+            }
+
+            return new DataTable(expectedTable, list);
+        }
+    }
+
+    private static DataEntry ParseEntry(string table, JsonElement e, (string Name, string Type)[] required)
+    {
+        if (e.ValueKind != JsonValueKind.Object
+            || !e.TryGetProperty("id", out var idElement)
+            || idElement.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(idElement.GetString()))
+        {
+            throw new DataException($"{table}: every entry needs a non-empty string \"id\".");
+        }
+
+        var id = idElement.GetString()!;
+        if (!e.TryGetProperty("values", out var values) || values.ValueKind != JsonValueKind.Object)
+        {
+            throw new DataException($"{table}/{id}: missing \"values\" object.");
+        }
+
+        var parsed = new SortedDictionary<string, DataValue>(StringComparer.Ordinal);
+        foreach (var p in values.EnumerateObject())
+        {
+            var declared = required.FirstOrDefault(r => r.Name == p.Name).Type;
+            parsed[p.Name] = ParseValue($"{table}/{id}/{p.Name}", p.Value, declared);
+        }
+
+        foreach (var (name, _) in required)
+        {
+            if (!parsed.ContainsKey(name))
+            {
+                throw new DataException($"{table}/{id}: missing required value '{name}'.");
+            }
+        }
+
+        return new DataEntry(id, parsed);
+    }
+
+    /// <param name="declared">n, t, or null for a value the schema does not list (numeric unless its unit is "text").</param>
+    private static DataValue ParseValue(string where, JsonElement v, string? declared)
+    {
+        if (v.ValueKind != JsonValueKind.Object)
+        {
+            throw new DataException($"{where}: a value must be an object with value, unit and source.");
+        }
+
+        if (!v.TryGetProperty("source", out var source))
+        {
+            throw new DataException($"{where}: no source tag.");
+        }
+
+        var parsedSource = ParseSource(where, source);
+
+        if (!v.TryGetProperty("value", out var raw)
+            || raw.ValueKind is not (JsonValueKind.String or JsonValueKind.Number))
+        {
+            throw new DataException($"{where}: \"value\" must be a string or a number.");
+        }
+
+        var text = raw.ValueKind == JsonValueKind.String ? raw.GetString()! : raw.GetRawText();
+        if (!v.TryGetProperty("unit", out var unit)
+            || unit.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(unit.GetString()))
+        {
+            throw new DataException($"{where}: \"unit\" is required (use \"text\" for non-numbers).");
+        }
+
+        var unitText = unit.GetString()!;
+        var numeric = (declared ?? (unitText == "text" ? T : N)) == N;
+        if (!numeric)
+        {
+            if (raw.ValueKind != JsonValueKind.String)
+            {
+                throw new DataException($"{where}: a text value must be a JSON string.");
+            }
+
+            return new DataValue(text, unitText, parsedSource, null);
+        }
+
+        if (!TryParseFixed(text, out var number))
+        {
+            throw new DataException(
+                $"{where}: '{text}' is not a valid number (optional '-', digits, optional '.' and "
+                + $"digits; at most {MaxIntegerDigits} integer and {MaxFractionDigits} fractional digits).");
+        }
+
+        return new DataValue(text, unitText, parsedSource, number);
+    }
+
+    private static DataSource ParseSource(string where, JsonElement s)
+    {
+        if (s.ValueKind != JsonValueKind.Object
+            || !s.TryGetProperty("kind", out var kind)
+            || kind.ValueKind != JsonValueKind.String)
+        {
+            throw new DataException($"{where}: source must be an object with a \"kind\".");
+        }
+
+        switch (kind.GetString())
+        {
+            case "reference":
+                return new DataSource(DataSourceKind.Reference, Need(where, s, "ref"));
+            case "estimated":
+                return new DataSource(DataSourceKind.Estimated, Need(where, s, "reasoning"));
+            case "placeholder":
+                var note = s.TryGetProperty("note", out var n) && n.ValueKind == JsonValueKind.String
+                    ? n.GetString()!
+                    : string.Empty;
+                return new DataSource(DataSourceKind.Placeholder, note);
+            default:
+                throw new DataException(
+                    $"{where}: unknown source kind '{kind.GetString()}' "
+                    + "(use reference, estimated or placeholder).");
+        }
+    }
+
+    private static string Need(string where, JsonElement s, string name)
+    {
+        if (s.TryGetProperty(name, out var p)
+            && p.ValueKind == JsonValueKind.String
+            && !string.IsNullOrWhiteSpace(p.GetString()))
+        {
+            return p.GetString()!;
+        }
+
+        throw new DataException($"{where}: source needs a non-empty \"{name}\".");
+    }
+
+    /// <summary>
+    /// Strictly parses an optionally negative plain decimal: digits, optionally a point and
+    /// more digits. No plus sign, exponent, comma or whitespace; at most 9 integer and 9
+    /// fractional digits (so the result always fits Q31.32). Integer arithmetic only.
+    /// Rounding rule: the value is divided as an exact ratio and the result is truncated
+    /// toward zero to the nearest Q31.32 step (2^-32), so 0.1 becomes 429496729/2^32 and
+    /// -0.1 becomes -429496729/2^32. Never rounds away from zero.
+    /// </summary>
+    public static bool TryParseFixed(string text, out Fixed value)
+    {
+        value = default;
+        var s = text.AsSpan();
+        var negative = s.Length > 0 && s[0] == '-';
+        if (negative)
+        {
+            s = s[1..];
+        }
+
+        var point = s.IndexOf('.');
+        var whole = point < 0 ? s : s[..point];
+        var fraction = point < 0 ? default : s[(point + 1)..];
+        if (whole.Length is 0 or > MaxIntegerDigits
+            || (point >= 0 && (fraction.Length == 0 || fraction.Length > MaxFractionDigits)))
+        {
+            return false;
+        }
+
+        long scaled = 0;
+        foreach (var c in whole)
+        {
+            if (c is < '0' or > '9')
+            {
+                return false;
+            }
+
+            scaled = (scaled * 10) + (c - '0');
+        }
+
+        long denominator = 1;
+        foreach (var c in fraction)
+        {
+            if (c is < '0' or > '9')
+            {
+                return false;
+            }
+
+            scaled = (scaled * 10) + (c - '0');
+            denominator *= 10;
+        }
+
+        value = Fixed.FromRatio(negative ? -scaled : scaled, denominator);
+        return true;
+    }
+}

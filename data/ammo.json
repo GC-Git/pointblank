@@ -1,0 +1,19 @@
+{
+  "table": "ammo",
+  "entries": [
+    {
+      "id": "us_rifle_round_sample",
+      "values": {
+        "caliber": { "value": "7.6", "unit": "mm", "source": { "kind": "placeholder", "note": "Not a historical value." } },
+        "bullet_mass": { "value": "10", "unit": "g", "source": { "kind": "placeholder", "note": "Not a historical value." } }
+      }
+    },
+    {
+      "id": "de_rifle_round_sample",
+      "values": {
+        "caliber": { "value": "7.9", "unit": "mm", "source": { "kind": "placeholder", "note": "Not a historical value." } },
+        "bullet_mass": { "value": "12", "unit": "g", "source": { "kind": "placeholder", "note": "Not a historical value." } }
+      }
+    }
+  ]
+}

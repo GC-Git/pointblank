@@ -1,0 +1,13 @@
+{
+  "table": "organisation",
+  "entries": [
+    {
+      "id": "us_squad_sample",
+      "values": {
+        "name": { "value": "US rifle squad (sample)", "unit": "text", "source": { "kind": "placeholder", "note": "Sample row; not a real table of organisation." } },
+        "unit": { "value": "us_rifleman_sample", "unit": "text", "source": { "kind": "placeholder", "note": "Sample row." } },
+        "count": { "value": "12", "unit": "men", "source": { "kind": "placeholder", "note": "Not a historical value." } }
+      }
+    }
+  ]
+}

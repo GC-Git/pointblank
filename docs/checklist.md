@@ -42,7 +42,7 @@ Status: draft, awaiting owner sign-off
   fails if `System.Random`, `DateTime` or `float` appear in `Sim` outside approved
   wrappers (fixed-point or deterministic maths only).
 
-- [ ] **0.3 Headless battle runner and replays** (S)
+- [x] **0.3 Headless battle runner and replays** (S)
   CLI: `runner --scenario X --seeds 1..100 --out stats.json`. Replay file =
   seed + map + forces + timestamped orders.
   *Done when:* running a scenario twice yields byte-identical stats. A saved replay
