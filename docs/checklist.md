@@ -73,7 +73,7 @@ Status: draft, awaiting owner sign-off
   blocks LOS. A performance test runs 300 × 300 LOS checks per tick under budget (set in
   the item plan).
 
-- [ ] **1.3 Soldiers, teams, squads, leaders** (S)
+- [x] **1.3 Soldiers, teams, squads, leaders** (S)
   Organisation from data (placeholder 1944 US rifle squad and German Gruppe). Positions,
   posture, and next-in-command succession.
   *Done when:* when a leader dies, the next in command takes over after a delay, and the

@@ -1,0 +1,15 @@
+{
+  "table": "formation",
+  "entries": [
+    {
+      "id": "staggered_column",
+      "values": {
+        "name": { "value": "Staggered column", "unit": "text", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
+        "spacing": { "value": "5", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: distance between ranks along the line of march." } },
+        "lateral": { "value": "4", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: offset left or right of the axis for the men behind the leader." } },
+        "leash": { "value": "20", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: the squad's guide waits while any man is further than this from it." } },
+        "replan_ticks": { "value": "5", "unit": "ticks", "source": { "kind": "placeholder", "note": "Placeholder: fewest ticks between one man's path replans." } }
+      }
+    }
+  ]
+}
