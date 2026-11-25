@@ -11,12 +11,12 @@ public sealed class OrgSystem(OrgTables tables) : ISimSystem
     public OrgTables Tables { get; } = tables;
 
     /// <summary>In spawn order.</summary>
-    public IReadOnlyList<Squad> Squads => _squads;
+    internal IReadOnlyList<Squad> Squads => _squads;
 
-    public Soldier? FindSoldier(int id) =>
+    internal Soldier? FindSoldier(int id) =>
         _squads.SelectMany(s => s.Soldiers).FirstOrDefault(s => s.Id == id);
 
-    public Squad? FindSquadOf(int soldierId) =>
+    internal Squad? FindSquadOf(int soldierId) =>
         _squads.FirstOrDefault(q => q.Soldiers.Any(s => s.Id == soldierId));
 
     /// <summary>
@@ -24,7 +24,7 @@ public sealed class OrgSystem(OrgTables tables) : ISimSystem
     /// four to a row) centred on the point, the leader at the front.
     /// </summary>
     /// <exception cref="ArgumentException">There is no such squad in the data.</exception>
-    public Squad SpawnSquad(string orgId, Fixed x, Fixed y, Posture posture = Posture.Standing)
+    internal Squad SpawnSquad(string orgId, Fixed x, Fixed y, Posture posture = Posture.Standing)
     {
         var template = Tables.Get(orgId);
         var spacing = Fixed.FromInt(2);

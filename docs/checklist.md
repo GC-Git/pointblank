@@ -85,7 +85,7 @@ Status: draft, awaiting owner sign-off
   *Done when:* units take the cheaper route around woods, `Sneak` is slower and lower
   posture than `Move`, and two squads crossing paths don't deadlock.
 
-- [ ] **1.5 Order pipeline with chain of command** (O)
+- [x] **1.5 Order pipeline with chain of command** (O)
   One order vocabulary for player and AI. Delivery delay depends on leader alive, morale,
   and HQ contact. Shaken units may hesitate or refuse. Delay state is exposed for the UI.
   *Done when:* with seeds, mean delay is higher for a leaderless squad and for a squad

@@ -36,8 +36,21 @@ public sealed class World
 
     public SimRng Rng { get; }
 
-    /// <summary>The first registered system of type <typeparamref name="T"/>.</summary>
-    public T GetSystem<T>()
+    /// <summary>
+    /// The view of one side: the only API for UI and AI code (see <see cref="SideView"/>). Needs an
+    /// <see cref="Org.OrgSystem"/>; orders and spotting are empty without their systems.
+    /// </summary>
+    public SideView ViewFor(string side) => new(this, side);
+
+    /// <summary>The earliest tick <see cref="Schedule"/> accepts now.</summary>
+    internal long EarliestInputTick => _stepping ? Tick + 1 : Tick;
+
+    /// <summary>The first registered system of type <typeparamref name="T"/>, or null.</summary>
+    internal T? FindSystem<T>()
+        where T : class, ISimSystem => _systems.OfType<T>().FirstOrDefault();
+
+    /// <summary>The first registered system of type <typeparamref name="T"/>. Internal: systems hold the truth of both sides.</summary>
+    internal T GetSystem<T>()
         where T : ISimSystem => _systems.OfType<T>().First();
 
     /// <summary>

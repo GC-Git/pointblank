@@ -100,6 +100,15 @@ lines.
 9. **Delete only inside the repo**, using relative paths.
 10. **Run `git push` and `gh pr create` as separate commands.** Combined in one line,
     `--base main` trips the push-to-main deny rule.
+11. **Fog of war: UI and AI code may only use `SideView`** (`world.ViewFor(side)`). It shows
+    the side's own units as copies, enemies only as spotted `ContactView` copies, and order
+    status and issuing for its own units. The raw state of both sides (`World.GetSystem`,
+    `OrgSystem.Squads`, live `Soldier`/`Squad` objects, `CommandSystem.StatusOf`,
+    `SpottingSystem.KnownEnemies`, `MovementSystem.Execute`) is `internal` to `Sim`, visible
+    only to `Sim.Tests` and the headless runner through `InternalsVisibleTo`. Never widen that
+    list for `game/` or AI code, and never make those members public.
+    `SpottingSystem.DebugTruth()` is the one public truth accessor, and it is for debug
+    overlays only. Tests in `tests/Sim.Tests/Boundary/` enforce this by reflection.
 
 ## Merge rule (owner's standing instruction, 2026-11-25)
 
@@ -123,7 +132,7 @@ The authoritative list is the report: `dotnet run --project tools/Runner -- --da
 (it lists every placeholder as `table/entry/value`). Currently every value in `data/` is a
 sample placeholder, added by item 0.4 to exercise the loader; none is historical.
 
-Data file format: `data/<table>.json` (tables: units, weapons, ammo, materials, organisation, terrain, postures, sight, movement, formation, command) = `{"table": "...", "entries": [{"id": "...", "values":
+Data file format: `data/<table>.json` (tables: units, weapons, ammo, materials, organisation, terrain, postures, sight, movement, formation, command, spotting) = `{"table": "...", "entries": [{"id": "...", "values":
 {"<name>": {"value": "853", "unit": "m/s", "source": {...}}}}]}`. `source` is
 `{"kind":"reference","ref":"title, author/publisher, page or URL"}`,
 `{"kind":"estimated","reasoning":"..."}` or `{"kind":"placeholder","note":"..."}`. The loader

@@ -56,7 +56,10 @@ public sealed class MovementSystem : ISimSystem
     public PathFinder Paths { get; }
 
     /// <summary>Whether the squad has a move order it has not finished.</summary>
-    public bool IsMoving(int squadId) => _guides.ContainsKey(squadId);
+    internal bool IsMoving(int squadId) => _guides.ContainsKey(squadId);
+
+    /// <summary>The mode of the squad's unfinished move order, or null when it is not moving.</summary>
+    internal MoveMode? ModeOf(int squadId) => _guides.TryGetValue(squadId, out var g) ? g.Mode : null;
 
     /// <summary>Whether a point (metres from the north-west corner) lies on the map.</summary>
     public bool IsOnMap(Fixed x, Fixed y) =>
@@ -70,7 +73,7 @@ public sealed class MovementSystem : ISimSystem
     /// the map is rejected, never clamped to the edge.
     /// </summary>
     /// <exception cref="InvalidOperationException">There is no such squad.</exception>
-    public MoveResult Execute(MoveOrder order)
+    internal MoveResult Execute(MoveOrder order)
     {
         var squad = _org.Squads.FirstOrDefault(s => s.Id == order.SquadId)
             ?? throw new InvalidOperationException($"No squad {order.SquadId}.");
@@ -116,7 +119,7 @@ public sealed class MovementSystem : ISimSystem
 
     /// <summary>Ends the squad's move where its men stand now (a Hold order). Does nothing if it is not moving.</summary>
     /// <exception cref="InvalidOperationException">There is no such squad.</exception>
-    public void Stop(int squadId)
+    internal void Stop(int squadId)
     {
         var squad = _org.Squads.FirstOrDefault(s => s.Id == squadId)
             ?? throw new InvalidOperationException($"No squad {squadId}.");
