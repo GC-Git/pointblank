@@ -92,6 +92,25 @@ public sealed class UnitAiRules
     /// <summary>How far (m) a man of a squad ordered to Defend or Ambush looks for a firing position at a hedge (item 2.4 follow-up).</summary>
     public Fixed DefendSearchRadius { get; init; }
 
+    /// <summary>Fire discipline (item 2.4 follow-up): a man at or above this suppression level keeps his head down and does not fire.</summary>
+    public Fixed FireHoldSuppression { get; init; }
+
+    /// <summary>The squad leader and MG gunner open fire within this many ticks of the squad's fire task starting.</summary>
+    public int OpenDelayTicks { get; init; }
+
+    /// <summary>The other men join between these many ticks after the start (each his own, deterministic draw).</summary>
+    public int JoinDelayMinTicks { get; init; }
+
+    public int JoinDelayMaxTicks { get; init; }
+
+    /// <summary>Chance a man stays silent through a fire task; <see cref="ShakenSilentChance"/> when his squad is shaken, pinned or rallying.</summary>
+    public Fixed SilentChance { get; init; }
+
+    public Fixed ShakenSilentChance { get; init; }
+
+    /// <summary>A squad on Defend or Ambush opens fire on its own only at enemies within this range (m), unless fired on.</summary>
+    public Fixed DefendOpenRange { get; init; }
+
     public Fixed LineSpacing { get; init; }
 
     public int LineReformSectors { get; init; }
@@ -159,6 +178,13 @@ public sealed class UnitAiRules
             CoverMin = F(e, "unit_ai", "cover_min", Fixed.Zero, Fixed.One),
             CoverSearchRadius = N("cover_search_radius"),
             DefendSearchRadius = N("defend_search_radius"),
+            FireHoldSuppression = N("fire_hold_suppression"),
+            OpenDelayTicks = (N("open_delay") * Fixed.FromInt(World.TicksPerSecond)).ToInt(),
+            JoinDelayMinTicks = (N("join_delay_min") * Fixed.FromInt(World.TicksPerSecond)).ToInt(),
+            JoinDelayMaxTicks = (N("join_delay_max") * Fixed.FromInt(World.TicksPerSecond)).ToInt(),
+            SilentChance = N("silent_chance"),
+            ShakenSilentChance = N("shaken_silent_chance"),
+            DefendOpenRange = N("defend_open_range"),
             LineSpacing = Pos("line_spacing"),
             LineReformSectors = Math.Max(1, N("line_reform_sectors").ToInt()),
             BoundDistance = N("bound_distance"),

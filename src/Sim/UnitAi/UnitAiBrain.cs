@@ -26,6 +26,9 @@ internal interface IAiEffects
     void SetFire(int squadId, int targetId, Fixed x, Fixed y, int teamMask);
 
     void StopFire(int squadId);
+
+    /// <summary>Keeps one of the squad's men from firing on its AI fire task, or lets him fire again (his own decision).</summary>
+    void SetSilent(int squadId, int soldierId, bool silent);
 }
 
 /// <summary>
@@ -116,6 +119,8 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
             hasher.Add(m.TargetId);
             hasher.Add(m.DefendTick);
             hasher.Add(m.LastShelled);
+            hasher.Add(m.FireStart);
+            hasher.Add(m.FireEnd);
         }
     }
 
@@ -249,6 +254,11 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
 
         var inRange = tracked != null && trackedD2 <= engage * engage;
 
+        // Fire discipline (item 2.4 follow-up): on Defend or Ambush the squad opens fire on its own only at close range.
+        var defending = status is { Status: OrderStatus.Done } && order is { Kind: OrderKind.Defend or OrderKind.Ambush };
+        var open = defending && rules.DefendOpenRange < engage ? rules.DefendOpenRange : engage;
+        var openRange = tracked != null && trackedD2 <= open * open;
+
         // The fire task.
         var roe = view.RoeOf(q.Id) ?? RoeMode.FireAtWill;
         var fireId = -2;
@@ -274,7 +284,7 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
                     (fireId, fireX, fireY) = (-1, cx + (dx * r / d), cy + (dy * r / d));
                 }
             }
-            else if (roe == RoeMode.FireAtWill && inRange)
+            else if (roe == RoeMode.FireAtWill && openRange)
             {
                 (fireId, fireX, fireY) = (tracked!.Value.EnemyId, tracked.Value.X, tracked.Value.Y);
             }
@@ -479,14 +489,73 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
 
         if (fireId >= -1)
         {
+            if (!m.Firing && tick - m.FireEnd > rules.UnderFireMemoryTicks)
+            {
+                m.FireStart = tick;
+            }
+
             fx.SetFire(q.Id, fireId, fireX, fireY, fireMask);
             (m.Firing, m.TargetId) = (true, fireId);
+            Discipline(fx, q, able, m, tick);
         }
         else if (m.Firing)
         {
             fx.StopFire(q.Id);
-            m.Firing = false;
+            (m.Firing, m.FireEnd) = (false, tick);
+            foreach (var s in able)
+            {
+                fx.SetSilent(q.Id, s.Id, false);
+            }
         }
+
+        // A badly suppressed man keeps low (item 2.4 follow-up), whatever the squad is doing, unless he is on the move.
+        foreach (var s in able)
+        {
+            if (!s.Moving && s.Suppression >= rules.FireHoldSuppression && s.Posture != rules.PostureOpen)
+            {
+                fx.SetPosture(s.Id, rules.PostureOpen);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Per-man fire decisions (item 2.4 follow-up) on the squad's AI fire task. A man fires only when all hold: his
+    /// suppression is below <c>fire_hold_suppression</c> (else he keeps his head down); he is not one of the men who stay
+    /// silent through this task (<c>silent_chance</c>, <c>shaken_silent_chance</c> when the squad is shaken, pinned or rallying);
+    /// and his own delay since the task started has run: the leader and the MG gunner within <c>open_delay</c>, the others
+    /// between <c>join_delay_min</c> and <c>join_delay_max</c> (doubled with no leader). The draws are a deterministic hash
+    /// of the man and the task's start tick, so they need no state and no RNG; both sides use the same rules.
+    /// </summary>
+    private void Discipline(IAiEffects fx, SquadView q, List<SoldierView> able, Mind m, long tick)
+    {
+        var shaken = q.Morale is MoraleState.Shaken or MoraleState.Pinned or MoraleState.Rallying;
+        var silentChance = shaken ? rules.ShakenSilentChance : rules.SilentChance;
+        foreach (var s in able)
+        {
+            var first = s.Id == q.LeaderId || s.Role == Role.MgGunner;
+            var delay = first
+                ? Draw(s.Id, m.FireStart, 1, rules.OpenDelayTicks)
+                : rules.JoinDelayMinTicks + Draw(s.Id, m.FireStart, 2, rules.JoinDelayMaxTicks - rules.JoinDelayMinTicks);
+            delay *= q.LeaderId < 0 ? 2 : 1;
+            var silent = !first && Fixed.FromRatio(Draw(s.Id, m.FireStart, 3, 1_000_000), 1_000_000) < silentChance;
+            var hold = s.Suppression >= rules.FireHoldSuppression || silent || tick < m.FireStart + delay;
+            fx.SetSilent(q.Id, s.Id, hold);
+        }
+    }
+
+    /// <summary>A deterministic draw in [0, <paramref name="range"/>] from a man, a tick and a salt (SplitMix64 finaliser).</summary>
+    private static int Draw(int soldierId, long tick, int salt, int range)
+    {
+        if (range <= 0)
+        {
+            return 0;
+        }
+
+        var z = unchecked(((ulong)soldierId * 0x9E3779B97F4A7C15UL) ^ ((ulong)tick * 0xBF58476D1CE4E5B9UL) ^ ((ulong)salt * 0x94D049BB133111EBUL));
+        z = unchecked((z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL);
+        z = unchecked((z ^ (z >> 27)) * 0x94D049BB133111EBUL);
+        z ^= z >> 31;
+        return (int)(z % (ulong)(range + 1));
     }
 
     /// <summary>
@@ -908,6 +977,12 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
 
         /// <summary>The last shell burst near one of its men (item 2.4 follow-up): under shellfire men lie flat.</summary>
         public long LastShelled { get; set; } = long.MinValue / 2;
+
+        /// <summary>When the squad's current AI fire task began (item 2.4 follow-up: per-man delays count from it).</summary>
+        public long FireStart { get; set; } = -1;
+
+        /// <summary>When its last AI fire task ended: a task that resumes within the under-fire memory keeps its start (and delays).</summary>
+        public long FireEnd { get; set; } = long.MinValue / 2;
 
         public bool Firing { get; set; }
 

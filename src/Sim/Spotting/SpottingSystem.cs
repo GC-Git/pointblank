@@ -261,6 +261,12 @@ public sealed class SpottingSystem : ISimSystem
         var rate = los.Visible
             ? Rules.Rate(distance, Concealment(t.Soldier), los.Obscurement, t.Soldier.Posture, Motion(t, tick), Firing(t, tick), ObserverFactor(o.Soldier))
             : Fixed.Zero;
+        if (rate > Fixed.Zero && !Firing(t, tick) && AtHedge(t.Soldier, o.Soldier))
+        {
+            // At a hedge and silent: picked out only close in, closer still when he keeps still.
+            var limit = Motion(t, tick) == TargetMotion.Still ? Rules.HedgeStillRange : Rules.HedgeMovingRange;
+            rate = distance > limit ? Fixed.Zero : rate;
+        }
         if (rate <= Fixed.Zero)
         {
             _progress.Remove(key);
@@ -418,6 +424,36 @@ public sealed class SpottingSystem : ISimSystem
     }
 
     private bool Firing(Entry e, long tick) => tick - e.LastFired <= Rules.FiringWindowTicks;
+    /// <summary>
+    /// Whether the target is at a firing position behind a hedge from this observer (item 2.4 follow-up): a hedge on an edge
+    /// of his tile, within <c>hedge_position_distance</c> of him, with the observer beyond that edge's line.
+    /// </summary>
+    private bool AtHedge(Soldier t, Soldier o)
+    {
+        var reach = Rules.HedgePositionDistance;
+        if (reach <= Fixed.Zero)
+        {
+            return false;
+        }
+
+        var size = Fixed.FromRaw(_tileRaw);
+        var x = (int)(t.X.Raw / _tileRaw);
+        var y = (int)(t.Y.Raw / _tileRaw);
+        if (!_map.InBounds(x, y))
+        {
+            return false;
+        }
+
+        var west = size * Fixed.FromInt(x);
+        var east = west + size;
+        var north = size * Fixed.FromInt(y);
+        var south = north + size;
+        return (_map.HasHedge(x, y, EdgeSide.East) && east - t.X <= reach && o.X > east)
+            || (x > 0 && _map.HasHedge(x - 1, y, EdgeSide.East) && t.X - west <= reach && o.X < west)
+            || (_map.HasHedge(x, y, EdgeSide.South) && south - t.Y <= reach && o.Y > south)
+            || (y > 0 && _map.HasHedge(x, y - 1, EdgeSide.South) && t.Y - north <= reach && o.Y < north);
+    }
+
 
     private sealed class Entry(Soldier soldier, Squad squad)
     {

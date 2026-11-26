@@ -19,7 +19,10 @@
         "firing_factor": { "value": "3", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: rate factor for a target that fired within the firing window." } },
         "firing_window": { "value": "3", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: how long after a shot the firer counts as firing." } },
         "lost_after": { "value": "30", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: an unseen contact degrades to Lost after this long." } },
-        "forget_after": { "value": "120", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: an unseen contact is forgotten after this long." } }
+        "forget_after": { "value": "120", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: an unseen contact is forgotten after this long." } },
+        "hedge_position_distance": { "value": "2", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: a man this close to a hedge between him and the observer is in a firing position behind it (about one tile)." } },
+        "hedge_still_range": { "value": "40", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: a still, silent man at a hedge cannot be picked out from further than this." } },
+        "hedge_moving_range": { "value": "100", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: a man moving at a hedge (not firing) cannot be picked out from further than this; firing gives him away at any range." } }
       }
     }
   ]

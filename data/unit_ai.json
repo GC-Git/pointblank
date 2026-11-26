@@ -52,6 +52,13 @@
             "note": "Placeholder: terrain whose cover ratio (terrain.json) is at least this counts as cover for the AI."
           }
         },
+        "fire_hold_suppression": { "value": "45", "unit": "points", "source": { "kind": "placeholder", "note": "Placeholder:  a man this suppressed (0 to 100) keeps his head down: he does not fire and lies low." } },
+        "open_delay": { "value": "0", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder:  the squad leader and MG gunner open fire within this long of the squad's fire task starting (0: at once; they set the example)." } },
+        "join_delay_min": { "value": "1", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder:  the soonest another man joins the fire." } },
+        "join_delay_max": { "value": "4", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder:  the latest another man joins the fire (each man draws his own delay)." } },
+        "silent_chance": { "value": "0", "unit": "probability", "source": { "kind": "placeholder", "note": "Placeholder:  chance a man does not fire at all through a fire task." } },
+        "shaken_silent_chance": { "value": "0.35", "unit": "probability", "source": { "kind": "placeholder", "note": "Placeholder:  the same when his squad is shaken, pinned or rallying." } },
+        "defend_open_range": { "value": "120", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder:  a squad on Defend or Ambush holds its fire until an enemy is this close, unless it is fired on." } },
         "defend_search_radius": { "value": "15", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: a man of a squad ordered to Defend or Ambush moves to a firing position at a hedge facing the order point within this distance." } },
         "cover_search_radius": {
           "value": "6",

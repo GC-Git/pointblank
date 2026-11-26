@@ -48,6 +48,69 @@ public class SpottingTests(ITestOutputHelper output)
         return int.MaxValue;
     }
 
+    [Theory]
+    [InlineData(Posture.Prone)]
+    [InlineData(Posture.Kneeling)]
+    public void A_still_silent_man_at_a_hedge_is_unspotted_from_100m_until_he_fires(Posture posture)
+    {
+        // The 1.2 setup: a hedge on the line x = 100 m, the target 1 m behind it, the observer 100 m away.
+        var map = new GameMap("hedge", 150, 30);
+        for (var y = 0; y < map.Height; y++)
+        {
+            map.SetHedge(49, y, EdgeSide.East, true);
+        }
+
+        Rig Scene(out Squad target)
+        {
+            var rig = Setup(map);
+            var us = rig.Org.SpawnSquad("us_rifle_squad", M(1), M(30), Posture.Standing);
+            foreach (var s in us.Soldiers.Skip(1))
+            {
+                us.SetHealth(s.Id, HealthState.Dead);
+            }
+
+            target = rig.Org.SpawnSquad("de_gruppe", M(101), M(30), posture);
+            for (var i = 0; i < target.Soldiers.Count; i++)
+            {
+                if (i > 0)
+                {
+                    target.SetHealth(target.Soldiers[i].Id, HealthState.Dead);
+                }
+            }
+
+            target.Soldiers[0].X = M(101); // 1 m behind the hedge, on the side away from the observer
+            target.Soldiers[0].Y = M(30);
+            us.Soldiers[0].X = M(1);
+            us.Soldiers[0].Y = M(30);
+            return rig;
+        }
+
+        var quiet = Scene(out var t1);
+        t1.Soldiers[0].X = M(101);
+        Assert.Equal(int.MaxValue, TicksUntilSpotted(quiet, t1, 1200)); // two minutes, still and silent
+
+        var firing = Scene(out var t2);
+        t2.Soldiers[0].X = M(101);
+        for (var tick = 0; tick < 1200; tick += 10)
+        {
+            firing.World.Schedule(tick, new FiredInput(t2.Soldiers[0].Id));
+        }
+
+        var ticks = TicksUntilSpotted(firing, t2, 1200);
+        output.WriteLine($"{posture} at the hedge, firing every second: spotted from 100 m after {ticks} ticks");
+        Assert.True(ticks < 1200);
+
+        var close = Scene(out var t3);
+        t3.Soldiers[0].X = M(101);
+        close.Org.Squads[0].Soldiers[0].X = M(75); // 26 m: close enough to make him out
+        Assert.True(TicksUntilSpotted(close, t3, 1200) < 1200);
+    }
+
+    private sealed class FiredInput(int soldierId) : ISimInput
+    {
+        public void Apply(World world) => world.GetSystem<SpottingSystem>().NoteFired(soldierId, world.Tick);
+    }
+
     [Fact]
     public void Rules_come_from_the_data_file()
     {

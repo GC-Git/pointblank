@@ -28,9 +28,11 @@ namespace PointBlank.Runner;
 /// </list>
 /// Start points jitter with the seed. A watch reads the truth (the runner only) against the US side's known enemies:
 /// <c>known_at_start</c>, <c>survivors</c> (able defenders) and <c>suppressed</c> (able defenders suppressed or pinned) at
-/// <see cref="AdvanceTick"/>; <c>known_150</c>, <c>known_100</c>, <c>known_50</c>, <c>known_20</c> (the discovered share, known at any time so far, of the
-/// able defenders when the creeping squad's centre first comes within that distance of the hedge, or at the end if it never
-/// does) and <c>reached_20</c>; <c>found_firing</c> (defenders the US first knew within 3 s of their firing);
+/// <see cref="AdvanceTick"/>; <c>known_150</c>, <c>known_100</c>, <c>known_50</c>, <c>known_20</c> (the number of able defenders discovered, known at any time so far,
+/// when the creeping squad's centre first comes within that distance of the hedge; -1 if it never does); <c>de_firers</c> and
+/// <c>fire_spread</c> (seconds from the first to the last defender's first shot in the creep); <c>found_firing</c> (defenders
+/// the US first knew within 3 s of their firing), <c>found_close</c> (first known, not by fire, with the squad within 50 m)
+/// and <c>never_found</c>;
 /// <c>de_suppression</c>, <c>de_peak_suppression</c> and <c>de_morale</c> at the advance; <c>de_casualties</c>;
 /// <c>us_creep_casualties</c> (US squad men down during the creep).
 /// </summary>
@@ -126,7 +128,6 @@ public sealed class BombardCreepScenario : IScenario
     {
         var w = world.GetSystem<Watch>();
         var org = world.GetSystem<OrgSystem>();
-        var now = w.Discovered();
         var list = new List<Metric>
         {
             new("known_at_start", Fixed.FromInt(w.KnownAtStart)),
@@ -135,13 +136,18 @@ public sealed class BombardCreepScenario : IScenario
         };
         for (var i = 0; i < Bands.Length; i++)
         {
-            list.Add(new($"known_{Bands[i]}", w.Share[i] ?? now));
+            // Discovered able defenders when the squad first came within the band; -1 if it never did.
+            list.Add(new($"known_{Bands[i]}", w.Share[i] ?? Fixed.FromInt(-1)));
         }
 
+        var first = w.FirstShots;
         list.AddRange(
         [
-            new("reached_20", w.Share[^1] != null ? Fixed.One : Fixed.Zero),
+            new("de_firers", Fixed.FromInt(first.Count)),
+            new("fire_spread", first.Count >= 2 ? Fixed.FromRatio(first.Max() - first.Min(), World.TicksPerSecond) : Fixed.FromInt(-1)),
             new("found_firing", Fixed.FromInt(w.FoundFiring)),
+            new("found_close", Fixed.FromInt(w.FoundClose)),
+            new("never_found", Fixed.FromInt(org.Squads[3].Soldiers.Count(s => s.CanLead && !w.Ever(s.Id)))),
             new("de_suppression", w.Suppression),
             new("de_peak_suppression", w.PeakSuppression),
             new("de_morale", w.Morale),
@@ -197,6 +203,8 @@ public sealed class BombardCreepScenario : IScenario
         private const int FiringWindowTicks = 3 * World.TicksPerSecond;
 
         private readonly SortedSet<int> _known = [];
+        private readonly SortedDictionary<int, long> _firstShot = [];
+        private Fixed _closest = Fixed.FromInt(100000);
 
         public Fixed Suppression { get; private set; }
 
@@ -233,16 +241,49 @@ public sealed class BombardCreepScenario : IScenario
             return able.Count == 0 ? Fixed.One : Fixed.FromRatio(able.Count(s => _known.Contains(s.Id)), able.Count);
         }
 
+        /// <summary>Whether the US side has ever known this defender.</summary>
+        public bool Ever(int soldierId) => _known.Contains(soldierId);
+
+        /// <summary>Each defender's first shot (tick) from the start of the creep.</summary>
+        public IReadOnlyCollection<long> FirstShots => _firstShot.Values;
+
+        /// <summary>Defenders first discovered with the creeping squad within 50 m, and not by their own fire.</summary>
+        public int FoundClose { get; private set; }
+
         public void Tick(World world)
         {
             var de = org.Squads[3];
             var known = spotting.KnownEnemies("us");
+
+            // The creeping squad's distance to the hedge (its able men's mean x), from the start of the creep.
+            Fixed? d = null;
+            var us = org.Squads[0].Soldiers.Where(s => s.CanLead).ToList();
+            if (world.Tick >= AdvanceTick && us.Count > 0)
+            {
+                var x = Fixed.Zero;
+                foreach (var s in us)
+                {
+                    x += s.X;
+                }
+
+                d = (x / Fixed.FromInt(us.Count)) - Fixed.FromInt(HedgeX);
+                _closest = d.Value < _closest ? d.Value : _closest;
+            }
+
             foreach (var s in de.Soldiers)
             {
+                var fired = fire.LastFiredTick(s.Id);
+                if (world.Tick >= AdvanceTick && fired >= AdvanceTick && !_firstShot.ContainsKey(s.Id))
+                {
+                    _firstShot[s.Id] = fired;
+                }
+
                 if (!_known.Contains(s.Id) && known.Any(c => c.EnemyId == s.Id))
                 {
                     _known.Add(s.Id);
-                    FoundFiring += world.Tick - fire.LastFiredTick(s.Id) <= FiringWindowTicks ? 1 : 0;
+                    var byFire = world.Tick - fired <= FiringWindowTicks;
+                    FoundFiring += byFire ? 1 : 0;
+                    FoundClose += !byFire && world.Tick > AdvanceTick && _closest <= Fixed.FromInt(50) ? 1 : 0;
                 }
             }
 
@@ -264,35 +305,26 @@ public sealed class BombardCreepScenario : IScenario
                 UsDownAtStart = org.Squads[0].Soldiers.Count(s => !s.CanLead);
             }
 
-            if (world.Tick < AdvanceTick)
+            for (var i = 0; d != null && i < Bands.Length; i++)
             {
-                return;
-            }
-
-            var us = org.Squads[0].Soldiers.Where(s => s.CanLead).ToList();
-            if (us.Count == 0)
-            {
-                return;
-            }
-
-            var x = Fixed.Zero;
-            foreach (var s in us)
-            {
-                x += s.X;
-            }
-
-            var d = (x / Fixed.FromInt(us.Count)) - Fixed.FromInt(HedgeX);
-            for (var i = 0; i < Bands.Length; i++)
-            {
-                if (Share[i] == null && d <= Fixed.FromInt(Bands[i]))
+                if (Share[i] == null && d.Value <= Fixed.FromInt(Bands[i]))
                 {
-                    Share[i] = Discovered();
+                    Share[i] = Fixed.FromInt(de.Soldiers.Count(s => s.CanLead && _known.Contains(s.Id)));
                 }
             }
         }
 
         public void AppendState(StateHasher hasher)
         {
+            hasher.Add(_firstShot.Count);
+            foreach (var (id, t) in _firstShot)
+            {
+                hasher.Add(id);
+                hasher.Add(t);
+            }
+
+            hasher.Add(_closest);
+            hasher.Add(FoundClose);
             hasher.Add(_known.Count);
             foreach (var id in _known)
             {

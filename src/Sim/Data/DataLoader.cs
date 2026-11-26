@@ -56,7 +56,8 @@ public static class DataLoader
             ("name", T), ("refresh_ticks", N), ("base_rate", N), ("near_range", N), ("max_range", N),
             ("posture_standing", N), ("posture_kneeling", N), ("posture_prone", N), ("motion_still", N),
             ("motion_sneak", N), ("motion_move", N), ("motion_move_fast", N), ("firing_factor", N),
-            ("firing_window", N), ("lost_after", N), ("forget_after", N),
+            ("firing_window", N), ("lost_after", N), ("forget_after", N), ("hedge_position_distance", N), ("hedge_still_range", N),
+            ("hedge_moving_range", N),
         ],
         ["fire"] =
         [
@@ -88,7 +89,8 @@ public static class DataLoader
             ("name", T), ("reaction_time", N), ("under_fire_memory", N), ("distance_band", N), ("effective_range_factor", N),
             ("cover_min", N), ("cover_search_radius", N), ("line_spacing", N), ("line_reform_sectors", N), ("bound_distance", N),
             ("stall_time", N), ("rush_time", N), ("down_time", N), ("posture_open", T), ("posture_cover", T), ("posture_contact", T),
-            ("defend_search_radius", N),
+            ("defend_search_radius", N), ("fire_hold_suppression", N), ("open_delay", N), ("join_delay_min", N), ("join_delay_max", N),
+            ("silent_chance", N), ("shaken_silent_chance", N), ("defend_open_range", N),
         ],
         ["unit_ai_tasks"] = [("name", T), ("role", T), ("target_kind", T), ("flank_offset", N), ("search_radius", N)],
         ["artillery"] =

@@ -109,6 +109,8 @@ lines.
     list for `game/` or AI code, and never make those members public.
     `SpottingSystem.DebugTruth()` is the one public truth accessor, and it is for debug
     overlays only. Tests in `tests/Sim.Tests/Boundary/` enforce this by reflection.
+12. **Realism first**: realistic unit behaviour beats hitting a scripted moment or test bar. Never
+    tune or reshape a scenario only to make a test pass; report the conflict instead.
 
 ## Merge rule (owner's standing instruction, 2026-11-25)
 

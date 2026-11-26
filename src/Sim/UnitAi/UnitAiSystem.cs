@@ -88,6 +88,15 @@ public sealed class UnitAiSystem : ISimSystem
 
         public void StopFire(int squadId) => ai._fire.StopAiFire(Own(squadId).Id);
 
+        public void SetSilent(int squadId, int soldierId, bool silent)
+        {
+            var q = Own(squadId);
+            if (q.Soldiers.Any(s => s.Id == soldierId))
+            {
+                ai._fire.SetAiSilent(soldierId, silent);
+            }
+        }
+
         private Squad Own(int squadId) =>
             ai._org.Squads.FirstOrDefault(q => q.Id == squadId && q.Side == side)
             ?? throw new InvalidOperationException($"Squad {squadId} is not on side {side}.");

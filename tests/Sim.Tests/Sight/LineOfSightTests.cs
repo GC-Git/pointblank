@@ -80,20 +80,27 @@ public class LineOfSightTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void Prone_soldier_behind_a_hedge_is_unseen_from_100m_but_standing_is_seen()
+    public void Prone_soldier_at_a_hedge_has_only_an_obscured_ray_from_100m_and_standing_is_clear()
     {
         var map = Strip();
         HedgeLine(map, 49); // the line x = 100 m
 
-        // Item 2.4 follow-up: the target lies 4 m behind the hedge (was 1 m, which is now "at the hedge", see below).
-        var prone = Check(map, At(1), At(104, Posture.Prone));
-        Assert.False(prone.Visible);
-        Assert.Equal(LosBlocker.Hedge, prone.Blocker);
-        Assert.Equal(new TilePos(49, 5), prone.BlockerTile);
+        // Original 1.2 setup restored (item 2.4 review): the target 1 m behind the hedge. Line of sight is geometry: a man
+        // at a hedge looks out through it, so the ray is clear but obscured, and symmetric. That he stays unseen while still
+        // and silent is concealment, at the spotting layer:
+        // SpottingTests.A_still_silent_man_at_a_hedge_is_unspotted_from_100m_until_he_fires (prone or kneeling). A man a
+        // few metres back from the hedge is not at it, and the hedge blocks the ray outright.
+        var prone = Check(map, At(1), At(101, Posture.Prone));
+        Assert.True(prone.Visible);
+        Assert.Equal(Rules.HedgeAdjacentObscurement, prone.Obscurement);
+        Assert.Equal(prone, Check(map, At(1), At(101, Posture.Kneeling)));
 
-        Assert.False(Check(map, At(1), At(104, Posture.Kneeling)).Visible);
+        var back = Check(map, At(1), At(104, Posture.Prone));
+        Assert.False(back.Visible);
+        Assert.Equal(LosBlocker.Hedge, back.Blocker);
+        Assert.Equal(new TilePos(49, 5), back.BlockerTile);
 
-        var standing = Check(map, At(1), At(104));
+        var standing = Check(map, At(1), At(101));
         Assert.True(standing.Visible);
         Assert.Equal(Fixed.Zero, standing.Obscurement);
     }
