@@ -38,7 +38,11 @@ public static class DataLoader
             ("move_cost_fast", N), ("move_cost_sneak", N), ("block_height", N), ("los_obscurement", N),
         ],
         ["postures"] = [("name", T), ("eye_height", N)],
-        ["sight"] = [("name", T), ("floor_height", N), ("block_threshold", N)],
+        ["sight"] =
+        [
+            ("name", T), ("floor_height", N), ("block_threshold", N), ("hedge_far_range", N), ("hedge_near_range", N),
+            ("hedge_near_obscurement", N), ("hedge_adjacent_range", N), ("hedge_adjacent_obscurement", N),
+        ],
         ["movement"] = [("name", T), ("speed", N), ("posture", T), ("terrain_cost", T)],
         ["formation"] = [("name", T), ("spacing", N), ("lateral", N), ("leash", N), ("replan_ticks", N)],
         ["command"] =
@@ -84,6 +88,7 @@ public static class DataLoader
             ("name", T), ("reaction_time", N), ("under_fire_memory", N), ("distance_band", N), ("effective_range_factor", N),
             ("cover_min", N), ("cover_search_radius", N), ("line_spacing", N), ("line_reform_sectors", N), ("bound_distance", N),
             ("stall_time", N), ("rush_time", N), ("down_time", N), ("posture_open", T), ("posture_cover", T), ("posture_contact", T),
+            ("defend_search_radius", N),
         ],
         ["unit_ai_tasks"] = [("name", T), ("role", T), ("target_kind", T), ("flank_offset", N), ("search_radius", N)],
         ["artillery"] =

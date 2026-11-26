@@ -52,6 +52,7 @@
             "note": "Placeholder: terrain whose cover ratio (terrain.json) is at least this counts as cover for the AI."
           }
         },
+        "defend_search_radius": { "value": "15", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: a man of a squad ordered to Defend or Ambush moves to a firing position at a hedge facing the order point within this distance." } },
         "cover_search_radius": {
           "value": "6",
           "unit": "m",

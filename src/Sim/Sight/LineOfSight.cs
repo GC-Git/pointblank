@@ -46,6 +46,9 @@ public sealed class LineOfSight
     private readonly bool[] _hedgeEast;
     private readonly bool[] _hedgeSouth;
 
+    /// <summary>The rules this was built with.</summary>
+    public SightRules Rules => _rules;
+
     public LineOfSight(GameMap map, SightRules rules)
     {
         _map = map;
@@ -330,7 +333,7 @@ public sealed class LineOfSight
                     cost = Better(pathX, pathY);
                 }
 
-                var edgeBlock = ApplyEdge(cost);
+                var edgeBlock = ApplyEdge(cost, tOut);
                 if (edgeBlock != null)
                 {
                     MarkLast(edgeBlock.Value.Blocker);
@@ -392,7 +395,33 @@ public sealed class LineOfSight
             return xBlocked || x.Hedge <= y.Hedge ? x : y;
         }
 
-        private LosResult? ApplyEdge(EdgeCost cost)
+        /// <summary>
+        /// The obscurement of one hedge crossed at ray parameter <paramref name="t"/> (item 2.4 follow-up): the hedge's full
+        /// obscurement beyond <c>hedge_far_range</c> (ray length), <c>hedge_near_obscurement</c> within <c>hedge_near_range</c>,
+        /// linear between; and at most <c>hedge_adjacent_obscurement</c> when the crossing is within <c>hedge_adjacent_range</c>
+        /// of either endpoint (a man at the hedge looks through it, and can be seen there). Depends only on the ray length and
+        /// the distances to both ends, so it is symmetric.
+        /// </summary>
+        private Fixed HedgeCost(Fixed t)
+        {
+            var r = _los._rules;
+            if (_length == Fixed.Zero)
+            {
+                var dx = Fixed.FromRaw(_dx);
+                var dy = Fixed.FromRaw(_dy);
+                _length = Fixed.Sqrt((dx * dx) + (dy * dy));
+            }
+
+            var full = r.HedgeObscurement;
+            var near = Min(r.HedgeNearObscurement, full);
+            var cost = r.HedgeFarRange <= r.HedgeNearRange || _length >= r.HedgeFarRange ? full
+                : _length <= r.HedgeNearRange ? near
+                : near + ((full - near) * (_length - r.HedgeNearRange) / (r.HedgeFarRange - r.HedgeNearRange));
+            var toEnd = Min(_length * t, _length * (Fixed.One - t));
+            return toEnd < r.HedgeAdjacentRange ? Min(cost, r.HedgeAdjacentObscurement) : cost;
+        }
+
+        private LosResult? ApplyEdge(EdgeCost cost, Fixed t)
         {
             if (cost.Block != LosBlocker.None)
             {
@@ -401,7 +430,7 @@ public sealed class LineOfSight
 
             if (cost.Hedge > Fixed.Zero)
             {
-                _obscurement += cost.Hedge;
+                _obscurement += cost.Hedge * HedgeCost(t);
                 if (_obscurement >= _los._rules.BlockThreshold)
                 {
                     return Blocked(LosBlocker.Hedge, cost.HedgeTile);
@@ -473,7 +502,7 @@ public sealed class LineOfSight
         if ((horizontal ? _hedgeEast : _hedgeSouth)[owner]
             && h < Max(_ground[from], _ground[to]) + _rules.HedgeHeight)
         {
-            cost.Hedge = _rules.HedgeObscurement;
+            cost.Hedge = Fixed.One; // a count of hedges crossed here; the walk prices each (HedgeCost)
             cost.HedgeTile = owner;
         }
 

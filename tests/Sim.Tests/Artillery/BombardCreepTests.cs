@@ -5,9 +5,9 @@ using Xunit.Abstractions;
 namespace PointBlank.Sim.Tests.Artillery;
 
 /// <summary>
-/// Item 2.4 "Done when": after a 2-minute barrage on a defended position, defender morale and suppression are measurably
-/// degraded (against a no-barrage control), and in at least 30% of seeds the attacker has not spotted every surviving
-/// defender when the advance begins (the side's knowledge against the truth, read by the scenario's watch).
+/// Item 2.4 "Done when", with the evaluator's creep test: after a 2-minute barrage the defenders are measurably degraded
+/// against a no-barrage control; when the creep (Sneak to the hedge) begins the US side knows fewer surviving defenders
+/// than the truth in at least 30% of seeds; survivors are discovered progressively as it closes, some when they fire.
 /// </summary>
 public class BombardCreepTests(ITestOutputHelper output)
 {
@@ -28,27 +28,44 @@ public class BombardCreepTests(ITestOutputHelper output)
     private static double Mean(Dictionary<string, double>[] runs, string name) => runs.Average(r => r[name]);
 
     [Fact]
-    public void A_two_minute_barrage_degrades_the_defenders_and_leaves_survivors_unspotted()
+    public void A_barrage_degrades_the_defenders_and_the_creep_discovers_the_survivors_progressively()
     {
         var barrage = Run("bombard-creep");
         var control = Run("bombard-creep-control");
         foreach (var (name, runs) in new[] { ("barrage", barrage), ("control", control) })
         {
+            var bands = string.Join(", ", BombardCreepScenario.Bands.Select(b => $"{b} m {Mean(runs, $"known_{b}"):F2}"));
             output.WriteLine(
-                $"{name}: at the advance, suppression {Mean(runs, "de_suppression"):F1} (peak {Mean(runs, "de_peak_suppression"):F1}), "
-                + $"morale {Mean(runs, "de_morale"):F1}, casualties {Mean(runs, "de_casualties"):F2}, able survivors {Mean(runs, "de_survivors"):F2}, "
-                + $"unspotted {Mean(runs, "de_unspotted"):F2}; after 30 s of advance: unspotted {Mean(runs, "de_unspotted_end"):F2}, "
-                + $"US casualties {Mean(runs, "us_casualties"):F2}");
+                $"{name}: at the creep start, able defenders {Mean(runs, "survivors"):F2}, known {Mean(runs, "known_at_start"):F2}, "
+                + $"suppressed {Mean(runs, "suppressed"):F2}, squad suppression {Mean(runs, "de_suppression"):F1} (peak {Mean(runs, "de_peak_suppression"):F1}), "
+                + $"morale {Mean(runs, "de_morale"):F1}, routing {Mean(runs, "de_routing"):P0}; discovered share {bands}; "
+                + $"reached 20 m {Mean(runs, "reached_20"):P0}; found when firing {Mean(runs, "found_firing"):F2}; "
+                + $"US casualties in the creep {Mean(runs, "us_creep_casualties"):F2}; defender casualties at the end {Mean(runs, "de_casualties"):F2}");
         }
 
-        var unspotted = barrage.Count(r => r["de_survivors"] > 0 && r["de_unspotted"] > 0);
-        output.WriteLine($"seeds with a surviving defender the US side has not spotted when the advance begins: {unspotted}/{Seeds}");
+        // (i) Fog at the start of the creep.
+        var unknown = barrage.Count(r => r["known_at_start"] < r["survivors"]);
+        output.WriteLine($"seeds where the US knows fewer surviving defenders than the truth at the creep start: {unknown}/{Seeds}");
+        Assert.True(unknown >= 30, $"{unknown}%");
 
-        Assert.True(Mean(barrage, "de_suppression") >= Mean(control, "de_suppression") + 20);
+        // (ii) Progressive discovery as the squad closes.
+        var shares = BombardCreepScenario.Bands.Select(b => Mean(barrage, $"known_{b}")).ToArray();
+        for (var i = 1; i < shares.Length; i++)
+        {
+            Assert.True(shares[i] >= shares[i - 1], string.Join(", ", shares));
+        }
+
+        Assert.True(shares[^1] >= 0.8, $"{shares[^1]}");
+        Assert.True(Mean(barrage, "known_at_start") / Math.Max(0.01, Mean(barrage, "survivors")) < shares[^1]);
+
+        // (iii) Some survivors are first discovered when they fire.
+        Assert.True(barrage.Count(r => r["found_firing"] > 0) >= 10);
+
+        // (iv) Against the control: fewer, weaker defenders and fewer US casualties in the creep.
+        Assert.True(Mean(barrage, "survivors") <= Mean(control, "survivors") - 1);
+        Assert.True(Mean(barrage, "de_peak_suppression") >= Mean(control, "de_peak_suppression") + 30);
         Assert.True(Mean(barrage, "de_morale") <= Mean(control, "de_morale") - 20);
-        Assert.True(Mean(barrage, "de_casualties") > 0);
-        Assert.True(barrage.Count(r => r["de_survivors"] > 0) >= 90, "a barrage on dug-in men leaves survivors");
-        Assert.True(unspotted >= 30, $"{unspotted}%");
+        Assert.True(Mean(barrage, "us_creep_casualties") < Mean(control, "us_creep_casualties"));
     }
 
     [Theory]

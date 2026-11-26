@@ -16,22 +16,34 @@ using PointBlank.Sim.UnitAi;
 namespace PointBlank.Runner;
 
 /// <summary>
-/// Item 2.4 "bombard and creep". On a 400 × 120 m field: a German Gruppe (squad 2, MG crew included) prone in a line
-/// behind a hedge at x = 110 m (the men at x ≈ 104 m, y 42 to 78 m), under the unit AI; a US platoon HQ (squad 1) kneeling
-/// on a 2 m rise at x ≈ 340 m; a US rifle squad (squad 0) prone beside it. With the barrage (<c>bombard-creep</c>) the HQ is
-/// ordered at tick 0 to call a mission (<see cref="OrderKind.CallFire"/>, through the chain of command) on the hedge line
-/// (<see cref="TargetX"/>, 60 m); in <c>bombard-creep-control</c> it is not. At <see cref="AdvanceTick"/>, a few seconds
-/// after the last round, the rifle squad is ordered to Move to the hedge. Start points jitter with the seed. A watch
-/// records, at <see cref="AdvanceTick"/>: <c>de_suppression</c> (the Gruppe's mean suppression), <c>de_morale</c>,
-/// <c>de_casualties</c>, <c>de_survivors</c> and <c>de_unspotted</c> (survivors absent from the US side's known enemies:
-/// truth, read by the runner only), plus <c>de_peak_suppression</c> before then. At the end: <c>us_casualties</c> and
-/// <c>de_casualties_end</c> and <c>de_unspotted_end</c>.
+/// Item 2.4 "bombard and creep". On a 400 × 120 m field with a hedge at x = <see cref="HedgeX"/> m:
+/// <list type="bullet">
+/// <item>A German Gruppe (squad 3, MG crew included; its platoon HQ, squad 2, lies 50 m behind it) starts prone in a line at x ≈ 104 m, y 42 to 78 m, under the unit AI,
+/// and is ordered at tick 0 (scripted, through its chain of command) to Defend facing east: its men take firing positions
+/// at the hedge, where they see and fire through it.</item>
+/// <item>A US platoon HQ (squad 1) kneels on a 4 m plateau at x ≈ 340 m. With the barrage (<c>bombard-creep</c>) it is ordered
+/// at tick 0 to call a mission (<see cref="OrderKind.CallFire"/>) on the hedge line; in <c>bombard-creep-control</c> it is not.</item>
+/// <item>A US rifle squad (squad 0) lies prone at x ≈ <see cref="CreepStartX"/> m, in a dip behind a 2.5 m ridge (x 280 to 296 m) that hides it from the hedge. At <see cref="AdvanceTick"/>, a few seconds
+/// after the last round, it is ordered to Sneak to the hedge.</item>
+/// </list>
+/// Start points jitter with the seed. A watch reads the truth (the runner only) against the US side's known enemies:
+/// <c>known_at_start</c>, <c>survivors</c> (able defenders) and <c>suppressed</c> (able defenders suppressed or pinned) at
+/// <see cref="AdvanceTick"/>; <c>known_150</c>, <c>known_100</c>, <c>known_50</c>, <c>known_20</c> (the discovered share, known at any time so far, of the
+/// able defenders when the creeping squad's centre first comes within that distance of the hedge, or at the end if it never
+/// does) and <c>reached_20</c>; <c>found_firing</c> (defenders the US first knew within 3 s of their firing);
+/// <c>de_suppression</c>, <c>de_peak_suppression</c> and <c>de_morale</c> at the advance; <c>de_casualties</c>;
+/// <c>us_creep_casualties</c> (US squad men down during the creep).
 /// </summary>
 public sealed class BombardCreepScenario : IScenario
 {
     public const int TargetX = 112;
+    public const int HedgeX = 110;
+    public const int CreepStartX = 308;
     public const int AdvanceTick = 1600;
-    public const int RunTicks = AdvanceTick + 300;
+    public const int RunTicks = AdvanceTick + 4400;
+
+    /// <summary>The distances to the hedge at which the creeping squad's knowledge is read.</summary>
+    public static readonly int[] Bands = [150, 100, 50, 20];
 
     private static readonly Lazy<DataSet> Data = new(() => DataLoader.LoadDirectory(DataDirectory()));
 
@@ -41,13 +53,13 @@ public sealed class BombardCreepScenario : IScenario
     {
         _barrage = barrage;
         Map = new ContentRef(BuildMap().Id, 1, BuildMap().ComputeContentHash());
-        var orders = new List<ReplayOrder>();
+        var orders = new List<ReplayOrder> { new(0, "order", [1, 3, (long)OrderKind.Defend, 340_000, 60_000]) };
         if (barrage)
         {
             orders.Add(new(0, "order", [0, 1, (long)OrderKind.CallFire, TargetX * 1000L, 60_000]));
         }
 
-        orders.Add(new(AdvanceTick, "order", [0, 0, (long)OrderKind.Move, TargetX * 1000L, 60_000]));
+        orders.Add(new(AdvanceTick, "order", [0, 0, (long)OrderKind.Sneak, (HedgeX + 2) * 1000L, 60_000]));
         ScriptedOrders = orders;
     }
 
@@ -55,7 +67,7 @@ public sealed class BombardCreepScenario : IScenario
 
     public ContentRef Map { get; }
 
-    public IReadOnlyList<ContentRef> Forces { get; } = [new("us_rifle_squad", 1), new("us_platoon_hq", 1), new("de_gruppe", 1)];
+    public IReadOnlyList<ContentRef> Forces { get; } = [new("us_rifle_squad", 1), new("us_platoon_hq", 1), new("de_gruppe", 1), new("de_zugtrupp", 1)];
 
     public int Ticks => RunTicks;
 
@@ -77,14 +89,15 @@ public sealed class BombardCreepScenario : IScenario
         var ai = new UnitAiSystem(map, org, move, fire, command, UnitAiRules.FromData(data));
         var morale = new MoraleSystem(org, MoraleRules.FromData(data), suppression, command, move, spot);
         var arty = new ArtillerySystem(map, org, los, ArtilleryRules.FromData(data), command, suppression, morale);
-        var watch = new Watch(org, suppression, spot);
+        var watch = new Watch(org, suppression, spot, fire);
         var world = new World(seed, new MapSystem(map), org, command, move, spot, ai, fire, arty, suppression, morale, watch);
 
         var rng = new SimRng((seed * 7919UL) + 43UL);
         Fixed Jitter(int metres) => Fixed.FromRatio(rng.NextInt(-metres * 1000, (metres * 1000) + 1), 1000);
-        org.SpawnSquad("us_rifle_squad", Fixed.FromInt(335) + Jitter(3), Fixed.FromInt(75) + Jitter(5), Posture.Prone); // squad 0
+        org.SpawnSquad("us_rifle_squad", Fixed.FromInt(CreepStartX) + Jitter(3), Fixed.FromInt(60) + Jitter(5), Posture.Prone); // squad 0
         org.SpawnSquad("us_platoon_hq", Fixed.FromInt(340) + Jitter(3), Fixed.FromInt(55) + Jitter(5), Posture.Kneeling); // squad 1
-        var de = org.SpawnSquad("de_gruppe", Fixed.FromInt(104), Fixed.FromInt(60), Posture.Prone); // squad 2
+        org.SpawnSquad("de_zugtrupp", Fixed.FromInt(60) + Jitter(3), Fixed.FromInt(60) + Jitter(5), Posture.Prone); // squad 2: the German platoon HQ, 50 m back
+        var de = org.SpawnSquad("de_gruppe", Fixed.FromInt(104), Fixed.FromInt(60), Posture.Prone); // squad 3
         var step = Fixed.FromInt(36) / Fixed.FromInt(Math.Max(1, de.Soldiers.Count - 1));
         for (var i = 0; i < de.Soldiers.Count; i++)
         {
@@ -99,7 +112,7 @@ public sealed class BombardCreepScenario : IScenario
     public ISimInput CreateInput(ReplayOrder order)
     {
         if (order.Type == "order" && order.Args is [var side, var unit, var kind, var x, var y]
-            && side is 0 or 1 && unit is >= 0 and <= 2 && kind is >= 0 and <= byte.MaxValue && Enum.IsDefined((OrderKind)kind)
+            && side is 0 or 1 && unit is >= 0 and <= 3 && kind is >= 0 and <= byte.MaxValue && Enum.IsDefined((OrderKind)kind)
             && x is >= 0 and <= 1_000_000 && y is >= 0 and <= 1_000_000)
         {
             return new IssueOrderInput(
@@ -113,41 +126,48 @@ public sealed class BombardCreepScenario : IScenario
     {
         var w = world.GetSystem<Watch>();
         var org = world.GetSystem<OrgSystem>();
-        return
+        var now = w.Discovered();
+        var list = new List<Metric>
+        {
+            new("known_at_start", Fixed.FromInt(w.KnownAtStart)),
+            new("survivors", Fixed.FromInt(w.Survivors)),
+            new("suppressed", Fixed.FromInt(w.Suppressed)),
+        };
+        for (var i = 0; i < Bands.Length; i++)
+        {
+            list.Add(new($"known_{Bands[i]}", w.Share[i] ?? now));
+        }
+
+        list.AddRange(
         [
+            new("reached_20", w.Share[^1] != null ? Fixed.One : Fixed.Zero),
+            new("found_firing", Fixed.FromInt(w.FoundFiring)),
             new("de_suppression", w.Suppression),
             new("de_peak_suppression", w.PeakSuppression),
             new("de_morale", w.Morale),
-            new("de_casualties", Fixed.FromInt(w.Casualties)),
-            new("de_survivors", Fixed.FromInt(w.Survivors)),
-            new("de_unspotted", Fixed.FromInt(w.Unspotted)),
-            new("us_casualties", Fixed.FromInt(org.Squads[0].Soldiers.Count(s => !s.CanLead))),
-            new("de_casualties_end", Fixed.FromInt(org.Squads[2].Soldiers.Count(s => !s.CanLead))),
-            new("de_unspotted_end", Fixed.FromInt(Unspotted(world, org))),
-        ];
-    }
-
-    /// <summary>Able defenders absent from the US side.s known enemies (truth: the runner only).</summary>
-    private static int Unspotted(World world, OrgSystem org)
-    {
-        var known = world.GetSystem<SpottingSystem>().KnownEnemies("us");
-        return org.Squads[2].Soldiers.Count(s => s.CanLead && !known.Any(c => c.EnemyId == s.Id));
+            new("de_routing", w.Routing ? Fixed.One : Fixed.Zero),
+            new("de_casualties", Fixed.FromInt(org.Squads[3].Soldiers.Count(s => !s.CanLead))),
+            new("us_creep_casualties", Fixed.FromInt(org.Squads[0].Soldiers.Count(s => !s.CanLead) - w.UsDownAtStart)),
+        ]);
+        return list;
     }
 
     private static GameMap BuildMap()
     {
         var map = new GameMap("bombard-creep", 200, 60);
-        for (var tx = 150; tx < map.Width; tx++)
+        for (var tx = 140; tx < map.Width; tx++)
         {
             for (var ty = 0; ty < map.Height; ty++)
             {
-                map.SetElevationDm(tx, ty, tx < 160 ? (tx - 150) * 2 : 20); // a 2 m rise east of x = 320 m
+                // A 2.5 m ridge at x 280 to 296 m hides the dip behind it (the US squad's start) from the hedge; the HQ's
+                // 4 m plateau east of x = 320 m sees over it.
+                map.SetElevationDm(tx, ty, tx < 148 ? 25 : tx < 160 ? 0 : 40);
             }
         }
 
         for (var ty = 0; ty < map.Height; ty++)
         {
-            map.SetHedge(54, ty, EdgeSide.East, true); // the hedge at x = 110 m
+            map.SetHedge((HedgeX / 2) - 1, ty, EdgeSide.East, true);
         }
 
         return map;
@@ -171,53 +191,127 @@ public sealed class BombardCreepScenario : IScenario
         return "data";
     }
 
-    /// <summary>Records the Gruppe's state when the advance begins, and its peak suppression before (hashed).</summary>
-    internal sealed class Watch(OrgSystem org, SuppressionSystem suppression, SpottingSystem spotting) : ISimSystem
+    /// <summary>The truth against the US side's knowledge, through the creep (hashed). Runner-only: it reads both sides.</summary>
+    internal sealed class Watch(OrgSystem org, SuppressionSystem suppression, SpottingSystem spotting, FireSystem fire) : ISimSystem
     {
+        private const int FiringWindowTicks = 3 * World.TicksPerSecond;
+
+        private readonly SortedSet<int> _known = [];
+
         public Fixed Suppression { get; private set; }
 
         public Fixed PeakSuppression { get; private set; }
 
         public Fixed Morale { get; private set; }
 
-        public int Casualties { get; private set; }
+        public bool Routing { get; private set; }
+
+        public int KnownAtStart { get; private set; }
 
         public int Survivors { get; private set; }
 
-        public int Unspotted { get; private set; }
+        public int Suppressed { get; private set; }
+
+        public int UsDownAtStart { get; private set; }
+
+        public int FoundFiring { get; private set; }
+
+        public Fixed?[] Share { get; } = new Fixed?[Bands.Length];
+
+        /// <summary>The share of the able defenders the US side knows (1 if none is able).</summary>
+        public static Fixed KnownShare(OrgSystem org, SpottingSystem spotting)
+        {
+            var known = spotting.KnownEnemies("us");
+            var able = org.Squads[3].Soldiers.Where(s => s.CanLead).ToList();
+            return able.Count == 0 ? Fixed.One : Fixed.FromRatio(able.Count(s => known.Any(c => c.EnemyId == s.Id)), able.Count);
+        }
+
+        /// <summary>The share of the able defenders the US side has discovered (known at any time so far); 1 if none is able.</summary>
+        public Fixed Discovered()
+        {
+            var able = org.Squads[3].Soldiers.Where(s => s.CanLead).ToList();
+            return able.Count == 0 ? Fixed.One : Fixed.FromRatio(able.Count(s => _known.Contains(s.Id)), able.Count);
+        }
 
         public void Tick(World world)
         {
-            if (world.Tick > AdvanceTick)
-            {
-                return;
-            }
-
-            var de = org.Squads[2];
-            var level = suppression.SquadLevelOf(de.Id);
-            PeakSuppression = level > PeakSuppression ? level : PeakSuppression;
-            if (world.Tick != AdvanceTick)
-            {
-                return;
-            }
-
-            Suppression = level;
-            Morale = de.MoraleLevel;
-            Casualties = de.Soldiers.Count(s => !s.CanLead);
+            var de = org.Squads[3];
             var known = spotting.KnownEnemies("us");
-            var alive = de.Soldiers.Where(s => s.CanLead).ToList(); // a surviving defender: able to fight (ok or wounded)
-            Survivors = alive.Count;
-            Unspotted = alive.Count(s => !known.Any(c => c.EnemyId == s.Id));
+            foreach (var s in de.Soldiers)
+            {
+                if (!_known.Contains(s.Id) && known.Any(c => c.EnemyId == s.Id))
+                {
+                    _known.Add(s.Id);
+                    FoundFiring += world.Tick - fire.LastFiredTick(s.Id) <= FiringWindowTicks ? 1 : 0;
+                }
+            }
+
+            if (world.Tick <= AdvanceTick)
+            {
+                var level = suppression.SquadLevelOf(de.Id);
+                PeakSuppression = level > PeakSuppression ? level : PeakSuppression;
+            }
+
+            if (world.Tick == AdvanceTick)
+            {
+                Suppression = suppression.SquadLevelOf(de.Id);
+                Morale = de.MoraleLevel;
+                Routing = de.Morale == MoraleState.Routing;
+                var able = de.Soldiers.Where(s => s.CanLead).ToList();
+                Survivors = able.Count;
+                KnownAtStart = able.Count(s => known.Any(c => c.EnemyId == s.Id));
+                Suppressed = able.Count(s => suppression.StateOf(s.Id) != SuppressionState.None);
+                UsDownAtStart = org.Squads[0].Soldiers.Count(s => !s.CanLead);
+            }
+
+            if (world.Tick < AdvanceTick)
+            {
+                return;
+            }
+
+            var us = org.Squads[0].Soldiers.Where(s => s.CanLead).ToList();
+            if (us.Count == 0)
+            {
+                return;
+            }
+
+            var x = Fixed.Zero;
+            foreach (var s in us)
+            {
+                x += s.X;
+            }
+
+            var d = (x / Fixed.FromInt(us.Count)) - Fixed.FromInt(HedgeX);
+            for (var i = 0; i < Bands.Length; i++)
+            {
+                if (Share[i] == null && d <= Fixed.FromInt(Bands[i]))
+                {
+                    Share[i] = Discovered();
+                }
+            }
         }
 
         public void AppendState(StateHasher hasher)
         {
+            hasher.Add(_known.Count);
+            foreach (var id in _known)
+            {
+                hasher.Add(id);
+            }
+
             hasher.Add(Suppression);
             hasher.Add(PeakSuppression);
             hasher.Add(Morale);
-            hasher.Add(Casualties);
+            hasher.Add(Routing);
+            hasher.Add(KnownAtStart);
             hasher.Add(Survivors);
-            hasher.Add(Unspotted);
+            hasher.Add(Suppressed);
+            hasher.Add(UsDownAtStart);
+            hasher.Add(FoundFiring);
+            foreach (var s in Share)
+            {
+                hasher.Add(s ?? Fixed.FromInt(-1));
+            }
         }
     }
 }

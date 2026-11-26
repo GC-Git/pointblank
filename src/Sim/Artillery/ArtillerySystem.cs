@@ -39,6 +39,7 @@ public sealed class ArtillerySystem : ISimSystem
     private readonly GameMap _map;
     private readonly OrgSystem _org;
     private readonly LineOfSight _los;
+    private readonly LineOfSight _blast; // hedges as solid walls: sight through a hedge is not shelter from fragments
     private readonly SuppressionSystem? _suppression;
     private readonly MoraleSystem? _morale;
     private readonly List<Mission> _missions = [];
@@ -53,6 +54,7 @@ public sealed class ArtillerySystem : ISimSystem
         _map = map;
         _org = org;
         _los = los;
+        _blast = new LineOfSight(map, los.Rules.SolidHedges());
         Rules = rules;
         _suppression = suppression;
         _morale = morale;
@@ -252,7 +254,7 @@ public sealed class ArtillerySystem : ISimSystem
                 }
                 else if (d > b.DirectHitRadius)
                 {
-                    if (!_los.Check(burst, new Viewpoint(s.X, s.Y, s.Posture)).Visible)
+                    if (!_blast.Check(burst, new Viewpoint(s.X, s.Y, s.Posture)).Visible)
                     {
                         p *= b.ShelterFactor;
                     }

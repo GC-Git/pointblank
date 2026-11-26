@@ -85,16 +85,48 @@ public class LineOfSightTests(ITestOutputHelper output)
         var map = Strip();
         HedgeLine(map, 49); // the line x = 100 m
 
-        var prone = Check(map, At(1), At(101, Posture.Prone));
+        // Item 2.4 follow-up: the target lies 4 m behind the hedge (was 1 m, which is now "at the hedge", see below).
+        var prone = Check(map, At(1), At(104, Posture.Prone));
         Assert.False(prone.Visible);
         Assert.Equal(LosBlocker.Hedge, prone.Blocker);
         Assert.Equal(new TilePos(49, 5), prone.BlockerTile);
 
-        Assert.False(Check(map, At(1), At(101, Posture.Kneeling)).Visible);
+        Assert.False(Check(map, At(1), At(104, Posture.Kneeling)).Visible);
 
-        var standing = Check(map, At(1), At(101));
+        var standing = Check(map, At(1), At(104));
         Assert.True(standing.Visible);
         Assert.Equal(Fixed.Zero, standing.Obscurement);
+    }
+
+    [Fact]
+    public void A_man_at_a_hedge_sees_through_it_and_is_seen_obscured_both_ways()
+    {
+        var map = Strip();
+        HedgeLine(map, 49); // x = 100 m
+        var atHedge = At(101, Posture.Prone); // 1 m behind it: a firing position
+        var a = Check(map, At(1), atHedge);
+        var b = Check(map, atHedge, At(1));
+        Assert.True(a.Visible);
+        Assert.Equal(Rules.HedgeAdjacentObscurement, a.Obscurement);
+        Assert.Equal(a, b);
+    }
+
+    [Fact]
+    public void Through_a_hedge_close_observers_make_out_shapes_and_far_ones_see_nothing()
+    {
+        var map = Strip();
+        HedgeLine(map, 49); // x = 100 m; the target lies prone 4 m behind it
+        var target = At(104, Posture.Prone);
+        var near = Check(map, At(95), target); // 9 m
+        var mid = Check(map, At(74), target); // 30 m
+        var far = Check(map, At(50), target); // 54 m
+        Assert.True(near.Visible);
+        Assert.Equal(Rules.HedgeNearObscurement, near.Obscurement);
+        Assert.True(mid.Visible);
+        Assert.True(mid.Obscurement > near.Obscurement && mid.Obscurement < Fixed.One);
+        Assert.False(far.Visible);
+        Assert.Equal(LosBlocker.Hedge, far.Blocker);
+        Assert.Equal(mid, Check(map, target, At(74)));
     }
 
     [Fact]

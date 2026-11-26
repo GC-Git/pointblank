@@ -89,6 +89,9 @@ public sealed class UnitAiRules
 
     public Fixed CoverSearchRadius { get; init; }
 
+    /// <summary>How far (m) a man of a squad ordered to Defend or Ambush looks for a firing position at a hedge (item 2.4 follow-up).</summary>
+    public Fixed DefendSearchRadius { get; init; }
+
     public Fixed LineSpacing { get; init; }
 
     public int LineReformSectors { get; init; }
@@ -155,6 +158,7 @@ public sealed class UnitAiRules
             EffectiveRangeFactor = F(e, "unit_ai", "effective_range_factor", Fixed.Zero, Fixed.One),
             CoverMin = F(e, "unit_ai", "cover_min", Fixed.Zero, Fixed.One),
             CoverSearchRadius = N("cover_search_radius"),
+            DefendSearchRadius = N("defend_search_radius"),
             LineSpacing = Pos("line_spacing"),
             LineReformSectors = Math.Max(1, N("line_reform_sectors").ToInt()),
             BoundDistance = N("bound_distance"),

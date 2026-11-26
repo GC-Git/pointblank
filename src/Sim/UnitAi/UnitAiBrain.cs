@@ -114,6 +114,8 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
             hasher.Add(m.TaskTeam);
             hasher.Add(m.Firing);
             hasher.Add(m.TargetId);
+            hasher.Add(m.DefendTick);
+            hasher.Add(m.LastShelled);
         }
     }
 
@@ -149,6 +151,7 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
         m.LastUnderFire = Math.Max(m.LastUnderFire, e.Tick);
         if (e.Explosion)
         {
+            m.LastShelled = Math.Max(m.LastShelled, e.Tick);
             return; // a shell burst (item 2.4): men go to ground, but there is no one to fire back at
         }
 
@@ -438,6 +441,11 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
                 continue;
             }
 
+            if (want == rules.PostureCover && !moving && tick - m.LastShelled <= rules.UnderFireMemoryTicks)
+            {
+                want = rules.PostureOpen; // under shellfire a man lies flat, even in cover
+            }
+
             if (s.Posture != want)
             {
                 fx.SetPosture(s.Id, want);
@@ -458,6 +466,15 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
                 CoverMoves(fx, q, able, ux, uy);
                 m.CoverMoved = true;
             }
+        }
+
+        // Defend or Ambush (item 2.4 follow-up): once per order, the men take firing positions at a hedge facing the order
+        // point, where they can see and fire through it (LineOfSight: a man at a hedge), instead of lying blind behind it.
+        if (!moving && status is { Status: OrderStatus.Done } && order is { Kind: OrderKind.Defend or OrderKind.Ambush }
+            && m.DefendTick != status.IssuedTick)
+        {
+            m.DefendTick = status.IssuedTick;
+            TakeFiringPositions(fx, q, able, order.X, order.Y);
         }
 
         if (fireId >= -1)
@@ -663,6 +680,60 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
         }
     }
 
+    /// <summary>
+    /// Each man not already at a hedge (or in a building) facing the point goes to the nearest such tile within
+    /// <c>defend_search_radius</c> (one man per tile) and lies down there (reactions under fire may then kneel him).
+    /// </summary>
+    private void TakeFiringPositions(IAiEffects fx, SquadView q, List<SoldierView> able, Fixed px, Fixed py)
+    {
+        _claimed.Clear();
+        var cx = Fixed.Zero;
+        var cy = Fixed.Zero;
+        foreach (var s in able)
+        {
+            cx += s.X;
+            cy += s.Y;
+        }
+
+        cx /= Fixed.FromInt(able.Count);
+        cy /= Fixed.FromInt(able.Count);
+        var l = Len(px - cx, py - cy);
+        if (l <= Fixed.One)
+        {
+            return;
+        }
+
+        var (ux, uy) = ((px - cx) / l, (py - cy) / l);
+        var moving = new List<SoldierView>();
+        foreach (var s in able)
+        {
+            if (CoverScore(TileOf(s.X, s.Y), ux, uy, true) >= 2)
+            {
+                Claim(TileOf(s.X, s.Y));
+            }
+            else
+            {
+                moving.Add(s);
+            }
+        }
+
+        foreach (var s in moving)
+        {
+            if (BestTile(s.X, s.Y, rules.DefendSearchRadius, ux, uy, 2) is { } goal)
+            {
+                Send(fx, q, s, goal);
+            }
+        }
+
+        foreach (var s in able)
+        {
+            if (s.Posture != Posture.Prone) // lying at the hedge: he sees through it (LineOfSight) and shows little
+            {
+                fx.SetPosture(s.Id, Posture.Prone);
+            }
+        }
+    }
+
     /// <summary>The leader sends each man in the open to the best covered tile near him (one man per tile).</summary>
     private void CoverMoves(IAiEffects fx, SquadView q, List<SoldierView> able, Fixed ux, Fixed uy)
     {
@@ -831,6 +902,12 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
         public int PhaseLeft { get; set; }
 
         public int TaskTeam { get; set; } = -1;
+
+        /// <summary>The issue tick of the Defend or Ambush order whose firing positions were taken (item 2.4 follow-up), or -1.</summary>
+        public long DefendTick { get; set; } = -1;
+
+        /// <summary>The last shell burst near one of its men (item 2.4 follow-up): under shellfire men lie flat.</summary>
+        public long LastShelled { get; set; } = long.MinValue / 2;
 
         public bool Firing { get; set; }
 
