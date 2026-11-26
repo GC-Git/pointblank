@@ -147,6 +147,10 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
         }
 
         m.LastUnderFire = Math.Max(m.LastUnderFire, e.Tick);
+        if (e.Explosion)
+        {
+            return; // a shell burst (item 2.4): men go to ground, but there is no one to fire back at
+        }
 
         if (tick - m.LastEnemyFire > rules.UnderFireMemoryTicks)
         {

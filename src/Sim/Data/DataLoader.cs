@@ -11,7 +11,7 @@ public static class DataLoader
 {
     /// <summary>The tables, in the fixed order used by reports.</summary>
     public static readonly string[] TableNames =
-        ["units", "weapons", "ammo", "materials", "organisation", "terrain", "postures", "sight", "movement", "formation", "command", "spotting", "fire", "suppression", "morale", "unit_ai", "unit_ai_tasks"];
+        ["units", "weapons", "ammo", "materials", "organisation", "terrain", "postures", "sight", "movement", "formation", "command", "spotting", "fire", "suppression", "morale", "unit_ai", "unit_ai_tasks", "artillery"];
 
     private const int MaxIntegerDigits = 9;
     private const int MaxFractionDigits = 9;
@@ -86,6 +86,14 @@ public static class DataLoader
             ("stall_time", N), ("rush_time", N), ("down_time", N), ("posture_open", T), ("posture_cover", T), ("posture_contact", T),
         ],
         ["unit_ai_tasks"] = [("name", T), ("role", T), ("target_kind", T), ("flank_offset", N), ("search_radius", N)],
+        ["artillery"] =
+        [
+            ("name", T), ("side", T), ("missions", N), ("call_time", N), ("flight_time", N), ("guns", N), ("rounds_per_gun", N),
+            ("duration", N), ("aim_error", N), ("scatter", N), ("lethal_radius", N), ("casualty_radius", N), ("lethal_chance", N),
+            ("direct_hit_radius", N), ("kneeling_factor", N), ("prone_factor", N), ("shelter_factor", N), ("building_factor", N),
+            ("cover_weight", N), ("kill_chance", N), ("incapacitate_chance", N), ("suppression", N), ("suppression_radius", N),
+            ("morale_shock", N), ("morale_radius", N), ("impact_memory", N),
+        ],
     };
 
     public static DataSet LoadDirectory(string directory)

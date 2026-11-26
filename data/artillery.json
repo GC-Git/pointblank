@@ -1,0 +1,67 @@
+{
+  "table": "artillery",
+  "entries": [
+    {
+      "id": "us_105",
+      "values": {
+        "name": { "value": "US 105 mm howitzer battery, HE (placeholder)", "unit": "text", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
+        "side": { "value": "us", "unit": "text", "source": { "kind": "placeholder", "note": "Placeholder: the side this battery supports." } },
+        "missions": { "value": "3", "unit": "missions", "source": { "kind": "placeholder", "note": "Placeholder: fire missions the side may call per battle." } },
+        "call_time": { "value": "20", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: time from the call reaching the radio to the guns firing (fire direction and laying)." } },
+        "flight_time": { "value": "10", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: shell time of flight." } },
+        "guns": { "value": "4", "unit": "guns", "source": { "kind": "placeholder", "note": "Placeholder: guns in the battery." } },
+        "rounds_per_gun": { "value": "6", "unit": "rounds", "source": { "kind": "placeholder", "note": "Placeholder: rounds each gun fires per mission." } },
+        "duration": { "value": "120", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: length of a mission; rounds are spread evenly over it." } },
+        "aim_error": { "value": "12", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: standard deviation per axis of the mission's mean point of impact from the called point." } },
+        "scatter": { "value": "18", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: standard deviation per axis of each round around the mean point of impact." } },
+        "lethal_radius": { "value": "8", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: inside this radius an exposed man is hit with the lethal chance." } },
+        "casualty_radius": { "value": "25", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: the casualty chance falls linearly to 0 at this radius." } },
+        "lethal_chance": { "value": "0.5", "unit": "probability", "source": { "kind": "placeholder", "note": "Placeholder: chance a standing man in the open inside the lethal radius is hit." } },
+        "direct_hit_radius": { "value": "2", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: a burst this close ignores hedges, walls and terrain cover." } },
+        "kneeling_factor": { "value": "0.7", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: casualty chance multiplier for a kneeling man." } },
+        "prone_factor": { "value": "0.35", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: casualty chance multiplier for a prone man." } },
+        "shelter_factor": { "value": "0.25", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: casualty chance multiplier when a hedge, wall or ground blocks the line from the burst to the man." } },
+        "building_factor": { "value": "0.2", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: casualty chance multiplier for a man inside a building the burst is not in (floors simplified)." } },
+        "cover_weight": { "value": "0.5", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: the chance is multiplied by 1 - cover_weight x terrain cover of the man's tile." } },
+        "kill_chance": { "value": "0.4", "unit": "probability", "source": { "kind": "placeholder", "note": "Placeholder: share of fragment casualties killed outright." } },
+        "incapacitate_chance": { "value": "0.3", "unit": "probability", "source": { "kind": "placeholder", "note": "Placeholder: share of fragment casualties incapacitated (the rest are wounded)." } },
+        "suppression": { "value": "70", "unit": "points", "source": { "kind": "placeholder", "note": "Placeholder: suppression a burst adds at its centre (scale 0 to 100); a rifle near miss adds 10." } },
+        "suppression_radius": { "value": "40", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: burst suppression falls linearly to 0 at this radius." } },
+        "morale_shock": { "value": "1.5", "unit": "points", "source": { "kind": "placeholder", "note": "Placeholder: morale a squad loses from a burst at its nearest man (scale 0 to 100)." } },
+        "morale_radius": { "value": "40", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: the morale shock falls linearly to 0 at this radius." } },
+        "impact_memory": { "value": "10", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: how long a shell impact stays in the impacts list shown to both sides." } }
+      }
+    },
+    {
+      "id": "de_105",
+      "values": {
+        "name": { "value": "German 10.5 cm leFH battery, HE (placeholder)", "unit": "text", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
+        "side": { "value": "de", "unit": "text", "source": { "kind": "placeholder", "note": "Placeholder: the side this battery supports." } },
+        "missions": { "value": "2", "unit": "missions", "source": { "kind": "placeholder", "note": "Placeholder: fire missions the side may call per battle." } },
+        "call_time": { "value": "25", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: time from the call reaching the radio to the guns firing (fire direction and laying)." } },
+        "flight_time": { "value": "10", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: shell time of flight." } },
+        "guns": { "value": "4", "unit": "guns", "source": { "kind": "placeholder", "note": "Placeholder: guns in the battery." } },
+        "rounds_per_gun": { "value": "5", "unit": "rounds", "source": { "kind": "placeholder", "note": "Placeholder: rounds each gun fires per mission." } },
+        "duration": { "value": "120", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: length of a mission; rounds are spread evenly over it." } },
+        "aim_error": { "value": "12", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: standard deviation per axis of the mission's mean point of impact from the called point." } },
+        "scatter": { "value": "18", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: standard deviation per axis of each round around the mean point of impact." } },
+        "lethal_radius": { "value": "8", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: inside this radius an exposed man is hit with the lethal chance." } },
+        "casualty_radius": { "value": "25", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: the casualty chance falls linearly to 0 at this radius." } },
+        "lethal_chance": { "value": "0.5", "unit": "probability", "source": { "kind": "placeholder", "note": "Placeholder: chance a standing man in the open inside the lethal radius is hit." } },
+        "direct_hit_radius": { "value": "2", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: a burst this close ignores hedges, walls and terrain cover." } },
+        "kneeling_factor": { "value": "0.7", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: casualty chance multiplier for a kneeling man." } },
+        "prone_factor": { "value": "0.35", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: casualty chance multiplier for a prone man." } },
+        "shelter_factor": { "value": "0.25", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: casualty chance multiplier when a hedge, wall or ground blocks the line from the burst to the man." } },
+        "building_factor": { "value": "0.2", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: casualty chance multiplier for a man inside a building the burst is not in (floors simplified)." } },
+        "cover_weight": { "value": "0.5", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: the chance is multiplied by 1 - cover_weight x terrain cover of the man's tile." } },
+        "kill_chance": { "value": "0.4", "unit": "probability", "source": { "kind": "placeholder", "note": "Placeholder: share of fragment casualties killed outright." } },
+        "incapacitate_chance": { "value": "0.3", "unit": "probability", "source": { "kind": "placeholder", "note": "Placeholder: share of fragment casualties incapacitated (the rest are wounded)." } },
+        "suppression": { "value": "70", "unit": "points", "source": { "kind": "placeholder", "note": "Placeholder: suppression a burst adds at its centre (scale 0 to 100); a rifle near miss adds 10." } },
+        "suppression_radius": { "value": "40", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: burst suppression falls linearly to 0 at this radius." } },
+        "morale_shock": { "value": "1.5", "unit": "points", "source": { "kind": "placeholder", "note": "Placeholder: morale a squad loses from a burst at its nearest man (scale 0 to 100)." } },
+        "morale_radius": { "value": "40", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: the morale shock falls linearly to 0 at this radius." } },
+        "impact_memory": { "value": "10", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: how long a shell impact stays in the impacts list shown to both sides." } }
+      }
+    }
+  ]
+}

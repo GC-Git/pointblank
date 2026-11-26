@@ -47,6 +47,9 @@ public sealed class CommandSystem(
 
     public CommandRules Rules { get; } = rules;
 
+    /// <summary>The off-map artillery that CallFire orders go to (item 2.4); set by <c>ArtillerySystem</c>.</summary>
+    internal global::PointBlank.Sim.Artillery.ArtillerySystem? Artillery { get; set; }
+
     /// <summary>The unit's latest order and its state, for the UI. Status None when it has had none.</summary>
     internal OrderView StatusOf(int unitId) =>
         _tickets.TryGetValue(unitId, out var t)
@@ -130,7 +133,7 @@ public sealed class CommandSystem(
 
         var t = new Ticket(order, world.Tick);
         _tickets[unitId] = t;
-        if ((OrderKinds.IsMove(order.Kind) || (order.Kind == OrderKind.Fire && order.TargetId < 0)) && !move.IsOnMap(order.X, order.Y))
+        if ((OrderKinds.IsMove(order.Kind) || order.Kind == OrderKind.CallFire || (order.Kind == OrderKind.Fire && order.TargetId < 0)) && !move.IsOnMap(order.X, order.Y))
         {
             t.Status = OrderStatus.Rejected;
             t.Note = OrderNote.OffMap;
@@ -350,6 +353,15 @@ public sealed class CommandSystem(
 
             t.Status = valid ? OrderStatus.Done : OrderStatus.Rejected;
             t.Note = valid ? OrderNote.None : OrderNote.InvalidRoe;
+            return;
+        }
+
+        if (kind == OrderKind.CallFire && Artillery != null)
+        {
+            // A call for fire changes nothing else either: the caller's move or fire carries on.
+            var note = Artillery.Request(world, squad, t.Order);
+            t.Status = note == OrderNote.None ? OrderStatus.Done : OrderStatus.Rejected;
+            t.Note = note;
             return;
         }
 

@@ -35,6 +35,7 @@ namespace PointBlank.Sim.Morale;
 /// side knows (<see cref="SpottingSystem.KnownEnemies"/>, so fog is respected), or to its nearest HQ if it knows none,
 /// pulled in until the point is on the map. <see cref="CommandSystem"/> refuses it every order but FallBack.</item>
 /// </list>
+/// Shell bursts (item 2.4) also shock morale directly through <see cref="AddShock"/>.
 /// Register after <see cref="SuppressionSystem"/>.
 /// </summary>
 public sealed class MoraleSystem(
@@ -52,6 +53,14 @@ public sealed class MoraleSystem(
     {
         var e = Get(squadId);
         e.Level = Clamp(level);
+        e.Squad.SetMoraleLevel(e.Level);
+    }
+
+    /// <summary>A morale shock that is not a casualty (item 2.4: a shell burst nearby): the level drops by <paramref name="amount"/>.</summary>
+    internal void AddShock(int squadId, Fixed amount)
+    {
+        var e = Get(squadId);
+        e.Level = Clamp(e.Level - amount);
         e.Squad.SetMoraleLevel(e.Level);
     }
 

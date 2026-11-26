@@ -1,3 +1,4 @@
+using PointBlank.Sim.Artillery;
 using PointBlank.Sim.Fire;
 using PointBlank.Sim.Morale;
 using PointBlank.Sim.Movement;
@@ -25,9 +26,11 @@ public readonly record struct SoldierView(
 /// <see cref="DirX"/>, <see cref="DirY"/>) and the distance rounded to the unit AI's <c>distance_band</c>, never the exact
 /// origin. <see cref="SourceId"/> is the shooter's id only when he is already a contact the side knows, else -1.
 /// <see cref="Friendly"/>: one of the side's own men fired it (a man ducks a round from either side, but does not fire back).
+/// <see cref="Explosion"/> (item 2.4): a shell burst within its suppression radius of him; the bearing and distance are to the
+/// burst, never to the guns (they are off the map), and <see cref="SourceId"/> is -1.
 /// </summary>
 public readonly record struct IncomingFireView(
-    int SoldierId, long Tick, int SourceId, int Sector, Fixed DirX, Fixed DirY, Fixed Distance, bool Hit, bool Friendly = false);
+    int SoldierId, long Tick, int SourceId, int Sector, Fixed DirX, Fixed DirY, Fixed Distance, bool Hit, bool Friendly = false, bool Explosion = false);
 
 /// <summary>
 /// A copy of one of the side's own squads. <see cref="LeaderId"/> is -1 while the post is vacant. <see cref="Ammo"/>
@@ -72,6 +75,7 @@ public sealed class SideView
     private readonly SuppressionSystem? _suppression;
     private readonly MoraleSystem? _morale;
     private readonly UnitAiSystem? _ai;
+    private readonly ArtillerySystem? _artillery;
 
     internal SideView(World world, string side)
     {
@@ -85,6 +89,7 @@ public sealed class SideView
         _suppression = world.FindSystem<SuppressionSystem>();
         _morale = world.FindSystem<MoraleSystem>();
         _ai = world.FindSystem<UnitAiSystem>();
+        _artillery = world.FindSystem<ArtillerySystem>();
     }
 
     public string Side { get; }
@@ -119,7 +124,8 @@ public sealed class SideView
             }
 
             var list = new List<IncomingFireView>();
-            if (_fire.NearMisses.Count == 0 && _fire.Shots.Count == 0)
+            var bursts = _artillery?.LastImpacts ?? [];
+            if (_fire.NearMisses.Count == 0 && _fire.Shots.Count == 0 && bursts.Count == 0)
             {
                 return list;
             }
@@ -166,9 +172,46 @@ public sealed class SideView
                 }
             }
 
+            // Shell bursts (item 2.4): every able man of the side within the burst's radius notices it.
+            foreach (var b in bursts)
+            {
+                foreach (var q in _org.Squads)
+                {
+                    if (q.Side != Side)
+                    {
+                        continue;
+                    }
+
+                    foreach (var s in q.Soldiers)
+                    {
+                        var dx = b.X - s.X;
+                        var dy = b.Y - s.Y;
+                        var d2 = (dx * dx) + (dy * dy);
+                        if (!s.CanLead || d2 > b.Radius * b.Radius)
+                        {
+                            continue;
+                        }
+
+                        var sector = Bearings.SectorOf(dx, dy);
+                        var (ux, uy) = Bearings.Dir(sector);
+                        var band = Bearings.Band(Fixed.Sqrt(d2), _ai.Rules.DistanceBand);
+                        list.Add(new IncomingFireView(s.Id, b.Tick, -1, sector, ux, uy, band, false, false, true));
+                    }
+                }
+            }
+
             return list;
         }
     }
+
+    /// <summary>The side's own fire missions (item 2.4), oldest first: status, ETA and rounds left. Empty without artillery.</summary>
+    public IReadOnlyList<FireMissionView> FireMissions => _artillery?.MissionsOf(Side, _world.Tick) ?? [];
+
+    /// <summary>Fire missions the side may still call (0 without artillery or a battery).</summary>
+    public int MissionsLeft => _artillery?.MissionsLeft(Side) ?? 0;
+
+    /// <summary>Recent shell bursts of either side, oldest first: loud, so everyone knows where they fell.</summary>
+    public IReadOnlyList<ShellImpactView> ShellImpacts => _artillery?.Impacts ?? [];
 
     /// <summary>The order state of one of the side's own units, or null (also for an enemy unit).</summary>
     public OrderView? StatusOf(int unitId) => _command != null && Own(unitId) != null ? _command.StatusOf(unitId) : null;
