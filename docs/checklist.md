@@ -115,7 +115,7 @@ Status: draft, awaiting owner sign-off
   crossing open ground under sustained MG fire is pinned in ≥80% of seeds within 30 s,
   and through hedges it's pinned in clearly fewer seeds (at least 20 points lower).
 
-- [ ] **2.2 Morale** (O)
+- [x] **2.2 Morale** (O)
   Inputs: suppression, casualties, leader, isolation, nearby friendly support. States:
   steady, shaken, pinned, broken, routing, rallying.
   *Done when:* after its leader is killed, the squad's morale drops and it obeys orders

@@ -4,7 +4,7 @@ namespace PointBlank.Sim.Orders;
 
 /// <summary>
 /// The one order vocabulary, shared by the player and the AI. Values are hashed and stored in
-/// replays, so never renumber. Implemented today: the four moves, <see cref="Fire"/> and <see cref="Hold"/>; the others
+/// replays, so never renumber. Implemented today: the four moves, <see cref="Fire"/>, <see cref="Hold"/> and <see cref="SetRoe"/>; the others
 /// are delivered through the chain of command and acknowledged as <see cref="OrderNote.NotImplemented"/>.
 /// </summary>
 public enum OrderKind : byte
@@ -23,6 +23,22 @@ public enum OrderKind : byte
 
     /// <summary>Stop where you are (also "Stop").</summary>
     Hold = 8,
+
+    /// <summary>Set the squad's rules of engagement (item 2.3): <see cref="Order.TargetId"/> carries the <see cref="RoeMode"/>; X and Y are ignored.</summary>
+    SetRoe = 9,
+}
+
+/// <summary>A squad's rules of engagement for its own (AI) fire (item 2.3). Values are hashed, so never renumber.</summary>
+public enum RoeMode : byte
+{
+    /// <summary>Engage any spotted enemy in effective range, and return fire (the default).</summary>
+    FireAtWill = 0,
+
+    /// <summary>Fire only back at fire on the squad.</summary>
+    ReturnFireOnly = 1,
+
+    /// <summary>Never open fire on its own (the squad still takes cover). Player Fire orders are still obeyed.</summary>
+    HoldFire = 2,
 }
 
 /// <summary>How refusal rules treat an order kind.</summary>
@@ -153,6 +169,9 @@ public enum OrderNote : byte
 
     /// <summary>On a <see cref="OrderStatus.Held"/> order: the squad is pinned by suppression.</summary>
     Pinned = 12,
+
+    /// <summary>A <see cref="OrderKind.SetRoe"/> order's TargetId is not a <see cref="RoeMode"/>.</summary>
+    InvalidRoe = 13,
 }
 
 /// <summary>What <see cref="CommandSystem.Issue"/> did with an order. Values are hashed, so never renumber.</summary>

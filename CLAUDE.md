@@ -16,7 +16,7 @@ owner wants to sell it someday.
 |---|---|
 | `src/Sim/` | Pure C# deterministic simulation core. All game rules. |
 | `tests/Sim.Tests/` | xUnit tests, run headless. |
-| `data/` | JSON data tables (units, weapons, ammo, materials, organisation, command, fire, suppression, morale, ...); every value has a `source`. Loader: `src/Sim/Data`. |
+| `data/` | JSON data tables (units, weapons, ammo, materials, organisation, command, fire, suppression, morale, unit_ai, ...); every value has a `source`. Loader: `src/Sim/Data`. |
 | `tools/Runner/` | Headless battle runner CLI and its scenarios. References `Sim`. |
 | `game/` | Godot 4.7 .NET project. Rendering and input only. References `Sim`. |
 | `PointBlank.sln` | All four projects. Godot builds this one (`solution_directory=".."`). |
@@ -132,7 +132,7 @@ The authoritative list is the report: `dotnet run --project tools/Runner -- --da
 (it lists every placeholder as `table/entry/value`). Currently every value in `data/` is a
 sample placeholder, added by item 0.4 to exercise the loader; none is historical.
 
-Data file format: `data/<table>.json` (tables: units, weapons, ammo, materials, organisation, terrain, postures, sight, movement, formation, command, spotting, fire, suppression, morale) = `{"table": "...", "entries": [{"id": "...", "values":
+Data file format: `data/<table>.json` (tables: units, weapons, ammo, materials, organisation, terrain, postures, sight, movement, formation, command, spotting, fire, suppression, morale, unit_ai, unit_ai_tasks) = `{"table": "...", "entries": [{"id": "...", "values":
 {"<name>": {"value": "853", "unit": "m/s", "source": {...}}}}]}`. `source` is
 `{"kind":"reference","ref":"title, author/publisher, page or URL"}`,
 `{"kind":"estimated","reasoning":"..."}` or `{"kind":"placeholder","note":"..."}`. The loader

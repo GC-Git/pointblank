@@ -22,7 +22,9 @@ namespace PointBlank.Sim.Orders;
 /// <item>Execution: moves start in <see cref="MovementSystem"/> and stay Executing until it finishes;
 /// Hold stops the squad; Fire starts in <see cref="FireSystem"/> (Rejected with its note if it cannot) and stays
 /// Executing until fire ends, then Done with the end note; any other delivered order stops the squad's fire;
-/// kinds without behaviour (and Fire without a FireSystem) are Done with <see cref="OrderNote.NotImplemented"/>.</item>
+/// kinds without behaviour (and Fire without a FireSystem) are Done with <see cref="OrderNote.NotImplemented"/>. SetRoe (item 2.3)
+/// sets the squad's <see cref="RoeMode"/> (<see cref="RoeOf"/>, hashed) and touches nothing else; a bad mode is Rejected
+/// (<see cref="OrderNote.InvalidRoe"/>). A delivered order stops only the player's fire order, never the unit AI's fire.</item>
 /// <item>Suppression (item 2.1, optional <see cref="SuppressionSystem"/>): an advance-type move (Move, MoveFast,
 /// Sneak) delivered to a pinned squad, or under way when it becomes pinned, is <see cref="OrderStatus.Held"/>: the
 /// move stops, and starts again to the same point once the squad is no longer pinned. Fall-back, Hold and Fire
@@ -41,6 +43,7 @@ public sealed class CommandSystem(
 {
     private readonly Dictionary<int, Ticket> _tickets = [];
     private readonly List<IssueRejection> _rejections = [];
+    private readonly SortedDictionary<int, RoeMode> _roe = [];
 
     public CommandRules Rules { get; } = rules;
 
@@ -49,6 +52,12 @@ public sealed class CommandSystem(
         _tickets.TryGetValue(unitId, out var t)
             ? new OrderView(unitId, t.Order, t.Status, t.Remaining, t.Total, t.Reasons, t.Note, t.Issued)
             : new OrderView(unitId, null, OrderStatus.None, 0, 0, DelayReason.None, OrderNote.None, -1);
+
+    /// <summary>A squad's rules of engagement (item 2.3); <see cref="RoeMode.FireAtWill"/> until a SetRoe order says otherwise.</summary>
+    internal RoeMode RoeOf(int unitId) => _roe.TryGetValue(unitId, out var r) ? r : RoeMode.FireAtWill;
+
+    /// <summary>Sets a squad's rules of engagement at once: for tests and scenario setup (orders use <see cref="OrderKind.SetRoe"/>).</summary>
+    internal void SetRoe(int unitId, RoeMode roe) => _roe[unitId] = roe;
 
     /// <summary>The reasons an order issued now would be delayed (a UI preview).</summary>
     /// <exception cref="InvalidOperationException">There is no such unit.</exception>
@@ -218,6 +227,13 @@ public sealed class CommandSystem(
             hasher.Add((byte)t.Note);
         }
 
+        hasher.Add(_roe.Count);
+        foreach (var (id, roe) in _roe)
+        {
+            hasher.Add(id);
+            hasher.Add((byte)roe);
+        }
+
         hasher.Add(_rejections.Count);
         foreach (var r in _rejections)
         {
@@ -323,6 +339,20 @@ public sealed class CommandSystem(
     private void Execute(World world, Squad squad, Ticket t)
     {
         var kind = t.Order.Kind;
+        if (kind == OrderKind.SetRoe)
+        {
+            // Rules of engagement change nothing else: a Fire order or a move under way carries on.
+            var valid = t.Order.TargetId is >= 0 and <= byte.MaxValue && Enum.IsDefined((RoeMode)t.Order.TargetId);
+            if (valid)
+            {
+                _roe[squad.Id] = (RoeMode)t.Order.TargetId;
+            }
+
+            t.Status = valid ? OrderStatus.Done : OrderStatus.Rejected;
+            t.Note = valid ? OrderNote.None : OrderNote.InvalidRoe;
+            return;
+        }
+
         fire?.Stop(squad.Id);
         if (IsHeldKind(kind) && Pinned(squad))
         {

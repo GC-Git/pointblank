@@ -1,0 +1,95 @@
+{
+  "table": "unit_ai_tasks",
+  "entries": [
+    {
+      "id": "bar",
+      "values": {
+        "name": {
+          "value": "BAR team to a flank (placeholder)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: name of the task."
+          }
+        },
+        "role": {
+          "value": "bar_gunner",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: the role whose team the leader sends; a role in organisation.json."
+          }
+        },
+        "target_kind": {
+          "value": "infantry",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: the contact kind that calls for the task: infantry, machine_gun or any."
+          }
+        },
+        "flank_offset": {
+          "value": "8",
+          "unit": "m",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: the task point lies this far beyond the end of the firing line."
+          }
+        },
+        "search_radius": {
+          "value": "16",
+          "unit": "m",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: the leader looks this far around the task point for the best covered tile."
+          }
+        }
+      }
+    },
+    {
+      "id": "mg",
+      "values": {
+        "name": {
+          "value": "MG team to a flank (placeholder)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: name of the task."
+          }
+        },
+        "role": {
+          "value": "mg_gunner",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: the role whose team the leader sends; a role in organisation.json."
+          }
+        },
+        "target_kind": {
+          "value": "any",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: the contact kind that calls for the task: infantry, machine_gun or any."
+          }
+        },
+        "flank_offset": {
+          "value": "8",
+          "unit": "m",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: the task point lies this far beyond the end of the firing line."
+          }
+        },
+        "search_radius": {
+          "value": "16",
+          "unit": "m",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: the leader looks this far around the task point for the best covered tile."
+          }
+        }
+      }
+    }
+  ]
+}

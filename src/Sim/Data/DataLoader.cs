@@ -11,7 +11,7 @@ public static class DataLoader
 {
     /// <summary>The tables, in the fixed order used by reports.</summary>
     public static readonly string[] TableNames =
-        ["units", "weapons", "ammo", "materials", "organisation", "terrain", "postures", "sight", "movement", "formation", "command", "spotting", "fire", "suppression", "morale"];
+        ["units", "weapons", "ammo", "materials", "organisation", "terrain", "postures", "sight", "movement", "formation", "command", "spotting", "fire", "suppression", "morale", "unit_ai", "unit_ai_tasks"];
 
     private const int MaxIntegerDigits = 9;
     private const int MaxFractionDigits = 9;
@@ -77,8 +77,15 @@ public static class DataLoader
             ("recovery_rate", N), ("leader_recovery_weight", N), ("support_recovery_bonus", N), ("hq_rally_bonus", N),
             ("support_radius", N), ("hq_rally_radius", N), ("loss_window", N), ("leader_killed_memory", N),
             ("heavy_casualty_fraction", N), ("shaken_below", N), ("shaken_release", N), ("broken_below", N),
-            ("broken_release", N), ("rout_below", N), ("steady_above", N), ("rout_distance", N),
+            ("broken_release", N), ("rout_below", N), ("steady_above", N), ("rout_distance", N), ("rout_threat_radius", N),
         ],
+        ["unit_ai"] =
+        [
+            ("name", T), ("reaction_time", N), ("under_fire_memory", N), ("distance_band", N), ("effective_range_factor", N),
+            ("cover_min", N), ("cover_search_radius", N), ("line_spacing", N), ("line_reform_sectors", N), ("bound_distance", N),
+            ("stall_time", N), ("rush_time", N), ("down_time", N), ("posture_open", T), ("posture_cover", T), ("posture_contact", T),
+        ],
+        ["unit_ai_tasks"] = [("name", T), ("role", T), ("target_kind", T), ("flank_offset", N), ("search_radius", N)],
     };
 
     public static DataSet LoadDirectory(string directory)
