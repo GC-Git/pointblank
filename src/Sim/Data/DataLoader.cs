@@ -83,6 +83,7 @@ public static class DataLoader
             ("support_radius", N), ("hq_rally_radius", N), ("loss_window", N), ("leader_killed_memory", N),
             ("heavy_casualty_fraction", N), ("shaken_below", N), ("shaken_release", N), ("broken_below", N),
             ("broken_release", N), ("rout_below", N), ("steady_above", N), ("rout_distance", N), ("rout_threat_radius", N),
+            ("cower_radius", N), ("cower_lift", N),
         ],
         ["unit_ai"] =
         [

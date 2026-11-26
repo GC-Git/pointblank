@@ -148,6 +148,7 @@ public sealed class BombardCreepScenario : IScenario
             new("found_firing", Fixed.FromInt(w.FoundFiring)),
             new("found_close", Fixed.FromInt(w.FoundClose)),
             new("never_found", Fixed.FromInt(org.Squads[3].Soldiers.Count(s => s.CanLead && !w.Ever(s.Id)))),
+            new("broken_at_hedge", Fixed.FromInt(w.BrokenAtHedge)),
             new("de_suppression", w.Suppression),
             new("de_peak_suppression", w.PeakSuppression),
             new("de_morale", w.Morale),
@@ -250,6 +251,9 @@ public sealed class BombardCreepScenario : IScenario
         /// <summary>Defenders first discovered with the creeping squad within 50 m, and not by their own fire.</summary>
         public int FoundClose { get; private set; }
 
+        /// <summary>Broken or routing able defenders still at the hedge when the squad first came within 50 m; -1 if it never did.</summary>
+        public int BrokenAtHedge { get; private set; } = -1;
+
         public void Tick(World world)
         {
             var de = org.Squads[3];
@@ -310,6 +314,12 @@ public sealed class BombardCreepScenario : IScenario
                 if (Share[i] == null && d.Value <= Fixed.FromInt(Bands[i]))
                 {
                     Share[i] = Fixed.FromInt(de.Soldiers.Count(s => s.CanLead && _known.Contains(s.Id)));
+                    if (Bands[i] == 50)
+                    {
+                        // Broken or routing able defenders still at the hedge (within 3 m behind it) when the squad arrives.
+                        var broken = de.Morale is MoraleState.Broken or MoraleState.Routing;
+                        BrokenAtHedge = !broken ? 0 : de.Soldiers.Count(s => s.CanLead && s.X <= Fixed.FromInt(HedgeX) && s.X >= Fixed.FromInt(HedgeX - 3));
+                    }
                 }
             }
         }
@@ -325,6 +335,7 @@ public sealed class BombardCreepScenario : IScenario
 
             hasher.Add(_closest);
             hasher.Add(FoundClose);
+            hasher.Add(BrokenAtHedge);
             hasher.Add(_known.Count);
             foreach (var id in _known)
             {

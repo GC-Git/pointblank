@@ -10,9 +10,9 @@ namespace PointBlank.Sim.Tests.Artillery;
 /// <summary>
 /// Item 2.4: a tick-by-tick trace of the barrage battles whose creeping squad gets within 50 m of the hedge (seeds 1 to 30).
 /// Every first sighting of a defender is printed with why it was possible: distance to the nearest able US man, posture,
-/// whether he fired or moved lately, and the observer's suppression. The finding it pins down: the squad gets that close
-/// only when no unknown defender is left at the hedge (the survivors routed, were seen moving or firing, or fell), so the
-/// close-range spotting term has no one left to find there. See the PR for the discussion.
+/// whether he fired or moved lately, and the observer's suppression; and, when the squad gets within 50 m, how many able
+/// defenders are still at the hedge unknown. A diagnostic: it prints, and asserts only that some battle closes that far.
+/// See the PR for the findings.
 /// </summary>
 [Collection(TimingCollection.Name)]
 public class CreepTraceTests(ITestOutputHelper output)
@@ -20,11 +20,12 @@ public class CreepTraceTests(ITestOutputHelper output)
     private const int HedgeBand = 3; // a man within 3 m behind the hedge line is at it
 
     [Fact]
-    public void The_creep_closes_to_50m_only_when_no_unknown_defender_is_left_at_the_hedge()
+    public void Trace_of_the_barrage_battles_that_close_to_50m()
     {
         var scenario = ScenarioCatalog.Find("bombard-creep")!;
         var traced = false;
         var closing = 0;
+        var hiddenTotal = 0;
         for (ulong seed = 1; seed <= 30; seed++)
         {
             var w = scenario.CreateWorld(seed);
@@ -84,9 +85,10 @@ public class CreepTraceTests(ITestOutputHelper output)
             }
 
             output.WriteLine($"seed {seed}: closed to 50 m with {hiddenAtHedge} unknown defenders at the hedge");
-            Assert.Equal(0, hiddenAtHedge);
+            hiddenTotal += hiddenAtHedge.Value;
         }
 
+        output.WriteLine($"{closing} seeds closed to 50 m; unknown defenders left at the hedge then: {hiddenTotal} in all");
         Assert.True(closing > 0, "no barrage battle in seeds 1 to 30 closed to 50 m");
     }
 }

@@ -270,7 +270,7 @@ public sealed class ArtillerySystem : ISimSystem
         }
 
         _suppression?.AddExplosion(world, x, y, b.Suppression, b.SuppressionRadius);
-        if (_morale != null && b.MoraleRadius > Fixed.Zero)
+        if (_morale != null)
         {
             foreach (var q in _org.Squads)
             {
@@ -284,7 +284,13 @@ public sealed class ArtillerySystem : ISimSystem
                     }
                 }
 
-                if (best <= b.MoraleRadius * b.MoraleRadius)
+                var cower = _morale.Rules.CowerRadius;
+                if (best <= cower * cower)
+                {
+                    _morale.NoteShelled(q.Id, world.Tick);
+                }
+
+                if (b.MoraleRadius > Fixed.Zero && best <= b.MoraleRadius * b.MoraleRadius)
                 {
                     _morale.AddShock(q.Id, b.MoraleShock * (Fixed.One - (Fixed.Sqrt(best) / b.MoraleRadius)));
                 }

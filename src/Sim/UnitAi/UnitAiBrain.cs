@@ -180,6 +180,26 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
     {
         var m = MindOf(q.Id);
         var able = q.Soldiers.Where(Able).ToList();
+        if ((q.MoraleReasons & Morale.MoraleReason.Cowering) != 0)
+        {
+            // Broken or routing under shellfire (item 2.4): flat where they are, no fire and no moves of the AI's own.
+            if (m.Firing)
+            {
+                fx.StopFire(q.Id);
+                (m.Firing, m.FireEnd) = (false, tick);
+            }
+
+            foreach (var s in able)
+            {
+                if (s.Posture != Posture.Prone)
+                {
+                    fx.SetPosture(s.Id, Posture.Prone);
+                }
+            }
+
+            return;
+        }
+
         if (able.Count == 0 || q.Morale == MoraleState.Routing)
         {
             if (m.Firing)

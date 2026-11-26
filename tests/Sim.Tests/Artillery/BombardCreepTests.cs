@@ -87,6 +87,9 @@ public class BombardCreepTests(ITestOutputHelper output)
         var hidden = barrage.Count(r => r["found_close"] + r["never_found"] > 0);
         output.WriteLine($"barrage seeds with a survivor hidden until within 50 m or never found: {hidden}/{Seeds}");
         output.WriteLine($"barrage seeds with a survivor first found close in (not by fire): {barrage.Count(r => r["found_close"] > 0)}/{Seeds}");
+        var arrived = barrage.Where(r => r["broken_at_hedge"] >= 0).ToList();
+        output.WriteLine($"barrage seeds where the squad reached 50 m: {arrived.Count}; of them with cowering broken men still at the hedge: {arrived.Count(r => r["broken_at_hedge"] > 0)}");
+        output.WriteLine($"barrage seeds with 2+ known more at 50 m than at 150 m (reached both): {closed.Count(r => r["known_50"] > r["known_150"])}/{closed.Count}");
 
         // (4) The barrage against the control.
         Assert.True(Mean(barrage, "survivors") < Mean(control, "survivors") - 1);

@@ -57,6 +57,9 @@ public sealed class MoraleSystem(
     }
 
     /// <summary>A morale shock that is not a casualty (item 2.4: a shell burst nearby): the level drops by <paramref name="amount"/>.</summary>
+    /// <summary>A shell burst fell within <c>cower_radius</c> of one of the squad's able men (item 2.4).</summary>
+    internal void NoteShelled(int squadId, long tick) => Get(squadId).LastShelled = tick;
+
     internal void AddShock(int squadId, Fixed amount)
     {
         var e = Get(squadId);
@@ -156,10 +159,39 @@ public sealed class MoraleSystem(
             // State.
             var before = e.Core;
             e.Core = Next(e.Core, e.Level, ceiling, recovering);
+            // Cower first (item 2.4, owner decision): a broken or routing squad under shellfire lies flat where it is, not
+            // moving (and, through the unit AI, not firing), until no burst has fallen within cower_radius for cower_lift.
+            // A squad that routs under shellfire bolts only then.
             if (e.Core == MoraleState.Routing && before != MoraleState.Routing)
             {
+                e.FleePending = true;
+            }
+
+            e.FleePending &= e.Core == MoraleState.Routing;
+            var cowering = e.Core is MoraleState.Broken or MoraleState.Routing && world.Tick - e.LastShelled <= Rules.CowerLiftTicks;
+            if (cowering)
+            {
+                if (move?.IsMoving(squad.Id) == true)
+                {
+                    move.Stop(squad.Id);
+                    e.FleePending |= e.Core == MoraleState.Routing; // caught by shellfire on the run: down, then run again
+                }
+
+                foreach (var s in squad.Soldiers)
+                {
+                    if (s.CanLead)
+                    {
+                        s.Posture = Sight.Posture.Prone;
+                    }
+                }
+            }
+            else if (e.FleePending)
+            {
+                e.FleePending = false;
                 Flee(squad, centre);
             }
+
+            e.Cowering = cowering;
 
             var pinned = supState == SuppressionState.Pinned;
             squad.SetMorale(pinned && e.Core is MoraleState.Steady or MoraleState.Shaken or MoraleState.Rallying ? MoraleState.Pinned : e.Core);
@@ -175,6 +207,7 @@ public sealed class MoraleSystem(
             r |= supported ? MoraleReason.Supported : MoraleReason.Isolated;
             r |= inContact ? MoraleReason.None : MoraleReason.OutOfContact;
             r |= nearHq ? MoraleReason.NearHq : MoraleReason.None;
+            r |= e.Cowering ? MoraleReason.Cowering : MoraleReason.None;
             e.Reasons = r;
         }
     }
@@ -193,6 +226,9 @@ public sealed class MoraleSystem(
             hasher.Add(e.Initial);
             hasher.Add(e.LastLoss);
             hasher.Add(e.LeaderKilled);
+            hasher.Add(e.LastShelled);
+            hasher.Add(e.FleePending);
+            hasher.Add(e.Cowering);
             hasher.Add((ushort)e.Reasons);
         }
     }
@@ -400,6 +436,12 @@ public sealed class MoraleSystem(
         public long LastLoss { get; set; } = long.MinValue / 2;
 
         public long LeaderKilled { get; set; } = -1;
+
+        public long LastShelled { get; set; } = long.MinValue / 2;
+
+        public bool FleePending { get; set; }
+
+        public bool Cowering { get; set; }
 
         public MoraleReason Reasons { get; set; }
     }

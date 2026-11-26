@@ -348,6 +348,68 @@ public class ArtilleryTests(ITestOutputHelper output)
         Assert.InRange(ticks, 1, 40 * World.TicksPerSecond);
     }
 
+    private static (Rig Rig, Squad De) RoutingScene()
+    {
+        var rig = new Rig(new GameMap("open", 150, 60));
+        var de = rig.Org.SpawnSquad("de_gruppe", M(150), M(60), Posture.Kneeling);
+        rig.Org.SpawnSquad("de_zugtrupp", M(40), M(60), Posture.Prone); // somewhere to run to
+        rig.World.Step();
+        rig.Morale.SetLevel(de.Id, M(5)); // below rout_below: Broken, then Routing on the next ticks
+        return (rig, de);
+    }
+
+    [Fact]
+    public void A_routing_squad_cowers_flat_under_shellfire_and_bolts_only_after_the_lift()
+    {
+        var (rig, de) = RoutingScene();
+        var view = rig.World.ViewFor("de");
+        var quiet = Us with { LethalChance = Fixed.Zero };
+        var lift = rig.Morale.Rules.CowerLiftTicks;
+        var lastBurst = 0L;
+        for (var t = 0; t < 600; t++)
+        {
+            if (t % 50 == 0)
+            {
+                rig.Arty.Burst(rig.World, quiet, M(170), M(60)); // a round every 5 s, 20 m off
+                lastBurst = rig.World.Tick;
+            }
+
+            rig.World.Step();
+            if (t > 20)
+            {
+                var q = view.Squad(de.Id)!.Value;
+                Assert.Equal(MoraleState.Routing, q.Morale);
+                Assert.True((q.MoraleReasons & MoraleReason.Cowering) != 0);
+                Assert.False(q.IsMoving, $"moved under shellfire at tick {t}");
+                Assert.All(q.Soldiers.Where(s => s.Health is HealthState.Ok or HealthState.Wounded), s => Assert.Equal(Posture.Prone, s.Posture));
+            }
+        }
+
+        var bolted = -1L;
+        for (var t = 0; t < lift + 50 && bolted < 0; t++)
+        {
+            rig.World.Step();
+            bolted = view.Squad(de.Id)!.Value.IsMoving ? rig.World.Tick : -1;
+        }
+
+        output.WriteLine($"shelling lifted at tick {lastBurst}; the squad bolted at tick {bolted} (cower_lift {lift} ticks)");
+        Assert.InRange(bolted - lastBurst, lift, lift + 20);
+    }
+
+    [Fact]
+    public void A_routing_squad_with_no_shellfire_flees_at_once()
+    {
+        var (rig, de) = RoutingScene();
+        var moving = -1;
+        for (var t = 0; t < 30 && moving < 0; t++)
+        {
+            rig.World.Step();
+            moving = rig.World.ViewFor("de").Squad(de.Id)!.Value.IsMoving ? t : -1;
+        }
+
+        Assert.InRange(moving, 0, 10);
+    }
+
     [Fact]
     public void Mission_state_is_in_the_hash_and_same_seed_gives_same_battle()
     {
