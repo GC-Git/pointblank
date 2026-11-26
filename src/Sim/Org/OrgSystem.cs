@@ -78,6 +78,7 @@ public sealed class OrgSystem(OrgTables tables) : ISimSystem
             hasher.Add(q.IsHq);
             hasher.Add(q.HasRadio);
             hasher.Add((byte)q.Morale);
+            hasher.Add(q.MoraleLevel);
             hasher.Add(q.Soldiers.Count);
             foreach (var s in q.Soldiers)
             {
@@ -115,13 +116,24 @@ public sealed class SetHealthInput(int soldierId, HealthState health) : ISimInpu
     }
 }
 
-/// <summary>Sets a squad's morale state when it applies (a stub until the morale model, item 2.2).</summary>
+/// <summary>
+/// Forces a squad's morale state when it applies (a test and scenario override). With a
+/// <see cref="Morale.MoraleSystem"/> the level is also set inside the state's band, so the model
+/// carries on from there; without one only the state is set.
+/// </summary>
 public sealed class SetMoraleInput(int squadId, MoraleState morale) : ISimInput
 {
     public void Apply(World world)
     {
         var squad = world.GetSystem<OrgSystem>().Squads.FirstOrDefault(s => s.Id == squadId)
             ?? throw new InvalidOperationException($"No squad {squadId}.");
-        squad.SetMorale(morale);
+        if (world.FindSystem<Morale.MoraleSystem>() is { } model)
+        {
+            model.Force(squad.Id, morale);
+        }
+        else
+        {
+            squad.SetMorale(morale);
+        }
     }
 }

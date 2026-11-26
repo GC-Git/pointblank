@@ -18,7 +18,8 @@ namespace PointBlank.Runner;
 /// <c>Move</c> to the MG. A fire controller for the Germans, using only their <see cref="SideView"/>, keeps
 /// the MG team firing at the nearest tracked contact. With <c>hedges</c>, four hedge lines (<see cref="HedgeLines"/>)
 /// cross the field between them. Both sides have their platoon HQ behind them. Start positions
-/// jitter with the seed. Metrics: <c>pinned</c> (1 if the US squad was pinned within the run),
+/// jitter with the seed. <c>pin-open-nocas</c> is <c>pin-open</c> with <see cref="FireRules.HitsAsNearMisses"/>: no one is hurt,
+/// so it checks suppression apart from casualties (item 2.2 follow-up). Metrics: <c>pinned</c> (1 if the US squad was pinned within the run),
 /// <c>ticks_to_pin</c> (-1 if never), <c>first_mg_shot</c>, <c>us_casualties</c>.
 /// </summary>
 public sealed class PinScenario : IScenario
@@ -37,14 +38,16 @@ public sealed class PinScenario : IScenario
     private static readonly Lazy<DataSet> Data = new(() => DataLoader.LoadDirectory(DataDirectory()));
 
     private readonly bool _hedges;
+    private readonly bool _noCasualties;
 
-    public PinScenario(bool hedges)
+    public PinScenario(bool hedges, bool noCasualties = false)
     {
         _hedges = hedges;
+        _noCasualties = noCasualties;
         Map = new ContentRef(BuildMap().Id, 1, BuildMap().ComputeContentHash());
     }
 
-    public string Id => _hedges ? "pin-hedges" : "pin-open";
+    public string Id => _hedges ? "pin-hedges" : _noCasualties ? "pin-open-nocas" : "pin-open";
 
     public ContentRef Map { get; }
 
@@ -66,7 +69,8 @@ public sealed class PinScenario : IScenario
         var move = new MovementSystem(map, org, MovementRules.FromData(data), suppression);
         var sight = SightRules.FromData(data);
         var spot = new SpottingSystem(map, org, move, new LineOfSight(map, sight), SpottingRules.FromData(data), suppression);
-        var fire = new FireSystem(map, org, sight, FireRules.FromData(data), spot, suppression);
+        var fireRules = FireRules.FromData(data) with { HitsAsNearMisses = _noCasualties };
+        var fire = new FireSystem(map, org, sight, fireRules, spot, suppression);
         var command = new CommandSystem(org, move, CommandRules.FromData(data), fire, suppression);
         var watch = new PinWatch(org, fire, suppression);
         var world = new World(seed, new MapSystem(map), org, command, move, spot, fire, suppression, new MgFireControl(2), watch);

@@ -95,7 +95,7 @@ public class FireTests(ITestOutputHelper output)
     public void Rules_come_from_the_data_file()
     {
         Assert.Equal(M(2), Rules.NearMissRadius);
-        Assert.Equal(Fixed.FromRatio(1, 2), Rules.HedgeBlockChance);
+        Assert.Equal(Fixed.FromRatio(8, 10), Rules.HedgeBlockChance); // tuned in item 2.2
         Assert.Equal(Fixed.FromRatio(17, 10), Rules.BodyHeight(Posture.Standing));
         var rifle = Rules.Weapon("us_rifle_sample");
         Assert.Equal(80, rifle.CarriedRounds);
@@ -159,7 +159,8 @@ public class FireTests(ITestOutputHelper output)
         var rate = reached.Count(s => s.Outcome == ShotOutcome.Hedge) / (double)reached.Count;
         output.WriteLine($"hedge block rate {rate:P1} over {reached.Count} shots (configured {Rules.HedgeBlockChance})");
         Assert.True(reached.Count > 3000);
-        Assert.InRange(rate, 0.45, 0.55);
+        var p = Rules.HedgeBlockChance.Raw / 4294967296.0;
+        Assert.InRange(rate, p - 0.05, p + 0.05);
     }
 
     [Fact]

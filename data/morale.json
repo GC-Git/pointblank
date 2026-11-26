@@ -1,0 +1,39 @@
+{
+  "table": "morale",
+  "entries": [
+    {
+      "id": "default",
+      "values": {
+        "name": { "value": "Morale (placeholder)", "unit": "text", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
+        "start_level": { "value": "100", "unit": "points", "source": { "kind": "placeholder", "note": "Placeholder: morale of a fresh squad; the scale is 0 to 100." } },
+        "suppression_drain": { "value": "2", "unit": "points/s", "source": { "kind": "placeholder", "note": "Placeholder: morale lost per second at squad suppression 100 (linear in the squad level)." } },
+        "casualty_shock": { "value": "9", "unit": "points", "source": { "kind": "placeholder", "note": "Placeholder: morale lost per man down, times a random spread and times (1 + share of the squad lost)." } },
+        "shock_spread_min": { "value": "0.5", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: lowest random factor on a casualty shock." } },
+        "shock_spread_max": { "value": "1.5", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: highest random factor on a casualty shock." } },
+        "leader_shock": { "value": "15", "unit": "points", "source": { "kind": "placeholder", "note": "Placeholder: extra morale lost when the squad leader goes down." } },
+        "support_shock_reduction": { "value": "0.3", "unit": "ratio", "source": { "kind": "placeholder", "note": "Placeholder: share of each shock that a squad with friendly support nearby does not take." } },
+        "casualty_ceiling": { "value": "60", "unit": "points", "source": { "kind": "placeholder", "note": "Placeholder: recovery ceiling lost with 100% of the squad down (linear)." } },
+        "leaderless_ceiling": { "value": "15", "unit": "points", "source": { "kind": "placeholder", "note": "Placeholder: recovery ceiling lost while the squad has no effective leader." } },
+        "isolated_ceiling": { "value": "10", "unit": "points", "source": { "kind": "placeholder", "note": "Placeholder: recovery ceiling lost while no friendly squad is within the support radius." } },
+        "out_of_contact_ceiling": { "value": "10", "unit": "points", "source": { "kind": "placeholder", "note": "Placeholder: recovery ceiling lost while the squad is out of contact with an HQ." } },
+        "drift_rate": { "value": "0.5", "unit": "points/s", "source": { "kind": "placeholder", "note": "Placeholder: morale lost per second while above the recovery ceiling." } },
+        "recovery_rate": { "value": "1", "unit": "points/s", "source": { "kind": "placeholder", "note": "Placeholder: morale regained per second toward the ceiling while not under fire." } },
+        "leader_recovery_weight": { "value": "1", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: recovery is multiplied by (1 + leader bonus x this + the bonuses below)." } },
+        "support_recovery_bonus": { "value": "0.5", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: added to the recovery multiplier with friendly support nearby." } },
+        "hq_rally_bonus": { "value": "1.5", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: added to the recovery multiplier with an HQ of the side within the rally radius." } },
+        "support_radius": { "value": "50", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: a friendly squad this close (between able-men centres) supports the squad." } },
+        "hq_rally_radius": { "value": "60", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: an HQ of the side this close helps the squad rally." } },
+        "loss_window": { "value": "10", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: no recovery for this long after the squad loses a man." } },
+        "leader_killed_memory": { "value": "60", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: how long the LeaderKilled reason shows after the leader went down." } },
+        "heavy_casualty_fraction": { "value": "0.3", "unit": "ratio", "source": { "kind": "placeholder", "note": "Placeholder: share of the squad down from which the reason is HeavyCasualties." } },
+        "shaken_below": { "value": "60", "unit": "points", "source": { "kind": "placeholder", "note": "Placeholder: a steady squad below this is Shaken." } },
+        "shaken_release": { "value": "65", "unit": "points", "source": { "kind": "placeholder", "note": "Placeholder: a shaken squad at or above this is Steady again." } },
+        "broken_below": { "value": "30", "unit": "points", "source": { "kind": "placeholder", "note": "Placeholder: a squad below this is Broken." } },
+        "broken_release": { "value": "40", "unit": "points", "source": { "kind": "placeholder", "note": "Placeholder: a broken or routing squad at or above this, while recovering, is Rallying." } },
+        "rout_below": { "value": "15", "unit": "points", "source": { "kind": "placeholder", "note": "Placeholder: a broken squad below this routs." } },
+        "steady_above": { "value": "70", "unit": "points", "source": { "kind": "placeholder", "note": "Placeholder: a rallying squad at or above this (or at its ceiling, if lower) has rallied." } },
+        "rout_distance": { "value": "100", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: how far a routing squad runs from the nearest known enemy." } }
+      }
+    }
+  ]
+}

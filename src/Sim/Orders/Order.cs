@@ -108,6 +108,9 @@ public enum DelayReason : byte
     Shaken = 2,
     Broken = 4,
     OutOfContact = 8,
+
+    /// <summary>Morale below full (item 2.2): <c>low_morale_delay</c> × (100 − level) / 100 extra.</summary>
+    LowMorale = 16,
 }
 
 /// <summary>Extra detail on a finished or rejected order. Values are hashed, so never renumber.</summary>
@@ -138,6 +141,18 @@ public enum OrderNote : byte
 
     /// <summary>A Fire order's target is beyond every armed man's range.</summary>
     OutOfRange = 8,
+
+    /// <summary>Refused because the squad is broken (or, on a hesitation or refusal, shaken: <see cref="MoraleShaken"/>).</summary>
+    MoraleBroken = 9,
+
+    /// <summary>Refused or hesitated over because the squad is shaken (or pinned or rallying, which count as shaken).</summary>
+    MoraleShaken = 10,
+
+    /// <summary>Refused or cancelled because the squad is routing: it obeys only FallBack.</summary>
+    Routing = 11,
+
+    /// <summary>On a <see cref="OrderStatus.Held"/> order: the squad is pinned by suppression.</summary>
+    Pinned = 12,
 }
 
 /// <summary>What <see cref="CommandSystem.Issue"/> did with an order. Values are hashed, so never renumber.</summary>

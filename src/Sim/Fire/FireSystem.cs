@@ -278,6 +278,12 @@ public sealed class FireSystem : ISimSystem
             var h = Rules.BodyHeight(s.Posture);
             var coverTop = g + (h * (tile < 0 ? Fixed.Zero : Rules.Cover(_tracer.Terrain(tile))));
             var z = walk.HeightAt(along);
+            if (lateral <= half && z >= g && z <= g + h && Rules.HitsAsNearMisses && z >= coverTop)
+            {
+                NearMiss(world, s, firer, weapon, lateral);
+                continue;
+            }
+
             if (lateral <= half && z >= g && z <= g + h)
             {
                 stopS = along;

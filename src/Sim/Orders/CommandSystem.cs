@@ -27,7 +27,12 @@ namespace PointBlank.Sim.Orders;
 /// Sneak) delivered to a pinned squad, or under way when it becomes pinned, is <see cref="OrderStatus.Held"/>: the
 /// move stops, and starts again to the same point once the squad is no longer pinned. Fall-back, Hold and Fire
 /// are never held. Morale and suppression stay separate: refusal and hesitation (morale) are decided at delivery,
-/// and only an order that gets past them can be held. Item 2.2 will feed suppression into morale.</item>
+/// and only an order that gets past them can be held (note <see cref="OrderNote.Pinned"/>).</item>
+/// <item>Morale (item 2.2): the rules read <see cref="Squad.Morale"/> through <see cref="Band"/> (Pinned and
+/// Rallying count as Shaken, Routing as Broken) and add <see cref="DelayReason.LowMorale"/> from
+/// <see cref="Squad.MoraleLevel"/>. Refusals and hesitations carry a morale note. A Routing squad refuses
+/// every order but FallBack (<see cref="OrderNote.Routing"/>), and an order under way when it routs is
+/// cancelled with that note.</item>
 /// </list>
 /// Register after <see cref="OrgSystem"/> and before <see cref="MovementSystem"/>.
 /// </summary>
@@ -131,7 +136,7 @@ public sealed class CommandSystem(
         }
 
         t.Reasons = Reasons(squad);
-        t.Total = t.Remaining = Rules.RollDelayTicks(t.Reasons, world.Rng);
+        t.Total = t.Remaining = Rules.RollDelayTicks(t.Reasons, world.Rng, squad.MoraleLevel);
         t.Status = OrderStatus.Pending;
         return IssueResult.Accepted;
     }
@@ -142,6 +147,17 @@ public sealed class CommandSystem(
         {
             if (!_tickets.TryGetValue(squad.Id, out var t))
             {
+                continue;
+            }
+
+            if (squad.Morale == MoraleState.Routing && t.Order.Kind != OrderKind.FallBack
+                && t.Status is OrderStatus.Executing or OrderStatus.Held or OrderStatus.Hesitating)
+            {
+                // A routing squad drops what it was doing; MoraleSystem moves it.
+                fire?.Stop(squad.Id);
+                t.Status = OrderStatus.Refused;
+                t.Note = OrderNote.Routing;
+                t.Remaining = 0;
                 continue;
             }
 
@@ -158,6 +174,7 @@ public sealed class CommandSystem(
                 case OrderStatus.Executing when IsHeldKind(t.Order.Kind) && Pinned(squad):
                     move.Stop(squad.Id);
                     t.Status = OrderStatus.Held;
+                    t.Note = OrderNote.Pinned;
                     break;
                 case OrderStatus.Held when !Pinned(squad):
                     Execute(world, squad, t);
@@ -243,23 +260,42 @@ public sealed class CommandSystem(
     {
         var r = DelayReason.None;
         r |= squad.HasEffectiveLeader ? DelayReason.None : DelayReason.NoLeader;
-        r |= squad.Morale switch
+        r |= Band(squad.Morale) switch
         {
             MoraleState.Shaken => DelayReason.Shaken,
             MoraleState.Broken => DelayReason.Broken,
             _ => DelayReason.None,
         };
         r |= InContact(squad) ? DelayReason.None : DelayReason.OutOfContact;
+        r |= squad.MoraleLevel < Fixed.FromInt(100) ? DelayReason.LowMorale : DelayReason.None;
         return r;
     }
+
+    /// <summary>
+    /// The morale band the order rules use: Steady, Shaken (also Pinned and Rallying) or Broken (also Routing).
+    /// </summary>
+    internal static MoraleState Band(MoraleState state) => state switch
+    {
+        MoraleState.Shaken or MoraleState.Pinned or MoraleState.Rallying => MoraleState.Shaken,
+        MoraleState.Broken or MoraleState.Routing => MoraleState.Broken,
+        _ => MoraleState.Steady,
+    };
 
     private void Deliver(World world, Squad squad, Ticket t)
     {
         var rng = world.Rng;
         var cls = OrderKinds.ClassOf(t.Order.Kind);
+        if (squad.Morale == MoraleState.Routing && cls != OrderClass.FallBack)
+        {
+            t.Status = OrderStatus.Refused;
+            t.Note = OrderNote.Routing;
+            return;
+        }
+
+        var band = Band(squad.Morale);
         var refuse = cls != OrderClass.Advance
             ? Fixed.Zero
-            : squad.Morale switch
+            : band switch
             {
                 MoraleState.Broken => Rules.BrokenRefuseChance,
                 MoraleState.Shaken => Rules.ShakenRefuseChance,
@@ -268,13 +304,15 @@ public sealed class CommandSystem(
         if (refuse > Fixed.Zero && Roll(rng, refuse))
         {
             t.Status = OrderStatus.Refused;
+            t.Note = band == MoraleState.Broken ? OrderNote.MoraleBroken : OrderNote.MoraleShaken;
             return;
         }
 
-        if (squad.Morale == MoraleState.Shaken && cls != OrderClass.FallBack && Rules.HesitateChance > Fixed.Zero
+        if (band == MoraleState.Shaken && cls != OrderClass.FallBack && Rules.HesitateChance > Fixed.Zero
             && Roll(rng, Rules.HesitateChance) && Rules.HesitateTicks > 0)
         {
             t.Status = OrderStatus.Hesitating;
+            t.Note = OrderNote.MoraleShaken;
             t.Remaining = Rules.HesitateTicks;
             return;
         }
@@ -290,7 +328,7 @@ public sealed class CommandSystem(
         {
             move.Stop(squad.Id);
             t.Status = OrderStatus.Held;
-            t.Note = OrderNote.None;
+            t.Note = OrderNote.Pinned;
             return;
         }
 
@@ -320,6 +358,7 @@ public sealed class CommandSystem(
         {
             move.Stop(squad.Id);
             t.Status = OrderStatus.Done;
+            t.Note = OrderNote.None;
             return;
         }
 

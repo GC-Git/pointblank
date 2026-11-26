@@ -21,11 +21,11 @@
           }
         },
         "hedge_block_chance": {
-          "value": "0.5",
+          "value": "0.8",
           "unit": "ratio",
           "source": {
             "kind": "placeholder",
-            "note": "Placeholder: chance a hedge stops a shot crossing it below its top."
+            "note": "Placeholder: chance a hedge stops a shot crossing it below its top (0.5 until item 2.2 tuning: 0.8 keeps the pin-hedges gap once near misses alone can pin)."
           }
         },
         "body_width": {

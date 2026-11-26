@@ -23,6 +23,10 @@ public class PinScenarioTests(ITestOutputHelper output)
             {
                 pinned++;
                 ticks += metrics["ticks_to_pin"];
+                if (id.EndsWith("-nocas", StringComparison.Ordinal))
+                {
+                    Assert.Equal(0, metrics["us_casualties"]);
+                }
                 Assert.InRange(metrics["ticks_to_pin"], 0, PinScenario.RunTicks);
             }
         }
@@ -41,9 +45,18 @@ public class PinScenarioTests(ITestOutputHelper output)
         Assert.True(open.Pinned - hedges.Pinned >= 20, $"open {open.Pinned}% vs hedges {hedges.Pinned}%");
     }
 
+    [Fact]
+    public void Near_misses_alone_pin_a_squad_in_the_open()
+    {
+        // Item 2.2 follow-up from the 2.1 review: hits become near misses, so nobody is hurt.
+        var open = Run("pin-open-nocas");
+        Assert.True(open.Pinned >= 70, $"no casualties: {open.Pinned}%");
+    }
+
     [Theory]
     [InlineData("pin-open")]
     [InlineData("pin-hedges")]
+    [InlineData("pin-open-nocas")]
     public void The_scenario_replays_to_the_same_hash(string id)
     {
         var scenario = ScenarioCatalog.Find(id)!;

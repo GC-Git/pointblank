@@ -39,6 +39,9 @@ public sealed class CommandRules
 
     public Fixed BrokenRefuseChance { get; private init; }
 
+    /// <summary>Extra seconds at morale level 0, falling linearly to none at 100.</summary>
+    public Fixed LowMoraleDelay { get; private init; }
+
     /// <exception cref="DataException">The entry is missing or a value is out of range.</exception>
     public static CommandRules FromData(DataSet data)
     {
@@ -61,6 +64,7 @@ public sealed class CommandRules
             HesitateTicks = ToTicks(Seconds("hesitate_delay")),
             ShakenRefuseChance = Chance("shaken_refuse_chance"),
             BrokenRefuseChance = Chance("broken_refuse_chance"),
+            LowMoraleDelay = Seconds("low_morale_delay"),
         };
         if (rules.SpreadMin > rules.SpreadMax)
         {
@@ -70,10 +74,20 @@ public sealed class CommandRules
         return rules;
     }
 
-    /// <summary>The delay in seconds before the random spread.</summary>
-    public Fixed DelaySeconds(DelayReason reasons)
+    /// <summary>
+    /// The delay in seconds before the random spread. <paramref name="moraleLevel"/> (0 to 100, default 100)
+    /// counts only with <see cref="DelayReason.LowMorale"/>.
+    /// </summary>
+    public Fixed DelaySeconds(DelayReason reasons, Fixed? moraleLevel = null)
     {
         var s = BaseDelay;
+        if (reasons.HasFlag(DelayReason.LowMorale) && moraleLevel is { } level)
+        {
+            var hundred = Fixed.FromInt(100);
+            var missing = level < Fixed.Zero ? hundred : level > hundred ? Fixed.Zero : hundred - level;
+            s += LowMoraleDelay * missing / hundred;
+        }
+
         s += reasons.HasFlag(DelayReason.NoLeader) ? NoLeaderDelay : Fixed.Zero;
         s += reasons.HasFlag(DelayReason.OutOfContact) ? OutOfContactDelay : Fixed.Zero;
         s += reasons.HasFlag(DelayReason.Shaken) ? ShakenDelay : Fixed.Zero;
@@ -82,10 +96,10 @@ public sealed class CommandRules
     }
 
     /// <summary>Rolls the delay in ticks: the seconds times a spread factor, rounded up. Draws once from the RNG.</summary>
-    public int RollDelayTicks(DelayReason reasons, SimRng rng)
+    public int RollDelayTicks(DelayReason reasons, SimRng rng, Fixed? moraleLevel = null)
     {
         var spread = SpreadMin + ((SpreadMax - SpreadMin) * rng.NextFixed());
-        return ToTicks(DelaySeconds(reasons) * spread);
+        return ToTicks(DelaySeconds(reasons, moraleLevel) * spread);
     }
 
     /// <summary>Seconds to ticks, rounded up.</summary>

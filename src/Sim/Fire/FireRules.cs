@@ -31,6 +31,13 @@ public sealed record FireRules
 
     public Fixed NearMissRadius { get; init; }
 
+    /// <summary>
+    /// A test and scenario switch, not data (false from <see cref="FromData"/>): a round that would hit a
+    /// man in the open counts as a near miss on him and flies on, so fire causes no casualties. Used to
+    /// check that suppression works apart from casualties (scenario <c>pin-open-nocas</c>).
+    /// </summary>
+    public bool HitsAsNearMisses { get; init; }
+
     /// <summary>The chance a hedge stops a shot that reaches it below its top.</summary>
     public Fixed HedgeBlockChance { get; init; }
 

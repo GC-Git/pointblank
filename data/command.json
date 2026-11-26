@@ -16,7 +16,8 @@
         "hesitate_chance": { "value": "0.4", "unit": "probability", "source": { "kind": "placeholder", "note": "Placeholder: chance that a shaken squad hesitates when an order reaches it." } },
         "hesitate_delay": { "value": "5", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: how long a hesitating squad waits before it obeys." } },
         "shaken_refuse_chance": { "value": "0.15", "unit": "probability", "source": { "kind": "placeholder", "note": "Placeholder: chance that a shaken squad refuses an advance-type order." } },
-        "broken_refuse_chance": { "value": "0.6", "unit": "probability", "source": { "kind": "placeholder", "note": "Placeholder: chance that a broken squad refuses an advance-type order." } }
+        "broken_refuse_chance": { "value": "0.6", "unit": "probability", "source": { "kind": "placeholder", "note": "Placeholder: chance that a broken squad refuses an advance-type order." } },
+        "low_morale_delay": { "value": "6", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: extra delay at morale level 0 (linear, none at 100)." } }
       }
     }
   ]

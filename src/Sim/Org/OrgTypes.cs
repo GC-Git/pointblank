@@ -26,14 +26,30 @@ public enum HealthState : byte
 }
 
 /// <summary>
-/// A squad's morale. A stub for item 1.5 (set by <see cref="SetMoraleInput"/>); item 2.2 adds the
-/// morale model and more states. Values are hashed, so never renumber.
+/// A squad's morale state, set by <c>Morale.MoraleSystem</c> (item 2.2) or, without one, by
+/// <see cref="SetMoraleInput"/>. Values are hashed, so never renumber.
 /// </summary>
 public enum MoraleState : byte
 {
     Steady = 0,
+
+    /// <summary>Slower orders, may hesitate, sometimes refuses advances.</summary>
     Shaken = 1,
+
+    /// <summary>Much slower orders; refuses advances in most cases.</summary>
     Broken = 2,
+
+    /// <summary>
+    /// The squad's suppression state is Pinned (the one notion of pinned) and its morale is not Broken
+    /// or Routing. Orders treat it as Shaken; advances are held by the suppression rule.
+    /// </summary>
+    Pinned = 3,
+
+    /// <summary>Broken and running from the enemy; refuses every order except FallBack.</summary>
+    Routing = 4,
+
+    /// <summary>Recovering from Broken or Routing; orders treat it as Shaken.</summary>
+    Rallying = 5,
 }
 
 public sealed class Soldier
@@ -133,8 +149,13 @@ public sealed class Squad
 
     public MoraleState Morale { get; private set; }
 
-    /// <summary>Sets the morale state. Item 1.5 has no morale model; tests and item 2.2 call this.</summary>
+    /// <summary>The morale level, 0 to 100 (100 without a morale model).</summary>
+    public Fixed MoraleLevel { get; private set; } = Fixed.FromInt(100);
+
+    /// <summary>Sets the morale state (the morale model calls this every tick; tests may call it without one).</summary>
     public void SetMorale(MoraleState morale) => Morale = morale;
+
+    internal void SetMoraleLevel(Fixed level) => MoraleLevel = level;
 
     /// <summary>The soldier in command, or null while the post is vacant.</summary>
     public Soldier? Leader { get; private set; }
@@ -142,8 +163,8 @@ public sealed class Squad
     public bool HasEffectiveLeader => Leader != null;
 
     /// <summary>
-    /// What a leader adds to the squad (0 to 1, from data), and zero while there is none. Later
-    /// morale (1.5) and order (2.2) code reads it; nothing applies it yet.
+    /// What a leader adds to the squad (0 to 1, from data), and zero while there is none. The
+    /// morale model (item 2.2) multiplies recovery by it.
     /// </summary>
     public Fixed LeaderBonus => HasEffectiveLeader ? _leaderBonus : Fixed.Zero;
 
