@@ -6,16 +6,27 @@ using PointBlank.Sim.Org;
 using PointBlank.Sim.Sight;
 using PointBlank.Sim.Spotting;
 using PointBlank.Sim.Suppression;
+using PointBlank.Sim.UnitAi;
 
 namespace PointBlank.Sim;
 
 /// <summary>
 /// A copy of one of the side's own soldiers. <see cref="Rounds"/> is what he has left (-1 without fire rules or a known weapon).
 /// <see cref="Suppression"/> is his suppression level (0 to 100) and <see cref="SuppressionState"/> its state.
+/// <see cref="Moving"/>: he is walking now (on his squad's move and not held, or on a local move of the unit AI).
 /// </summary>
 public readonly record struct SoldierView(
     int Id, string Key, Role Role, int Rank, string WeaponId, int TeamIndex, Fixed X, Fixed Y, Posture Posture, HealthState Health, int Rounds,
-    Fixed Suppression, SuppressionState SuppressionState);
+    Fixed Suppression, SuppressionState SuppressionState, bool Moving = false);
+
+/// <summary>
+/// A round that passed close to (or hit) one of the side's own soldiers on the last fire tick, as the side knows it
+/// (item 2.3): the bearing from him to the shooter as one of 16 sectors (<see cref="Sector"/>, with its unit vector
+/// <see cref="DirX"/>, <see cref="DirY"/>) and the distance rounded to the unit AI's <c>distance_band</c>, never the exact
+/// origin. <see cref="SourceId"/> is the shooter's id only when he is already a contact the side knows, else -1.
+/// </summary>
+public readonly record struct IncomingFireView(
+    int SoldierId, long Tick, int SourceId, int Sector, Fixed DirX, Fixed DirY, Fixed Distance, bool Hit);
 
 /// <summary>
 /// A copy of one of the side's own squads. <see cref="LeaderId"/> is -1 while the post is vacant. <see cref="Ammo"/>
@@ -59,6 +70,7 @@ public sealed class SideView
     private readonly FireSystem? _fire;
     private readonly SuppressionSystem? _suppression;
     private readonly MoraleSystem? _morale;
+    private readonly UnitAiSystem? _ai;
 
     internal SideView(World world, string side)
     {
@@ -71,6 +83,7 @@ public sealed class SideView
         _fire = world.FindSystem<FireSystem>();
         _suppression = world.FindSystem<SuppressionSystem>();
         _morale = world.FindSystem<MoraleSystem>();
+        _ai = world.FindSystem<UnitAiSystem>();
     }
 
     public string Side { get; }
@@ -85,6 +98,74 @@ public sealed class SideView
 
     /// <summary>The enemies the side has spotted, last-known data only (<see cref="SpottingSystem"/>).</summary>
     public IReadOnlyList<ContactView> KnownEnemies => _spotting?.KnownEnemies(Side) ?? [];
+
+    /// <summary>The rules of engagement of one of the side's own units (item 2.3), or null (also for an enemy unit).</summary>
+    public RoeMode? RoeOf(int unitId) => _command != null && Own(unitId) != null ? _command.RoeOf(unitId) : null;
+
+    /// <summary>
+    /// The rounds that passed close to or hit the side's own men on the last fire tick, fuzzed (see
+    /// <see cref="IncomingFireView"/>). Empty without a <see cref="FireSystem"/> and a <see cref="UnitAiSystem"/> (whose
+    /// rules give the distance band). The leak, by design: the side learns that someone fired and roughly from where,
+    /// as a soldier hears it; many men under fire could triangulate a little, as real troops do.
+    /// </summary>
+    public IReadOnlyList<IncomingFireView> IncomingFire
+    {
+        get
+        {
+            if (_fire == null || _ai == null)
+            {
+                return [];
+            }
+
+            var list = new List<IncomingFireView>();
+            if (_fire.NearMisses.Count == 0 && _fire.Shots.Count == 0)
+            {
+                return list;
+            }
+
+            var sides = new Dictionary<int, (bool Own, Soldier Soldier)>();
+            foreach (var q in _org.Squads)
+            {
+                foreach (var m in q.Soldiers)
+                {
+                    sides[m.Id] = (q.Side == Side, m);
+                }
+            }
+
+            void Add(int soldierId, int firerId, Fixed ox, Fixed oy, long tick, bool hit)
+            {
+                // Only rounds at the side's own men, and not its own men's rounds (friendly fire is known to be friendly).
+                if (!sides.TryGetValue(soldierId, out var v) || !v.Own || (sides.TryGetValue(firerId, out var f) && f.Own))
+                {
+                    return;
+                }
+
+                var s = v.Soldier;
+                var dx = ox - s.X;
+                var dy = oy - s.Y;
+                var sector = Bearings.SectorOf(dx, dy);
+                var (ux, uy) = Bearings.Dir(sector);
+                var band = Bearings.Band(Fixed.Sqrt((dx * dx) + (dy * dy)), _ai.Rules.DistanceBand);
+                var source = _spotting?.ContactOf(Side, firerId) != null ? firerId : -1;
+                list.Add(new IncomingFireView(soldierId, tick, source, sector, ux, uy, band, hit));
+            }
+
+            foreach (var n in _fire.NearMisses)
+            {
+                Add(n.SoldierId, n.FirerId, n.OriginX, n.OriginY, n.Tick, false);
+            }
+
+            foreach (var shot in _fire.Shots)
+            {
+                if (shot.Outcome == ShotOutcome.Hit)
+                {
+                    Add(shot.HitSoldierId, shot.FirerId, shot.OriginX, shot.OriginY, shot.Tick, true);
+                }
+            }
+
+            return list;
+        }
+    }
 
     /// <summary>The order state of one of the side's own units, or null (also for an enemy unit).</summary>
     public OrderView? StatusOf(int unitId) => _command != null && Own(unitId) != null ? _command.StatusOf(unitId) : null;
@@ -138,7 +219,8 @@ public sealed class SideView
         _fire?.AmmoOf(q) ?? AmmoState.Ok,
         q.Soldiers.Select(s => new SoldierView(
             s.Id, s.Key, s.Role, s.Rank, s.WeaponId, s.TeamIndex, s.X, s.Y, s.Posture, s.Health, _fire?.RoundsOf(s.Id) ?? -1,
-            _suppression?.LevelOf(s.Id) ?? Fixed.Zero, _suppression?.StateOf(s.Id) ?? SuppressionState.None)).ToArray(),
+            _suppression?.LevelOf(s.Id) ?? Fixed.Zero, _suppression?.StateOf(s.Id) ?? SuppressionState.None,
+            _move?.IsSoldierMoving(s.Id) ?? false)).ToArray(),
         _suppression?.SquadLevelOf(q.Id) ?? Fixed.Zero,
         _suppression?.SquadStateOf(q.Id) ?? SuppressionState.None,
         q.MoraleLevel,

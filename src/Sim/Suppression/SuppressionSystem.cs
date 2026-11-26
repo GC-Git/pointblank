@@ -237,6 +237,17 @@ public sealed class SuppressionSystem(OrgSystem org, SuppressionRules rules) : I
     /// <summary>Adds a zero state for each soldier and squad spawned since the last call (spawn order).</summary>
     private void Sync()
     {
+        var total = 0;
+        foreach (var squad in org.Squads)
+        {
+            total += squad.Soldiers.Count;
+        }
+
+        if (total == _states.Count && org.Squads.Count == _squads.Count)
+        {
+            return; // nothing spawned since the last call (soldiers and squads are never removed)
+        }
+
         foreach (var squad in org.Squads)
         {
             if (!_squads.ContainsKey(squad.Id))

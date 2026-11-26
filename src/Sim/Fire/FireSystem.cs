@@ -25,8 +25,11 @@ namespace PointBlank.Sim.Fire;
 /// stop a move under way (the firer then has the moving factor).</item>
 /// <item>Suppression (optional <see cref="SuppressionSystem"/>): it scales dispersion and the shot credit,
 /// and receives every near miss and hit.</item>
-/// <item>Every shot calls <see cref="SpottingSystem.NoteFired"/>. No automatic return fire (item 2.3);
-/// it can read <see cref="Shots"/>, <see cref="NearMisses"/> and <see cref="LastFiredTick"/>.</item>
+/// <item>Every shot calls <see cref="SpottingSystem.NoteFired"/>.</item>
+/// <item>AI fire (item 2.3): <see cref="SetAiFire"/> gives a squad a fire task from the unit AI, with a team mask (only
+/// those teams fire). It works like a fire order (same target rules, cadence and hold-fire) but sits below it: while
+/// the squad has a player Fire order, the AI task is ignored. New orders do not stop it; the AI does
+/// (<see cref="StopAiFire"/>). A forgotten or fallen target ends it.</item>
 /// </list>
 /// Register after <see cref="SpottingSystem"/>, and pass it to <see cref="CommandSystem"/>.
 /// </summary>
@@ -44,6 +47,7 @@ public sealed class FireSystem : ISimSystem
     private readonly Dictionary<int, int> _indexOf = [];
     private readonly SortedDictionary<int, FireOrder> _orders = [];
     private readonly SortedDictionary<int, OrderNote> _ended = [];
+    private readonly SortedDictionary<int, FireOrder> _ai = [];
     private readonly List<ShotEvent> _shots = [];
     private readonly List<NearMissEvent> _nearMisses = [];
     private readonly List<(Fixed S, Fixed Lateral, Soldier Soldier)> _candidates = [];
@@ -98,6 +102,42 @@ public sealed class FireSystem : ISimSystem
     }
 
     internal bool IsFiring(int squadId) => _orders.ContainsKey(squadId);
+
+    /// <summary>Whether the squad has a unit AI fire task (item 2.3).</summary>
+    internal bool IsAiFiring(int squadId) => _ai.ContainsKey(squadId);
+
+    /// <summary>
+    /// Sets or updates the squad's AI fire task: at a contact its side knows (<paramref name="targetId"/>) or at a
+    /// point (-1), by the teams in <paramref name="teamMask"/> (bit per team index). A new task draws a random start
+    /// phase for each man (one RNG draw each); an update keeps the cadence. An unknown contact clears the task.
+    /// </summary>
+    internal void SetAiFire(World world, Squad squad, int targetId, Fixed x, Fixed y, int teamMask)
+    {
+        Sync();
+        if (targetId >= 0)
+        {
+            if (_spotting?.ContactOf(squad.Side, targetId) is not { } c)
+            {
+                _ai.Remove(squad.Id);
+                return;
+            }
+
+            (x, y) = (c.X, c.Y);
+        }
+
+        if (!_ai.ContainsKey(squad.Id))
+        {
+            foreach (var s in squad.Soldiers)
+            {
+                StateOf(s).Credit = world.Rng.NextFixed();
+            }
+        }
+
+        _ai[squad.Id] = new FireOrder(targetId, x, y) { Mask = teamMask };
+    }
+
+    /// <summary>Ends the squad's AI fire task, if any.</summary>
+    internal void StopAiFire(int squadId) => _ai.Remove(squadId);
 
     /// <summary>Why the squad's last fire order ended (<see cref="OrderNote.None"/> if it was replaced or none ended).</summary>
     internal OrderNote EndNoteOf(int squadId) => _ended.TryGetValue(squadId, out var n) ? n : OrderNote.None;
@@ -177,7 +217,11 @@ public sealed class FireSystem : ISimSystem
         {
             if (_orders.TryGetValue(squad.Id, out var fo))
             {
-                FireSquad(world, squad, fo);
+                FireSquad(world, squad, fo, false);
+            }
+            else if (_ai.TryGetValue(squad.Id, out var ai))
+            {
+                FireSquad(world, squad, ai, true);
             }
         }
     }
@@ -351,6 +395,16 @@ public sealed class FireSystem : ISimSystem
             hasher.Add(fo.Y);
         }
 
+        hasher.Add(_ai.Count);
+        foreach (var (id, fo) in _ai)
+        {
+            hasher.Add(id);
+            hasher.Add(fo.TargetId);
+            hasher.Add(fo.X);
+            hasher.Add(fo.Y);
+            hasher.Add(fo.Mask);
+        }
+
         hasher.Add(_ended.Count);
         foreach (var (id, note) in _ended)
         {
@@ -422,8 +476,20 @@ public sealed class FireSystem : ISimSystem
         _suppression?.OnNearMiss(world, e, Rules.NearMissRadius);
     }
 
-    private void FireSquad(World world, Squad squad, FireOrder fo)
+    private void FireSquad(World world, Squad squad, FireOrder fo, bool ai)
     {
+        void End(int squadId, OrderNote note)
+        {
+            if (ai)
+            {
+                _ai.Remove(squadId);
+            }
+            else
+            {
+                EndOrder(squadId, note);
+            }
+        }
+
         Soldier? target = null;
         if (fo.TargetId >= 0)
         {
@@ -465,6 +531,11 @@ public sealed class FireSystem : ISimSystem
             }
 
             armed++;
+            if ((fo.Mask & (1 << s.TeamIndex)) == 0)
+            {
+                continue;
+            }
+
             if (st.Reload > 0 || st.Pause > 0 || !InRange(s, w, fo.X, fo.Y) || Masked(s, squad.Side, fo.X, fo.Y))
             {
                 continue;
@@ -546,7 +617,7 @@ public sealed class FireSystem : ISimSystem
         return false;
     }
 
-    private void End(int squadId, OrderNote note)
+    private void EndOrder(int squadId, OrderNote note)
     {
         _orders.Remove(squadId);
         _ended[squadId] = note;
@@ -557,6 +628,17 @@ public sealed class FireSystem : ISimSystem
     /// <summary>Adds a state, with full ammunition, for each soldier spawned since the last call (spawn order).</summary>
     private void Sync()
     {
+        var total = 0;
+        foreach (var squad in _org.Squads)
+        {
+            total += squad.Soldiers.Count;
+        }
+
+        if (total == _states.Count)
+        {
+            return; // soldiers are never removed, so every one already has a state
+        }
+
         foreach (var squad in _org.Squads)
         {
             foreach (var s in squad.Soldiers)
@@ -585,6 +667,9 @@ public sealed class FireSystem : ISimSystem
         public Fixed X { get; set; } = x;
 
         public Fixed Y { get; set; } = y;
+
+        /// <summary>The teams that fire (bit per team index); every team for a player order.</summary>
+        public int Mask { get; init; } = -1;
     }
 
     private sealed class State(Soldier soldier, WeaponStats? weapon)

@@ -129,6 +129,9 @@ public sealed record MoraleRules
 
     public Fixed RoutDistance { get; init; }
 
+    /// <summary>A routing squad runs from the mean bearing of the known enemies within this distance (item 2.3).</summary>
+    public Fixed RoutThreatRadius { get; init; }
+
     /// <exception cref="DataException">The entry is missing or a value is out of range.</exception>
     public static MoraleRules FromData(DataSet data)
     {
@@ -174,6 +177,7 @@ public sealed record MoraleRules
             RoutBelow = Level("rout_below"),
             SteadyAbove = Level("steady_above"),
             RoutDistance = F("rout_distance", big),
+            RoutThreatRadius = F("rout_threat_radius", big),
         };
         if (r.ShockSpreadMin > r.ShockSpreadMax || !(r.RoutBelow <= r.BrokenBelow && r.BrokenBelow < r.BrokenRelease
             && r.BrokenRelease <= r.ShakenBelow && r.ShakenBelow <= r.ShakenRelease && r.BrokenRelease <= r.SteadyAbove))

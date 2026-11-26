@@ -27,7 +27,11 @@ namespace PointBlank.Sim.Morale;
 /// <item>Pinned: there is one notion of pinned, the squad's suppression state. The shown state is
 /// <see cref="MoraleState.Pinned"/> while suppression is Pinned and the state above is Steady, Shaken or Rallying;
 /// Broken and Routing take precedence. Holding advances stays the suppression rule in <see cref="CommandSystem"/>.</item>
-/// <item>Routing: on entering it the squad runs (MoveFast) <c>rout_distance</c> straight away from the nearest enemy its
+/// <item>Known limit: a squad with very heavy casualties and no support nearby cannot recover from Broken. Its ceiling can sit
+/// below <c>broken_release</c>, so it never reaches Rallying and stays Broken (or routs) until a friendly squad or an HQ comes
+/// near. By design for now.</item>
+/// <item>Routing (item 2.3 follow-ups in <see cref="Flee"/>: mean bearing of the known enemies within <c>rout_threat_radius</c>,
+/// nearest reachable fallback point): on entering it the squad runs (MoveFast) <c>rout_distance</c> straight away from the nearest enemy its
 /// side knows (<see cref="SpottingSystem.KnownEnemies"/>, so fog is respected), or to its nearest HQ if it knows none,
 /// pulled in until the point is on the map. <see cref="CommandSystem"/> refuses it every order but FallBack.</item>
 /// </list>
@@ -244,7 +248,12 @@ public sealed class MoraleSystem(
         return false;
     }
 
-    /// <summary>Starts the rout: away from the nearest known enemy, or to the nearest own HQ when none is known.</summary>
+    /// <summary>
+    /// Starts the rout: away from the mean bearing of the known enemies within <c>rout_threat_radius</c> (the nearest
+    /// known one if none is that close or their bearings cancel out), or to the nearest own HQ when none is known. It
+    /// takes the nearest reachable of a set of fallback points: the ideal one and points turned 45 and 90 degrees either
+    /// side, each at full, half, quarter ... distance, on the map, tried by distance from the ideal point.
+    /// </summary>
     private void Flee(Squad squad, (Fixed X, Fixed Y) centre)
     {
         if (move == null)
@@ -254,6 +263,9 @@ public sealed class MoraleSystem(
 
         (Fixed X, Fixed Y)? from = null;
         var best = Fixed.MaxValue;
+        var r2 = Rules.RoutThreatRadius * Rules.RoutThreatRadius;
+        var sx = Fixed.Zero;
+        var sy = Fixed.Zero;
         foreach (var c in spotting?.KnownEnemies(squad.Side) ?? [])
         {
             var d = Dist2((c.X, c.Y), centre);
@@ -261,11 +273,23 @@ public sealed class MoraleSystem(
             {
                 (from, best) = ((c.X, c.Y), d);
             }
+
+            if (d <= r2 && d > Fixed.Zero)
+            {
+                var l = Fixed.Sqrt(d);
+                sx += (centre.X - c.X) / l;
+                sy += (centre.Y - c.Y) / l;
+            }
         }
 
         (Fixed X, Fixed Y) dir;
         var dist = Rules.RoutDistance;
-        if (from is { } f)
+        var sum = Fixed.Sqrt((sx * sx) + (sy * sy));
+        if (sum > Fixed.FromRatio(1, 100))
+        {
+            dir = (sx / sum, sy / sum);
+        }
+        else if (from is { } f)
         {
             var len = Fixed.Sqrt(best);
             dir = len > Fixed.Zero ? ((centre.X - f.X) / len, (centre.Y - f.Y) / len) : (Fixed.One, Fixed.Zero);
@@ -292,13 +316,32 @@ public sealed class MoraleSystem(
             dist = len;
         }
 
+        var ideal = (centre.X + (dir.X * dist), centre.Y + (dir.Y * dist));
+        var c45 = Fixed.FromRatio(707107, 1000000);
+        (Fixed X, Fixed Y)[] turns =
+        [
+            dir, ((dir.X - dir.Y) * c45, (dir.X + dir.Y) * c45), ((dir.X + dir.Y) * c45, (dir.Y - dir.X) * c45),
+            (-dir.Y, dir.X), (dir.Y, -dir.X),
+        ];
+        var candidates = new List<(Fixed D2, int Order, Fixed X, Fixed Y)>();
         for (var i = 0; i < 8; i++, dist /= Fixed.FromInt(2))
         {
-            var x = centre.X + (dir.X * dist);
-            var y = centre.Y + (dir.Y * dist);
-            if (move.IsOnMap(x, y))
+            foreach (var t in turns)
             {
-                move.Execute(new MoveOrder(squad.Id, x, y, MoveMode.MoveFast));
+                var x = centre.X + (t.X * dist);
+                var y = centre.Y + (t.Y * dist);
+                if (move.IsOnMap(x, y))
+                {
+                    candidates.Add((Dist2((x, y), ideal), candidates.Count, x, y));
+                }
+            }
+        }
+
+        candidates.Sort((a, b) => a.D2 != b.D2 ? a.D2.CompareTo(b.D2) : a.Order.CompareTo(b.Order));
+        foreach (var c in candidates)
+        {
+            if (move.Execute(new MoveOrder(squad.Id, c.X, c.Y, MoveMode.MoveFast)) == MoveResult.Started)
+            {
                 return;
             }
         }

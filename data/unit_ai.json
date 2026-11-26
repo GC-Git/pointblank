@@ -1,0 +1,138 @@
+{
+  "table": "unit_ai",
+  "entries": [
+    {
+      "id": "default",
+      "values": {
+        "name": {
+          "value": "Unit AI (placeholder)",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: name of the parameter set."
+          }
+        },
+        "reaction_time": {
+          "value": "0.5",
+          "unit": "s",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: time from the first near miss or hit on a squad to its men going to ground (a human reaction)."
+          }
+        },
+        "under_fire_memory": {
+          "value": "5",
+          "unit": "s",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: a squad counts as under fire this long after the last near miss or hit on one of its men."
+          }
+        },
+        "distance_band": {
+          "value": "50",
+          "unit": "m",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: the distance to an unseen shooter is known only to the nearest multiple of this (fog of war)."
+          }
+        },
+        "effective_range_factor": {
+          "value": "0.5",
+          "unit": "ratio",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: a squad engages a spotted enemy on its own within this share of its best weapon's max range."
+          }
+        },
+        "cover_min": {
+          "value": "0.3",
+          "unit": "ratio",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: terrain whose cover ratio (terrain.json) is at least this counts as cover for the AI."
+          }
+        },
+        "cover_search_radius": {
+          "value": "6",
+          "unit": "m",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: how far the leader looks for a covered tile when a man under fire stands in the open."
+          }
+        },
+        "line_spacing": {
+          "value": "3",
+          "unit": "m",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: spacing between men in a firing line."
+          }
+        },
+        "line_reform_sectors": {
+          "value": "2",
+          "unit": "sectors",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: the firing line is re-formed when the threat bearing turns by this many 22.5 degree sectors."
+          }
+        },
+        "bound_distance": {
+          "value": "15",
+          "unit": "m",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: fire and movement: the bounding group stops and covers once this far ahead of the other."
+          }
+        },
+        "stall_time": {
+          "value": "1.5",
+          "unit": "s",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: fire and movement: groups swap when the bounding group has stopped this long."
+          }
+        },
+        "rush_time": {
+          "value": "2",
+          "unit": "s",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: a man moving under fire rushes this long before going down."
+          }
+        },
+        "down_time": {
+          "value": "2",
+          "unit": "s",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: time down between rushes."
+          }
+        },
+        "posture_open": {
+          "value": "prone",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: posture of a man under fire with no cover; an id in postures.json."
+          }
+        },
+        "posture_cover": {
+          "value": "kneeling",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: posture of a man under fire behind a hedge facing the threat, in woods or a building; an id in postures.json."
+          }
+        },
+        "posture_contact": {
+          "value": "kneeling",
+          "unit": "text",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: posture of an idle man whose squad has spotted an enemy but is not under fire; an id in postures.json."
+          }
+        }
+      }
+    }
+  ]
+}

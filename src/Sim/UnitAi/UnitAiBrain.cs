@@ -1,0 +1,683 @@
+using PointBlank.Sim.Fire;
+using PointBlank.Sim.Map;
+using PointBlank.Sim.Movement;
+using PointBlank.Sim.Orders;
+using PointBlank.Sim.Org;
+using PointBlank.Sim.Sight;
+using PointBlank.Sim.Spotting;
+
+namespace PointBlank.Sim.UnitAi;
+
+/// <summary>
+/// What the unit AI may do: ids and values only, on the units of the side it thinks for (the implementation
+/// rejects any other). The same internal paths orders use: posture, a short local move, held teams during a squad
+/// move, and an AI fire task below the player's Fire order.
+/// </summary>
+internal interface IAiEffects
+{
+    void SetPosture(int soldierId, Posture posture);
+
+    bool MoveSoldier(int squadId, int soldierId, TilePos goal);
+
+    void SetHeldTeams(int squadId, int teamMask);
+
+    void SetFire(int squadId, int targetId, Fixed x, Fixed y, int teamMask);
+
+    void StopFire(int squadId);
+}
+
+/// <summary>
+/// The unit AI's decisions (item 2.3), the same code for both sides. It reads only a <see cref="SideView"/> (own
+/// squads, <see cref="SideView.KnownEnemies"/>, <see cref="SideView.IncomingFire"/>, order status and ROE), public static
+/// data (the map's terrain and hedges, movement and fire tables, <see cref="UnitAiRules"/>) and its own memory of each
+/// squad; it acts only through <see cref="IAiEffects"/>. A boundary test checks that nothing here holds a live sim
+/// object. Per own squad, per tick:
+/// <list type="bullet">
+/// <item>Under fire (a near miss or hit on one of its men within <c>under_fire_memory</c>), after <c>reaction_time</c>:
+/// men not walking take the cover posture of their tile; an idle squad's leader sends men on open tiles to the nearest
+/// covered tile within <c>cover_search_radius</c>, one man per tile.</item>
+/// <item>Fire (none while a player Fire order runs, nor when Broken or ROE HoldFire): under fire, at the source if it is a
+/// known contact, else at a tracked contact in range, else area fire at the fuzzed point (clamped to effective range);
+/// not under fire and FireAtWill, at the nearest tracked contact within <c>effective_range_factor</c> × best range.</item>
+/// <item>Contact: idle men of a squad that has a tracked contact or is engaging kneel (<c>posture_contact</c>).</item>
+/// <item>Firing line (idle, with a leader, engaging): men abreast across the threat bearing, <c>line_spacing</c> apart,
+/// in order of their lateral place; re-formed when the bearing turns <c>line_reform_sectors</c>. Tasks: when a contact
+/// of a task's kind is known, the team of its role goes to the best covered tile near the flank instead.</item>
+/// <item>Fire and movement (a Move or Sneak in contact, a leader, 2+ teams): teams alternate into two groups; the
+/// covering group is held and fires, the other bounds; they swap at <c>bound_distance</c> or after <c>stall_time</c>
+/// stalled, and all close in near the end. Under fire the moving men rush (<c>rush_time</c>) and go down
+/// (<c>down_time</c>). Never on MoveFast (or FallBack, or routing), which stays a straight dash.</item>
+/// <item>A routing squad gets no AI (its fire task is cleared).</item>
+/// </list>
+/// </summary>
+internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRules fireRules, UnitAiRules rules)
+{
+    private readonly SortedDictionary<int, Mind> _minds = [];
+    private readonly HashSet<int> _claimed = [];
+
+    public void Think(SideView view, IAiEffects fx)
+    {
+        var tick = view.Tick;
+        var squads = view.Squads;
+        var known = view.KnownEnemies;
+        var men = new Dictionary<int, (int SquadId, SoldierView Soldier)>();
+        foreach (var q in squads)
+        {
+            foreach (var s in q.Soldiers)
+            {
+                men[s.Id] = (q.Id, s);
+            }
+        }
+
+        foreach (var e in view.IncomingFire)
+        {
+            if (men.TryGetValue(e.SoldierId, out var o))
+            {
+                Note(MindOf(o.SquadId), e, o.Soldier, tick);
+            }
+        }
+
+        foreach (var q in squads)
+        {
+            ThinkSquad(view, fx, q, known, tick);
+        }
+    }
+
+    public void AppendState(StateHasher hasher)
+    {
+        hasher.Add(_minds.Count);
+        foreach (var (id, m) in _minds)
+        {
+            hasher.Add(id);
+            hasher.Add(m.LastUnderFire);
+            hasher.Add(m.UnderFireSince);
+            hasher.Add(m.NoteTick);
+            hasher.Add(m.SourceId);
+            hasher.Add(m.FireX);
+            hasher.Add(m.FireY);
+            hasher.Add(m.Band);
+            hasher.Add(m.LineSector);
+            hasher.Add(m.CoverMoved);
+            hasher.Add(m.Group);
+            hasher.Add(m.Stall);
+            hasher.Add(m.BestProgress);
+            hasher.Add(m.Swaps);
+            hasher.Add(m.Phase);
+            hasher.Add(m.PhaseLeft);
+            hasher.Add(m.TaskTeam);
+            hasher.Add(m.Firing);
+            hasher.Add(m.TargetId);
+        }
+    }
+
+    private static bool Able(SoldierView s) => s.Health is HealthState.Ok or HealthState.Wounded;
+
+    private static Fixed Len(Fixed x, Fixed y) => Fixed.Sqrt((x * x) + (y * y));
+
+    private Mind MindOf(int squadId)
+    {
+        if (!_minds.TryGetValue(squadId, out var m))
+        {
+            _minds[squadId] = m = new Mind();
+        }
+
+        return m;
+    }
+
+    /// <summary>Records one incoming round: the newest, nearest or known-source one sets the point the squad fires back at.</summary>
+    private void Note(Mind m, IncomingFireView e, SoldierView victim, long tick)
+    {
+        if (tick - m.LastUnderFire > rules.UnderFireMemoryTicks)
+        {
+            m.UnderFireSince = e.Tick;
+            m.CoverMoved = false;
+            m.Phase = 0;
+        }
+
+        m.LastUnderFire = Math.Max(m.LastUnderFire, e.Tick);
+        if (e.SourceId >= 0 || m.NoteTick != e.Tick || (m.SourceId < 0 && e.Distance < m.Band))
+        {
+            m.NoteTick = e.Tick;
+            m.SourceId = e.SourceId;
+            m.Band = e.Distance;
+            m.FireX = victim.X + (e.DirX * e.Distance);
+            m.FireY = victim.Y + (e.DirY * e.Distance);
+        }
+    }
+
+    private void ThinkSquad(SideView view, IAiEffects fx, SquadView q, IReadOnlyList<ContactView> known, long tick)
+    {
+        var m = MindOf(q.Id);
+        var able = q.Soldiers.Where(Able).ToList();
+        if (able.Count == 0 || q.Morale == MoraleState.Routing)
+        {
+            if (m.Firing)
+            {
+                fx.StopFire(q.Id);
+                m.Firing = false;
+            }
+
+            m.Phase = 0;
+            return;
+        }
+
+        var cx = Fixed.Zero;
+        var cy = Fixed.Zero;
+        var range = Fixed.Zero;
+        foreach (var s in able)
+        {
+            cx += s.X;
+            cy += s.Y;
+            var w = fireRules.TryWeapon(s.WeaponId);
+            range = w != null && w.MaxRange > range ? w.MaxRange : range;
+        }
+
+        cx /= Fixed.FromInt(able.Count);
+        cy /= Fixed.FromInt(able.Count);
+        var engage = range * rules.EffectiveRangeFactor;
+
+        var status = view.StatusOf(q.Id);
+        var order = status?.Order;
+        var playerFire = status is { Status: OrderStatus.Executing } && order?.Kind == OrderKind.Fire;
+        var moving = q.IsMoving;
+        var mode = !moving ? (MoveMode?)null
+            : order != null && OrderKinds.IsMove(order.Kind) && status!.Status == OrderStatus.Executing ? OrderKinds.MoveModeOf(order.Kind)
+            : MoveMode.MoveFast; // a flee or other move the AI did not order: leave it alone
+        var underFire = tick - m.LastUnderFire <= rules.UnderFireMemoryTicks;
+        var reacting = underFire && tick - m.UnderFireSince >= rules.ReactionTicks;
+
+        ContactView? tracked = null;
+        var trackedD2 = Fixed.MaxValue;
+        ContactView? source = null;
+        foreach (var c in known)
+        {
+            var d2 = ((c.X - cx) * (c.X - cx)) + ((c.Y - cy) * (c.Y - cy));
+            if (c.Quality == ContactQuality.Tracked && d2 < trackedD2)
+            {
+                (tracked, trackedD2) = (c, d2);
+            }
+
+            if (underFire && c.EnemyId == m.SourceId)
+            {
+                source = c;
+            }
+        }
+
+        var inRange = tracked != null && trackedD2 <= engage * engage;
+
+        // The fire task.
+        var roe = view.RoeOf(q.Id) ?? RoeMode.FireAtWill;
+        var fireId = -2;
+        Fixed fireX = Fixed.Zero, fireY = Fixed.Zero;
+        if (!playerFire && q.Morale != MoraleState.Broken && roe != RoeMode.HoldFire)
+        {
+            if (reacting && source is { } src)
+            {
+                (fireId, fireX, fireY) = (src.EnemyId, src.X, src.Y);
+            }
+            else if (reacting && inRange)
+            {
+                (fireId, fireX, fireY) = (tracked!.Value.EnemyId, tracked.Value.X, tracked.Value.Y);
+            }
+            else if (reacting)
+            {
+                var dx = m.FireX - cx;
+                var dy = m.FireY - cy;
+                var d = Len(dx, dy);
+                if (d > Fixed.One)
+                {
+                    var r = d > engage ? engage : d;
+                    (fireId, fireX, fireY) = (-1, cx + (dx * r / d), cy + (dy * r / d));
+                }
+            }
+            else if (roe == RoeMode.FireAtWill && inRange)
+            {
+                (fireId, fireX, fireY) = (tracked!.Value.EnemyId, tracked.Value.X, tracked.Value.Y);
+            }
+            else if (roe == RoeMode.FireAtWill && m.Firing && known.FirstOrDefault(c => c.EnemyId == m.TargetId) is { Quality: ContactQuality.Stale } last
+                && ((last.X - cx) * (last.X - cx)) + ((last.Y - cy) * (last.Y - cy)) <= engage * engage)
+            {
+                (fireId, fireX, fireY) = (last.EnemyId, last.X, last.Y); // keep fire on a target that just went out of sight
+            }
+        }
+
+        // The threat the squad faces.
+        var hasThreat = true;
+        Fixed tx, ty;
+        if (fireId >= -1)
+        {
+            (tx, ty) = (fireX, fireY);
+        }
+        else if (source is { } s0)
+        {
+            (tx, ty) = (s0.X, s0.Y);
+        }
+        else if (underFire)
+        {
+            (tx, ty) = (m.FireX, m.FireY);
+        }
+        else if (tracked is { } t0)
+        {
+            (tx, ty) = (t0.X, t0.Y);
+        }
+        else
+        {
+            (tx, ty, hasThreat) = (cx, cy, false);
+        }
+
+        var tl = Len(tx - cx, ty - cy);
+        hasThreat &= tl > Fixed.One;
+        var (ux, uy) = hasThreat ? ((tx - cx) / tl, (ty - cy) / tl) : (Fixed.Zero, Fixed.Zero);
+
+        // Fire and movement, and rushes under fire.
+        var teams = able.Select(s => s.TeamIndex).Distinct().Order().ToList();
+        var all = 0;
+        foreach (var t in teams)
+        {
+            all |= 1 << t;
+        }
+
+        var held = 0;
+        var fireMask = -1;
+        if (moving && mode != MoveMode.MoveFast && (underFire || inRange))
+        {
+            if (q.LeaderId >= 0 && teams.Count >= 2 && order != null)
+            {
+                int Group(int team) => teams.IndexOf(team) % 2;
+                int CoverMask()
+                {
+                    var mask = 0;
+                    foreach (var t in teams)
+                    {
+                        mask |= Group(t) != m.Group ? 1 << t : 0;
+                    }
+
+                    return mask;
+                }
+
+                var bound = able.Where(s => Group(s.TeamIndex) == m.Group).ToList();
+                var cover = able.Where(s => Group(s.TeamIndex) != m.Group).ToList();
+                var ox = order.X - cx;
+                var oy = order.Y - cy;
+                var ol = Len(ox, oy);
+                if (ol <= rules.BoundDistance || bound.Count == 0 || cover.Count == 0)
+                {
+                    m.Stall = 0; // close in: everyone moves to the end
+                }
+                else
+                {
+                    // Stalled: the bounding group's progress toward the end point (not the men's steps) stopped.
+                    var progress = ((Mean(bound, true) * ox) + (Mean(bound, false) * oy)) / ol;
+                    if (m.Phase != 2)
+                    {
+                        if (m.Stall == 0 || progress > m.BestProgress + Fixed.One)
+                        {
+                            (m.BestProgress, m.Stall) = (progress, 1);
+                            m.Swaps = progress > m.BestProgress + Fixed.One ? 0 : m.Swaps;
+                        }
+                        else if (!bound.Any(s => s.Moving))
+                        {
+                            m.Stall++; // still and not gaining: blocked, or waiting on nobody
+                        }
+                    }
+
+                    var along = (((Mean(bound, true) - Mean(cover, true)) * ox) + ((Mean(bound, false) - Mean(cover, false)) * oy)) / ol;
+                    if (along >= rules.BoundDistance || m.Stall > rules.StallTicks)
+                    {
+                        m.Swaps = along >= rules.BoundDistance ? 0 : m.Swaps + 1;
+                        m.Group ^= 1;
+                        m.Stall = 0;
+                    }
+
+                    // Two swaps in a row without gaining ground: the formation is jammed, so everyone moves (and fires)
+                    // until the squad gains ground again.
+                    held = m.Swaps >= 2 ? 0 : CoverMask();
+                    fireMask = held == 0 ? -1 : held;
+                }
+            }
+
+            if (underFire)
+            {
+                if (m.Phase == 0)
+                {
+                    (m.Phase, m.PhaseLeft) = (1, rules.RushTicks);
+                }
+                else if (--m.PhaseLeft <= 0)
+                {
+                    (m.Phase, m.PhaseLeft) = m.Phase == 1 ? (2, rules.DownTicks) : (1, rules.RushTicks);
+                }
+
+                held = m.Phase == 2 ? all : held;
+            }
+            else
+            {
+                m.Phase = 0;
+            }
+        }
+        else
+        {
+            (m.Phase, m.Stall) = (0, 0);
+        }
+
+        if (moving)
+        {
+            fx.SetHeldTeams(q.Id, held);
+        }
+
+        // Posture.
+        var engaging = fireId >= -1 || playerFire;
+        foreach (var s in able)
+        {
+            var isHeld = moving && (held & (1 << s.TeamIndex)) != 0;
+            Posture want;
+            if (moving && !isHeld)
+            {
+                want = moveRules.PostureOf(mode!.Value);
+            }
+            else if (s.Moving)
+            {
+                continue; // a local move: keep the posture he set off in
+            }
+            else if (reacting || (isHeld && underFire))
+            {
+                want = CoverPosture(s, ux, uy, hasThreat);
+            }
+            else if ((isHeld || engaging || tracked != null) && s.Posture == Posture.Standing)
+            {
+                want = rules.PostureContact;
+            }
+            else
+            {
+                continue;
+            }
+
+            if (s.Posture != want)
+            {
+                fx.SetPosture(s.Id, want);
+            }
+        }
+
+        // The leader's drills, for an idle squad.
+        if (!moving && q.LeaderId >= 0 && hasThreat)
+        {
+            var sector = Bearings.SectorOf(ux, uy);
+            if (engaging && !playerFire && (m.LineSector < 0 || Bearings.Between(sector, m.LineSector) >= rules.LineReformSectors))
+            {
+                FormLine(fx, q, able, known, cx, cy, ux, uy, m);
+                (m.LineSector, m.CoverMoved) = (sector, true);
+            }
+            else if (reacting && !m.CoverMoved)
+            {
+                CoverMoves(fx, q, able, ux, uy);
+                m.CoverMoved = true;
+            }
+        }
+
+        if (fireId >= -1)
+        {
+            fx.SetFire(q.Id, fireId, fireX, fireY, fireMask);
+            (m.Firing, m.TargetId) = (true, fireId);
+        }
+        else if (m.Firing)
+        {
+            fx.StopFire(q.Id);
+            m.Firing = false;
+        }
+    }
+
+    private static Fixed Mean(List<SoldierView> men, bool x)
+    {
+        var sum = Fixed.Zero;
+        foreach (var s in men)
+        {
+            sum += x ? s.X : s.Y;
+        }
+
+        return sum / Fixed.FromInt(men.Count);
+    }
+
+    private TilePos TileOf(Fixed x, Fixed y)
+    {
+        var tx = (x / map.TileSize).ToInt();
+        var ty = (y / map.TileSize).ToInt();
+        return new TilePos(Math.Clamp(tx, 0, map.Width - 1), Math.Clamp(ty, 0, map.Height - 1));
+    }
+
+    private (Fixed X, Fixed Y) Centre(TilePos t) =>
+        ((Fixed.FromInt(t.X) + Fixed.FromRatio(1, 2)) * map.TileSize, (Fixed.FromInt(t.Y) + Fixed.FromRatio(1, 2)) * map.TileSize);
+
+    /// <summary>
+    /// How well a tile covers a man from the threat direction: 2 inside a building or behind a hedge on the tile edge
+    /// facing the threat (the dominant axis; with no threat, any hedge edge), 1 in terrain whose cover is at least
+    /// <c>cover_min</c>, else 0.
+    /// </summary>
+    private int CoverScore(TilePos t, Fixed ux, Fixed uy, bool hasThreat)
+    {
+        if (map.BuildingAt(t.X, t.Y) != null)
+        {
+            return 2;
+        }
+
+        bool East() => map.HasHedge(t.X, t.Y, EdgeSide.East);
+        bool West() => t.X > 0 && map.HasHedge(t.X - 1, t.Y, EdgeSide.East);
+        bool South() => map.HasHedge(t.X, t.Y, EdgeSide.South);
+        bool North() => t.Y > 0 && map.HasHedge(t.X, t.Y - 1, EdgeSide.South);
+        var ax = ux < Fixed.Zero ? -ux : ux;
+        var ay = uy < Fixed.Zero ? -uy : uy;
+        var hedge = !hasThreat ? East() || West() || South() || North()
+            : ax >= ay ? (ux > Fixed.Zero ? East() : West())
+            : (uy > Fixed.Zero ? South() : North());
+        return hedge ? 2 : fireRules.Cover(map.GetTerrain(t.X, t.Y)) >= rules.CoverMin ? 1 : 0;
+    }
+
+    private Posture CoverPosture(SoldierView s, Fixed ux, Fixed uy, bool hasThreat) =>
+        s.SuppressionState == Suppression.SuppressionState.Pinned ? rules.PostureOpen
+        : CoverScore(TileOf(s.X, s.Y), ux, uy, hasThreat) > 0 ? rules.PostureCover
+        : rules.PostureOpen;
+
+    /// <summary>The unclaimed tile within <paramref name="radius"/> of a point with the best cover, then the nearest; null if none.</summary>
+    private TilePos? BestTile(Fixed x, Fixed y, Fixed radius, Fixed ux, Fixed uy, int minScore)
+    {
+        var size = map.TileSize;
+        var r = (radius / size).ToInt() + 1;
+        var c = TileOf(x, y);
+        TilePos? best = null;
+        var bestScore = -1;
+        var bestD = Fixed.MaxValue;
+        var r2 = radius * radius;
+        for (var ty = c.Y - r; ty <= c.Y + r; ty++)
+        {
+            for (var tx = c.X - r; tx <= c.X + r; tx++)
+            {
+                if (!map.InBounds(tx, ty) || _claimed.Contains((ty * map.Width) + tx))
+                {
+                    continue;
+                }
+
+                var t = new TilePos(tx, ty);
+                var (px, py) = Centre(t);
+                var d = ((px - x) * (px - x)) + ((py - y) * (py - y));
+                if (d > r2 && !(tx == c.X && ty == c.Y))
+                {
+                    continue;
+                }
+
+                var score = CoverScore(t, ux, uy, true);
+                if (score >= minScore && (score > bestScore || (score == bestScore && d < bestD)))
+                {
+                    (best, bestScore, bestD) = (t, score, d);
+                }
+            }
+        }
+
+        return best;
+    }
+
+    private void Claim(TilePos t) => _claimed.Add((t.Y * map.Width) + t.X);
+
+    private void Send(IAiEffects fx, SquadView q, SoldierView s, TilePos goal)
+    {
+        Claim(goal);
+        if (goal != TileOf(s.X, s.Y))
+        {
+            fx.MoveSoldier(q.Id, s.Id, goal);
+        }
+    }
+
+    /// <summary>The leader sends each man in the open to the best covered tile near him (one man per tile).</summary>
+    private void CoverMoves(IAiEffects fx, SquadView q, List<SoldierView> able, Fixed ux, Fixed uy)
+    {
+        _claimed.Clear();
+        var open = new List<SoldierView>();
+        foreach (var s in able)
+        {
+            var t = TileOf(s.X, s.Y);
+            if (CoverScore(t, ux, uy, true) > 0 || s.Moving)
+            {
+                Claim(t);
+            }
+            else
+            {
+                open.Add(s);
+            }
+        }
+
+        foreach (var s in open)
+        {
+            if (BestTile(s.X, s.Y, rules.CoverSearchRadius, ux, uy, 1) is { } goal)
+            {
+                Send(fx, q, s, goal);
+            }
+        }
+    }
+
+    /// <summary>The firing line across the threat bearing, and the specialist task if one applies.</summary>
+    private void FormLine(
+        IAiEffects fx, SquadView q, List<SoldierView> able, IReadOnlyList<ContactView> known, Fixed cx, Fixed cy, Fixed ux, Fixed uy, Mind m)
+    {
+        _claimed.Clear();
+        var (px, py) = (-uy, ux);
+        AiTaskRule? task = null;
+        var taskTeam = -1;
+        foreach (var rule in rules.Tasks)
+        {
+            var man = able.FirstOrDefault(s => s.Role == rule.Role);
+            if (man.Key != null && known.Any(c => rule.TargetKind == null || c.Kind == rule.TargetKind))
+            {
+                (task, taskTeam) = (rule, man.TeamIndex);
+                break;
+            }
+        }
+
+        var line = able.Where(s => s.TeamIndex != taskTeam).ToList();
+        if (line.Count == 0)
+        {
+            (line, task, taskTeam) = (able, null, -1);
+        }
+
+        line.Sort((a, b) =>
+        {
+            var la = ((a.X - cx) * px) + ((a.Y - cy) * py);
+            var lb = ((b.X - cx) * px) + ((b.Y - cy) * py);
+            return la != lb ? la.CompareTo(lb) : a.Id.CompareTo(b.Id);
+        });
+        var half = rules.LineSpacing * Fixed.FromInt(line.Count - 1) / Fixed.FromInt(2);
+        for (var i = 0; i < line.Count; i++)
+        {
+            // Abreast across the threat; a man keeps his depth within two spacings of the centre, so few walk far.
+            var off = (rules.LineSpacing * Fixed.FromInt(i)) - half;
+            var depth = ((line[i].X - cx) * ux) + ((line[i].Y - cy) * uy);
+            var lim = rules.LineSpacing * Fixed.FromInt(2);
+            depth = depth > lim ? lim : depth < -lim ? -lim : depth;
+            var sx = cx + (px * off) + (ux * depth);
+            var sy = cy + (py * off) + (uy * depth);
+            if (BestTile(sx, sy, map.TileSize, ux, uy, 0) is { } goal)
+            {
+                Send(fx, q, line[i], goal);
+            }
+        }
+
+        m.TaskTeam = taskTeam;
+        if (task == null)
+        {
+            return;
+        }
+
+        // The task: the flank whose search finds the better cover (the right-hand flank on a tie).
+        TilePos? spot = null;
+        var spotScore = -1;
+        foreach (var side in new[] { 1, -1 })
+        {
+            var reach = half + task.FlankOffset;
+            var bx = cx + (px * reach * Fixed.FromInt(side));
+            var by = cy + (py * reach * Fixed.FromInt(side));
+            if (BestTile(bx, by, task.SearchRadius, ux, uy, 0) is { } t && CoverScore(t, ux, uy, true) > spotScore)
+            {
+                (spot, spotScore) = (t, CoverScore(t, ux, uy, true));
+            }
+        }
+
+        if (spot is not { } first)
+        {
+            return;
+        }
+
+        var team = able.Where(s => s.TeamIndex == taskTeam).OrderBy(s => s.Role == task.Role ? 0 : 1).ThenBy(s => s.Id).ToList();
+        Send(fx, q, team[0], first);
+        var (fx0, fy0) = Centre(first);
+        for (var i = 1; i < team.Count; i++)
+        {
+            if (BestTile(fx0, fy0, map.TileSize * Fixed.FromInt(3), ux, uy, 0) is { } t)
+            {
+                Send(fx, q, team[i], t);
+            }
+        }
+    }
+
+    /// <summary>The AI's memory of one own squad. Every field is hashed.</summary>
+    private sealed class Mind
+    {
+        public long LastUnderFire { get; set; } = long.MinValue / 2;
+
+        public long UnderFireSince { get; set; } = long.MinValue / 2;
+
+        public long NoteTick { get; set; } = -1;
+
+        /// <summary>The firer of the noted round, if he is a known contact; else -1.</summary>
+        public int SourceId { get; set; } = -1;
+
+        /// <summary>The fuzzed point the noted round came from (bearing sector and distance band from the man it passed).</summary>
+        public Fixed FireX { get; set; }
+
+        public Fixed FireY { get; set; }
+
+        public Fixed Band { get; set; }
+
+        public int LineSector { get; set; } = -1;
+
+        public bool CoverMoved { get; set; }
+
+        /// <summary>Fire and movement: the bounding group (0 or 1).</summary>
+        public int Group { get; set; }
+
+        /// <summary>Ticks since the bounding group last gained a metre toward the end point (0: not counting).</summary>
+        public int Stall { get; set; }
+
+        public Fixed BestProgress { get; set; }
+
+        /// <summary>Fire and movement: swaps in a row forced by a stall.</summary>
+        public int Swaps { get; set; }
+
+        /// <summary>Rushes: 0 none, 1 rushing, 2 down.</summary>
+        public int Phase { get; set; }
+
+        public int PhaseLeft { get; set; }
+
+        public int TaskTeam { get; set; } = -1;
+
+        public bool Firing { get; set; }
+
+        /// <summary>The contact the AI fire task aims at, or -1 for area fire.</summary>
+        public int TargetId { get; set; } = -1;
+    }
+}

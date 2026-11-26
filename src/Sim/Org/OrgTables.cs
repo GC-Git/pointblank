@@ -11,6 +11,9 @@ public sealed record SquadTemplate(
 /// <summary>The squad structures from the <c>organisation</c> table, checked.</summary>
 public sealed class OrgTables
 {
+    /// <summary>The role named by a data text (as in <c>organisation.json</c>), or null.</summary>
+    internal static Role? RoleOf(string text) => Roles.Any(r => r.Text == text) ? Roles.First(r => r.Text == text).Role : null;
+
     private static readonly (string Text, Role Role)[] Roles =
     [
         ("squad_leader", Role.SquadLeader), ("assistant_leader", Role.AssistantLeader),
