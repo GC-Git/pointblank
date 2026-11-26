@@ -1,6 +1,7 @@
 using PointBlank.Sim.Fire;
 using PointBlank.Sim.Movement;
 using PointBlank.Sim.Org;
+using PointBlank.Sim.Suppression;
 
 namespace PointBlank.Sim.Orders;
 
@@ -22,10 +23,16 @@ namespace PointBlank.Sim.Orders;
 /// Hold stops the squad; Fire starts in <see cref="FireSystem"/> (Rejected with its note if it cannot) and stays
 /// Executing until fire ends, then Done with the end note; any other delivered order stops the squad's fire;
 /// kinds without behaviour (and Fire without a FireSystem) are Done with <see cref="OrderNote.NotImplemented"/>.</item>
+/// <item>Suppression (item 2.1, optional <see cref="SuppressionSystem"/>): an advance-type move (Move, MoveFast,
+/// Sneak) delivered to a pinned squad, or under way when it becomes pinned, is <see cref="OrderStatus.Held"/>: the
+/// move stops, and starts again to the same point once the squad is no longer pinned. Fall-back, Hold and Fire
+/// are never held. Morale and suppression stay separate: refusal and hesitation (morale) are decided at delivery,
+/// and only an order that gets past them can be held. Item 2.2 will feed suppression into morale.</item>
 /// </list>
 /// Register after <see cref="OrgSystem"/> and before <see cref="MovementSystem"/>.
 /// </summary>
-public sealed class CommandSystem(OrgSystem org, MovementSystem move, CommandRules rules, FireSystem? fire = null) : ISimSystem
+public sealed class CommandSystem(
+    OrgSystem org, MovementSystem move, CommandRules rules, FireSystem? fire = null, SuppressionSystem? suppression = null) : ISimSystem
 {
     private readonly Dictionary<int, Ticket> _tickets = [];
     private readonly List<IssueRejection> _rejections = [];
@@ -148,6 +155,13 @@ public sealed class CommandSystem(OrgSystem org, MovementSystem move, CommandRul
                     }
 
                     break;
+                case OrderStatus.Executing when IsHeldKind(t.Order.Kind) && Pinned(squad):
+                    move.Stop(squad.Id);
+                    t.Status = OrderStatus.Held;
+                    break;
+                case OrderStatus.Held when !Pinned(squad):
+                    Execute(world, squad, t);
+                    break;
                 case OrderStatus.Executing when !move.IsMoving(squad.Id):
                     t.Status = OrderStatus.Done;
                     break;
@@ -198,6 +212,11 @@ public sealed class CommandSystem(OrgSystem org, MovementSystem move, CommandRul
     }
 
     private static bool Roll(SimRng rng, Fixed chance) => rng.NextFixed() < chance;
+
+    /// <summary>The kinds a pinned squad holds: the advance-type moves.</summary>
+    private static bool IsHeldKind(OrderKind kind) => OrderKinds.IsMove(kind) && OrderKinds.ClassOf(kind) == OrderClass.Advance;
+
+    private bool Pinned(Squad squad) => suppression?.IsPinned(squad.Id) == true;
 
     private static (Fixed X, Fixed Y)? Centre(Squad squad)
     {
@@ -267,6 +286,14 @@ public sealed class CommandSystem(OrgSystem org, MovementSystem move, CommandRul
     {
         var kind = t.Order.Kind;
         fire?.Stop(squad.Id);
+        if (IsHeldKind(kind) && Pinned(squad))
+        {
+            move.Stop(squad.Id);
+            t.Status = OrderStatus.Held;
+            t.Note = OrderNote.None;
+            return;
+        }
+
         if (kind == OrderKind.Fire && fire != null)
         {
             var note = fire.Start(world, squad, t.Order);

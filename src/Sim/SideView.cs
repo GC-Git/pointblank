@@ -4,16 +4,23 @@ using PointBlank.Sim.Orders;
 using PointBlank.Sim.Org;
 using PointBlank.Sim.Sight;
 using PointBlank.Sim.Spotting;
+using PointBlank.Sim.Suppression;
 
 namespace PointBlank.Sim;
 
-/// <summary>A copy of one of the side's own soldiers. <see cref="Rounds"/> is what he has left (-1 without fire rules or a known weapon).</summary>
+/// <summary>
+/// A copy of one of the side's own soldiers. <see cref="Rounds"/> is what he has left (-1 without fire rules or a known weapon).
+/// <see cref="Suppression"/> is his suppression level (0 to 100) and <see cref="SuppressionState"/> its state.
+/// </summary>
 public readonly record struct SoldierView(
-    int Id, string Key, Role Role, int Rank, string WeaponId, int TeamIndex, Fixed X, Fixed Y, Posture Posture, HealthState Health, int Rounds);
+    int Id, string Key, Role Role, int Rank, string WeaponId, int TeamIndex, Fixed X, Fixed Y, Posture Posture, HealthState Health, int Rounds,
+    Fixed Suppression, SuppressionState SuppressionState);
 
 /// <summary>
 /// A copy of one of the side's own squads. <see cref="LeaderId"/> is -1 while the post is vacant. <see cref="Ammo"/>
-/// reads <see cref="AmmoState.OutOfAmmo"/> when none of its able, armed men has a round left.
+/// reads <see cref="AmmoState.OutOfAmmo"/> when none of its able, armed men has a round left. <see cref="SuppressionLevel"/>
+/// is the mean suppression of its able men (0 to 100) and <see cref="Suppression"/> the squad's state (Pinned: it holds
+/// advance orders). Enemy suppression is never shown (fog of war).
 /// </summary>
 public readonly record struct SquadView(
     int Id,
@@ -25,7 +32,9 @@ public readonly record struct SquadView(
     int TicksToSuccession,
     bool IsMoving,
     AmmoState Ammo,
-    IReadOnlyList<SoldierView> Soldiers);
+    IReadOnlyList<SoldierView> Soldiers,
+    Fixed SuppressionLevel,
+    SuppressionState Suppression);
 
 /// <summary>
 /// What one side may know, and the only API for UI and AI code (project rule, see CLAUDE.md). It
@@ -42,6 +51,7 @@ public sealed class SideView
     private readonly CommandSystem? _command;
     private readonly SpottingSystem? _spotting;
     private readonly FireSystem? _fire;
+    private readonly SuppressionSystem? _suppression;
 
     internal SideView(World world, string side)
     {
@@ -52,6 +62,7 @@ public sealed class SideView
         _command = world.FindSystem<CommandSystem>();
         _spotting = world.FindSystem<SpottingSystem>();
         _fire = world.FindSystem<FireSystem>();
+        _suppression = world.FindSystem<SuppressionSystem>();
     }
 
     public string Side { get; }
@@ -118,5 +129,8 @@ public sealed class SideView
         _move?.IsMoving(q.Id) ?? false,
         _fire?.AmmoOf(q) ?? AmmoState.Ok,
         q.Soldiers.Select(s => new SoldierView(
-            s.Id, s.Key, s.Role, s.Rank, s.WeaponId, s.TeamIndex, s.X, s.Y, s.Posture, s.Health, _fire?.RoundsOf(s.Id) ?? -1)).ToArray());
+            s.Id, s.Key, s.Role, s.Rank, s.WeaponId, s.TeamIndex, s.X, s.Y, s.Posture, s.Health, _fire?.RoundsOf(s.Id) ?? -1,
+            _suppression?.LevelOf(s.Id) ?? Fixed.Zero, _suppression?.StateOf(s.Id) ?? SuppressionState.None)).ToArray(),
+        _suppression?.SquadLevelOf(q.Id) ?? Fixed.Zero,
+        _suppression?.SquadStateOf(q.Id) ?? SuppressionState.None);
 }

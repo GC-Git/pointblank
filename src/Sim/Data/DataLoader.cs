@@ -11,7 +11,7 @@ public static class DataLoader
 {
     /// <summary>The tables, in the fixed order used by reports.</summary>
     public static readonly string[] TableNames =
-        ["units", "weapons", "ammo", "materials", "organisation", "terrain", "postures", "sight", "movement", "formation", "command", "spotting", "fire"];
+        ["units", "weapons", "ammo", "materials", "organisation", "terrain", "postures", "sight", "movement", "formation", "command", "spotting", "fire", "suppression"];
 
     private const int MaxIntegerDigits = 9;
     private const int MaxFractionDigits = 9;
@@ -60,6 +60,14 @@ public static class DataLoader
             ("body_height_standing", N), ("body_height_kneeling", N), ("body_height_prone", N),
             ("dispersion_standing", N), ("dispersion_kneeling", N), ("dispersion_prone", N), ("moving_factor", N),
             ("dispersion_per_100m", N), ("area_aim_height", N), ("kill_chance", N), ("incapacitate_chance", N), ("mask_clearance", N),
+        ],
+        ["suppression"] =
+        [
+            ("name", T), ("near_miss", N), ("calibre_pistol", N), ("calibre_rifle", N), ("calibre_heavy", N),
+            ("distance_falloff", N), ("share_factor", N), ("share_radius", N), ("hit_nearby", N), ("hit_radius", N),
+            ("decay_rate", N), ("under_fire_decay_factor", N), ("under_fire_window", N), ("suppressed_threshold", N),
+            ("pinned_threshold", N), ("pinned_release", N), ("dispersion_max", N), ("rate_min", N), ("rate_pinned", N),
+            ("observer_min", N), ("speed_suppressed", N), ("speed_pinned", N),
         ],
     };
 

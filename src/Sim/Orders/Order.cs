@@ -91,6 +91,12 @@ public enum OrderStatus : byte
 
     /// <summary>Could not be carried out; <see cref="OrderView.Note"/> says why.</summary>
     Rejected = 6,
+
+    /// <summary>
+    /// An advance-type move held because the squad is pinned (item 2.1): it is not moving, and the move
+    /// starts again, to the same point, when the squad is no longer pinned.
+    /// </summary>
+    Held = 7,
 }
 
 /// <summary>Why an order's delay is longer than the base delay. Values are hashed, so never renumber.</summary>
