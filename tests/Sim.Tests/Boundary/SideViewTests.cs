@@ -146,6 +146,15 @@ public class SideViewTests
                     offenders.Add($"{type.Name}.{m.Name} returns a system");
                 }
             }
+
+            // Public fields too: a field is a getter without a method.
+            foreach (var f in type.GetFields(Flags))
+            {
+                if (Mentions(f.FieldType, LiveTypes) || Mentions(f.FieldType, [typeof(ISimSystem)]))
+                {
+                    offenders.Add($"{type.Name}.{f.Name} (field)");
+                }
+            }
         }
 
         Assert.Empty(offenders);

@@ -9,7 +9,8 @@ public class DataLoaderTests
     private static string Ammo(string source) =>
         "{\"table\":\"ammo\",\"entries\":[{\"id\":\"a1\",\"values\":{"
         + "\"caliber\":{\"value\":\"7.62\",\"unit\":\"mm\",\"source\":" + source + "},"
-        + "\"bullet_mass\":{\"value\":\"9.7\",\"unit\":\"g\",\"source\":{\"kind\":\"placeholder\"}}}}]}";
+        + "\"bullet_mass\":{\"value\":\"9.7\",\"unit\":\"g\",\"source\":{\"kind\":\"placeholder\"}},"
+        + "\"calibre_class\":{\"value\":\"rifle\",\"unit\":\"text\",\"source\":{\"kind\":\"placeholder\"}}}}]}";
 
     [Fact]
     public void Loads_a_table_and_converts_numbers_to_Fixed()

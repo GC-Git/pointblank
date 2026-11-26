@@ -92,7 +92,7 @@ Status: draft, awaiting owner sign-off
   out of HQ contact. A broken squad refuses an advance order at least 50% of the time and
   never refuses a fall-back order.
 
-- [ ] **1.6 Spotting and fog of war** (O)
+- [x] **1.6 Spotting and fog of war** (O)
   Each side has its own knowledge of enemy contacts, which goes stale (last-known
   position). Spotting chance from distance, concealment, movement and posture.
   *Done when:* a moving enemy is spotted sooner than a still, prone one. A player-side
