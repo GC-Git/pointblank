@@ -47,7 +47,9 @@ internal interface IAiEffects
 /// <item>Fire and movement (a Move or Sneak in contact, a leader, 2+ teams): teams alternate into two groups; the
 /// covering group is held and fires, the other bounds; they swap at <c>bound_distance</c> or after <c>stall_time</c>
 /// stalled, and all close in near the end. Under fire the moving men rush (<c>rush_time</c>) and go down
-/// (<c>down_time</c>). Never on MoveFast (or FallBack, or routing), which stays a straight dash.</item>
+/// (<c>down_time</c>). Never on MoveFast (or FallBack, or routing), which stays a straight dash. Fire and movement needs fire
+/// superiority: without support, a squad under equal fire is pinned (item 2.1) and holds its advance; a second unit must
+/// suppress the enemy first (fix and assault, the runner's <c>fix-assault</c> scenario). Owner decision, item 2.3.</item>
 /// <item>A routing squad gets no AI (its fire task is cleared).</item>
 /// </list>
 /// </summary>

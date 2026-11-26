@@ -202,7 +202,7 @@ public class UnitAiScenarioTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void Fire_and_movement_one_group_fires_while_the_other_moves_and_the_squad_makes_real_progress()
+    public void Fire_and_movement_makes_progress_in_contact_and_a_lone_squad_is_pinned_under_equal_fire()
     {
         var free = Enumerable.Range(1, Seeds).Select(s => Advance((ulong)s, 0).Advance).Average();
         foreach (var enemy in new[] { 1, 2 })
@@ -213,7 +213,7 @@ public class UnitAiScenarioTests(ITestOutputHelper output)
             output.WriteLine(
                 $"enemy={(enemy == 1 ? "contact, holding fire" : "riflemen firing (near misses)")}: a team fired while another moved in {runs.Average(r => r.Both):P0} of advance ticks "
                 + $"(seeds >= 10%: {runs.Count(r => r.Both >= 0.1)}); mean advance {mean:F0} m vs {free:F0} m unopposed ({mean / free:P0}); min {runs.Min(r => r.Advance):F0} m; "
-                + $"seeds below 60%: {slow.Count}, pinned (Held) or broken for {(slow.Count == 0 ? 0 : slow.Average(r => r.Pinned)):P0} of their time");
+                + $"seeds below 60%: {slow.Count}; pinned (Held) or broken {runs.Average(r => r.Pinned):P0} of the time");
             if (enemy == 1)
             {
                 Assert.True(mean >= 0.6 * free, $"advance {mean:F0} m < 60% of {free:F0} m");
@@ -222,10 +222,11 @@ public class UnitAiScenarioTests(ITestOutputHelper output)
             }
             else
             {
-                // Under sustained fire the squad is pinned by the item 2.1 suppression rule, and a pinned squad holds its
-                // advance (CommandSystem). Open question for the owner; here we check the drill itself never stalls it:
-                // every slow seed spent most of its time pinned or broken.
-                Assert.All(slow, r => Assert.True(r.Pinned >= 0.5, $"advanced {r.Advance:F0} m, pinned only {r.Pinned:P0}"));
+                // Intended (owner decision, "Yes, needs fire support"): fire and movement needs fire superiority. A lone squad
+                // advancing across open ground against an equal squad that is firing is pinned (item 2.1) and holds its
+                // advance; another unit must suppress the enemy first (see FixAssaultTests).
+                Assert.True(runs.Average(r => r.Pinned) >= 0.5, $"pinned or held only {runs.Average(r => r.Pinned):P0} of the time");
+                Assert.True(mean <= 0.4 * free, $"advanced {mean:F0} m of {free:F0} m under equal fire");
             }
         }
     }
