@@ -20,7 +20,8 @@ internal interface IAiEffects
     /// <summary>A short local move; <paramref name="fast"/> at MoveFast speed (a dash into position), else at Move speed.</summary>
     bool MoveSoldier(int squadId, int soldierId, TilePos goal, bool fast);
 
-    void SetHeldTeams(int squadId, int teamMask);
+    /// <summary>Holds teams of a moving squad; with <paramref name="rush"/> the others move at MoveFast speed (a rush).</summary>
+    void SetHeldTeams(int squadId, int teamMask, bool rush);
 
     void SetFire(int squadId, int targetId, Fixed x, Fixed y, int teamMask);
 
@@ -47,10 +48,12 @@ internal interface IAiEffects
 /// <item>Fire and movement (a Move or Sneak in contact, a leader, 2+ teams): teams alternate into two groups; the
 /// covering group is held and fires, the other bounds; they swap at <c>bound_distance</c> or after <c>stall_time</c>
 /// stalled, and all close in near the end. Under fire the moving men rush (<c>rush_time</c>) and go down
-/// (<c>down_time</c>). Never on MoveFast (or FallBack, or routing), which stays a straight dash. Fire and movement needs fire
+/// (<c>down_time</c>): a rush is a MoveFast dash, and between rushes every man is down. Men of a moving squad who
+/// are not walking (waiting on the guide) go down under fire too. Never on MoveFast (or FallBack, or routing), which stays a straight dash. Fire and movement needs fire
 /// superiority: without support, a squad under equal fire is pinned (item 2.1) and holds its advance; a second unit must
 /// suppress the enemy first (fix and assault, the runner's <c>fix-assault</c> scenario). Owner decision, item 2.3.</item>
-/// <item>A routing squad gets no AI (its fire task is cleared).</item>
+/// <item>A routing squad never fires (its fire task is cleared); under fire its run is broken into MoveFast dashes
+/// and drops, like rushes.</item>
 /// </list>
 /// </summary>
 internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRules fireRules, UnitAiRules rules)
@@ -94,6 +97,8 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
             hasher.Add(id);
             hasher.Add(m.LastUnderFire);
             hasher.Add(m.UnderFireSince);
+            hasher.Add(m.LastEnemyFire);
+            hasher.Add(m.EnemyFireSince);
             hasher.Add(m.NoteTick);
             hasher.Add(m.SourceId);
             hasher.Add(m.FireX);
@@ -129,6 +134,11 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
     /// <summary>Records one incoming round: the newest, nearest or known-source one sets the point the squad fires back at.</summary>
     private void Note(Mind m, IncomingFireView e, SoldierView victim, long tick)
     {
+        if (e.Friendly)
+        {
+            return; // a friend's round is not enemy fire: men do not go to ground for it (it put a firing line prone, blind)
+        }
+
         if (tick - m.LastUnderFire > rules.UnderFireMemoryTicks)
         {
             m.UnderFireSince = e.Tick;
@@ -137,6 +147,13 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
         }
 
         m.LastUnderFire = Math.Max(m.LastUnderFire, e.Tick);
+
+        if (tick - m.LastEnemyFire > rules.UnderFireMemoryTicks)
+        {
+            m.EnemyFireSince = e.Tick;
+        }
+
+        m.LastEnemyFire = Math.Max(m.LastEnemyFire, e.Tick);
         if (e.SourceId >= 0 || m.NoteTick != e.Tick || (m.SourceId < 0 && e.Distance < m.Band))
         {
             m.NoteTick = e.Tick;
@@ -159,7 +176,22 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
                 m.Firing = false;
             }
 
-            m.Phase = 0;
+            if (able.Count > 0 && q.IsMoving)
+            {
+                Flee(fx, q, able, m, tick);
+            }
+            else
+            {
+                m.Phase = 0;
+                foreach (var s in able)
+                {
+                    if (tick - m.LastUnderFire <= rules.UnderFireMemoryTicks && s.Posture != rules.PostureOpen)
+                    {
+                        fx.SetPosture(s.Id, rules.PostureOpen); // routed and stopped under fire: down
+                    }
+                }
+            }
+
             return;
         }
 
@@ -185,8 +217,11 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
         var mode = !moving ? (MoveMode?)null
             : order != null && OrderKinds.IsMove(order.Kind) && status!.Status == OrderStatus.Executing ? OrderKinds.MoveModeOf(order.Kind)
             : MoveMode.MoveFast; // a flee or other move the AI did not order: leave it alone
+        // Enemy rounds close by put men down, start rushes and are fired back at (friendly rounds are ignored).
         var underFire = tick - m.LastUnderFire <= rules.UnderFireMemoryTicks;
         var reacting = underFire && tick - m.UnderFireSince >= rules.ReactionTicks;
+        var enemyFire = tick - m.LastEnemyFire <= rules.UnderFireMemoryTicks;
+        var returning = enemyFire && tick - m.EnemyFireSince >= rules.ReactionTicks;
 
         ContactView? tracked = null;
         var trackedD2 = Fixed.MaxValue;
@@ -199,7 +234,7 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
                 (tracked, trackedD2) = (c, d2);
             }
 
-            if (underFire && c.EnemyId == m.SourceId)
+            if (enemyFire && c.EnemyId == m.SourceId)
             {
                 source = c;
             }
@@ -213,15 +248,15 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
         Fixed fireX = Fixed.Zero, fireY = Fixed.Zero;
         if (!playerFire && q.Morale != MoraleState.Broken && roe != RoeMode.HoldFire)
         {
-            if (reacting && source is { } src)
+            if (returning && source is { } src)
             {
                 (fireId, fireX, fireY) = (src.EnemyId, src.X, src.Y);
             }
-            else if (reacting && inRange)
+            else if (returning && inRange)
             {
                 (fireId, fireX, fireY) = (tracked!.Value.EnemyId, tracked.Value.X, tracked.Value.Y);
             }
-            else if (reacting)
+            else if (returning)
             {
                 var dx = m.FireX - cx;
                 var dy = m.FireY - cy;
@@ -254,7 +289,7 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
         {
             (tx, ty) = (s0.X, s0.Y);
         }
-        else if (underFire)
+        else if (enemyFire)
         {
             (tx, ty) = (m.FireX, m.FireY);
         }
@@ -359,7 +394,8 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
 
         if (moving)
         {
-            fx.SetHeldTeams(q.Id, held);
+            // A rush is a MoveFast dash; between rushes everyone is down.
+            fx.SetHeldTeams(q.Id, held, underFire && m.Phase == 1);
         }
 
         // Posture.
@@ -368,13 +404,22 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
         {
             var isHeld = moving && (held & (1 << s.TeamIndex)) != 0;
             Posture want;
-            if (moving && !isHeld)
+            if (moving && !isHeld && (s.Moving || !underFire))
             {
-                want = moveRules.PostureOf(mode!.Value);
+                want = moveRules.PostureOf(mode!.Value); // walking (or rushing) on the squad's move
+            }
+            else if (moving && !isHeld)
+            {
+                want = CoverPosture(s, ux, uy, hasThreat); // under fire and waiting on the squad's move: down
             }
             else if (s.Moving)
             {
-                continue; // a local move: keep the posture he set off in
+                if (!underFire || s.Posture != Posture.Standing)
+                {
+                    continue; // a local move: keep the posture he set off in
+                }
+
+                want = rules.PostureContact; // under fire on a local move: crouch
             }
             else if (reacting || (isHeld && underFire))
             {
@@ -420,6 +465,45 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
         {
             fx.StopFire(q.Id);
             m.Firing = false;
+        }
+    }
+
+    /// <summary>
+    /// A routing squad's run (MoraleSystem chose where): it never fires, but under fire its men still dash and drop:
+    /// rushes at MoveFast for <c>rush_time</c>, then everyone down (<c>posture_open</c>) for <c>down_time</c>.
+    /// </summary>
+    private void Flee(IAiEffects fx, SquadView q, List<SoldierView> able, Mind m, long tick)
+    {
+        if (tick - m.LastUnderFire > rules.UnderFireMemoryTicks)
+        {
+            m.Phase = 0;
+            fx.SetHeldTeams(q.Id, 0, false);
+            return;
+        }
+
+        if (m.Phase == 0)
+        {
+            (m.Phase, m.PhaseLeft) = (1, rules.RushTicks);
+        }
+        else if (--m.PhaseLeft <= 0)
+        {
+            (m.Phase, m.PhaseLeft) = m.Phase == 1 ? (2, rules.DownTicks) : (1, rules.RushTicks);
+        }
+
+        var all = 0;
+        foreach (var s in able)
+        {
+            all |= 1 << s.TeamIndex;
+        }
+
+        fx.SetHeldTeams(q.Id, m.Phase == 2 ? all : 0, m.Phase == 1);
+        var want = m.Phase == 2 ? rules.PostureOpen : moveRules.PostureOf(MoveMode.MoveFast);
+        foreach (var s in able)
+        {
+            if (s.Posture != want)
+            {
+                fx.SetPosture(s.Id, want);
+            }
         }
     }
 
@@ -639,13 +723,14 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
         var half = spacing * Fixed.FromInt(line.Count - 1) / Fixed.FromInt(2);
         var laterals = new List<Fixed>();
 
-        // The line forms one tile ahead of the squad's front man (toward the threat), so every man who moves, the task
-        // team included, moves behind the firers and never masks them on his way.
+        // The line forms one tile behind the squad's rearmost man (away from the threat): the men fall back into it, so
+        // nobody has to walk forward through the others' lines of fire (measured: forming it ahead of the front man
+        // leaves the rear men masked for most of their run and fails the 10 s firing criterion in 20 seeds in 100).
         var depth = Fixed.MaxValue;
         foreach (var s in able)
         {
             var d = ((s.X - cx) * ux) + ((s.Y - cy) * uy);
-            depth = d < depth ? d : depth;
+            depth = d < depth ? d : depth; // u points at the threat: the rearmost man is least far along it
         }
 
         depth -= map.TileSize;
@@ -705,6 +790,11 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
         public long LastUnderFire { get; set; } = long.MinValue / 2;
 
         public long UnderFireSince { get; set; } = long.MinValue / 2;
+
+        /// <summary>The last enemy round (not a friend's) near one of its men, and when that spell began.</summary>
+        public long LastEnemyFire { get; set; } = long.MinValue / 2;
+
+        public long EnemyFireSince { get; set; } = long.MinValue / 2;
 
         public long NoteTick { get; set; } = -1;
 

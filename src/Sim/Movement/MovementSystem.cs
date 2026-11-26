@@ -30,12 +30,15 @@ public enum MoveResult : byte
 /// not share a final tile: a tile that another squad's idle man holds, or an earlier man of the same
 /// squad has claimed, is skipped. Dead and incapacitated men do not move. Item 2.3 adds, for the unit AI:
 /// held teams (<see cref="SetHeldTeams"/>: their men wait where they are, the leash ignores them, and the guide waits
-/// while every man is held; while any team is held, the others on a Move bound at MoveFast speed) and local moves (<see cref="MoveSoldier"/>: one man walks to a tile while his squad has no
+/// while every man is held; while any team is held, or during a rush, the others on a Move go at MoveFast speed) and local moves (<see cref="MoveSoldier"/>: one man walks to a tile while his squad has no
 /// move; a squad move cancels them). Register after <see cref="OrgSystem"/>.
 /// </summary>
 public sealed class MovementSystem : ISimSystem
 {
     private const int SnapRadius = 6;
+
+    /// <summary>In <see cref="_held"/>: the squad's free men rush (MoveFast speed) even with no team held.</summary>
+    private const int RushFlag = 1 << 30;
 
     private static readonly Fixed HalfTile = Fixed.FromRatio(1, 2);
     private static readonly Fixed InvSqrt2 = Fixed.One / Fixed.Sqrt(Fixed.FromInt(2));
@@ -75,17 +78,24 @@ public sealed class MovementSystem : ISimSystem
     /// Holds the teams in <paramref name="teamMask"/> (bit per team index) of a moving squad: they wait where they
     /// stand until released (mask 0). Ignored when the squad is not moving; cleared when its move ends or is replaced.
     /// </summary>
-    internal void SetHeldTeams(int squadId, int teamMask)
+    internal void SetHeldTeams(int squadId, int teamMask, bool rush = false)
     {
-        if (teamMask == 0 || !_guides.ContainsKey(squadId))
+        var value = (teamMask & ~RushFlag) | (rush ? RushFlag : 0);
+        if (value == 0 || !_guides.ContainsKey(squadId))
         {
             _held.Remove(squadId);
         }
         else
         {
-            _held[squadId] = teamMask;
+            _held[squadId] = value;
         }
     }
+
+    /// <summary>The pace the squad's free men move at now: MoveFast during a rush or a bound, else its move's mode; null when not moving.</summary>
+    internal MoveMode? PaceOf(int squadId) =>
+        !_guides.TryGetValue(squadId, out var g) ? null
+        : _held.GetValueOrDefault(squadId) != 0 && g.Mode is MoveMode.Move or MoveMode.MoveFast ? MoveMode.MoveFast
+        : g.Mode;
 
     /// <summary>
     /// Sends one able man of a squad that has no move to a tile (a short local move for the unit AI); his posture is
@@ -350,7 +360,7 @@ public sealed class MovementSystem : ISimSystem
             claimed.Add((goals[i].Y * _map.Width) + goals[i].X);
         }
 
-        var heldMask = _held.GetValueOrDefault(squad.Id);
+        var heldMask = _held.GetValueOrDefault(squad.Id) & ~RushFlag;
         var anyFree = false;
         foreach (var s in active)
         {
@@ -358,7 +368,7 @@ public sealed class MovementSystem : ISimSystem
         }
 
         // While some teams are held (fire and movement), the others bound: they rush at MoveFast speed on the same path.
-        var pace = heldMask != 0 && guide.Mode is MoveMode.Move or MoveMode.MoveFast ? MoveMode.MoveFast : guide.Mode;
+        var pace = PaceOf(squad.Id)!.Value;
         if (!guide.Done && anyFree && !AnyBeyondLeash(active, slots, heldMask))
         {
             AdvanceGuide(guide, pace);

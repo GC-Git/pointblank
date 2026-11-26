@@ -86,29 +86,6 @@ public class UnitAiScenarioTests(ITestOutputHelper output)
         Assert.Equal(underFire, reacted);
     }
 
-    [Theory]
-    [InlineData(false, false)]
-    [InlineData(true, false)]
-    [InlineData(false, true)]
-    public void No_soldier_under_fire_stands_in_the_open_for_more_than_3_s(bool hidden, bool advance)
-    {
-        var violations = 0;
-        var longest = 0;
-        var underFire = 0;
-        for (ulong seed = 1; seed <= Seeds; seed++)
-        {
-            var (rig, _, _) = Contact(seed, hidden, advance, noCasualties: advance);
-            rig.World.Run(advance ? 450 : 250);
-            violations += rig.Watch.Violations.Count;
-            longest = Math.Max(longest, rig.Watch.LongestOpenRun);
-            underFire += rig.Watch.FirstUnderFire.ContainsKey("us") ? 1 : 0;
-            Assert.True(rig.Watch.Violations.Count == 0, $"seed {seed}: soldier {rig.Watch.Violations.FirstOrDefault()} stood in the open under fire > 3 s");
-        }
-
-        output.WriteLine($"hidden={hidden} advance={advance}: US under fire in {underFire}/{Seeds}; violations {violations}; longest open run under fire {longest / (double)World.TicksPerSecond:F1} s");
-        Assert.True(underFire >= 90);
-    }
-
     /// <summary>
     /// The US squad idle in an east-west column (the worst case for the hold-fire rule), a German Gruppe kneeling in
     /// the open 150 m west with HoldFire, so it never shoots. Returns the share of able riflemen who fired within

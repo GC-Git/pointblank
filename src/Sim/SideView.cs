@@ -24,9 +24,10 @@ public readonly record struct SoldierView(
 /// (item 2.3): the bearing from him to the shooter as one of 16 sectors (<see cref="Sector"/>, with its unit vector
 /// <see cref="DirX"/>, <see cref="DirY"/>) and the distance rounded to the unit AI's <c>distance_band</c>, never the exact
 /// origin. <see cref="SourceId"/> is the shooter's id only when he is already a contact the side knows, else -1.
+/// <see cref="Friendly"/>: one of the side's own men fired it (a man ducks a round from either side, but does not fire back).
 /// </summary>
 public readonly record struct IncomingFireView(
-    int SoldierId, long Tick, int SourceId, int Sector, Fixed DirX, Fixed DirY, Fixed Distance, bool Hit);
+    int SoldierId, long Tick, int SourceId, int Sector, Fixed DirX, Fixed DirY, Fixed Distance, bool Hit, bool Friendly = false);
 
 /// <summary>
 /// A copy of one of the side's own squads. <see cref="LeaderId"/> is -1 while the post is vacant. <see cref="Ammo"/>
@@ -134,11 +135,13 @@ public sealed class SideView
 
             void Add(int soldierId, int firerId, Fixed ox, Fixed oy, long tick, bool hit)
             {
-                // Only rounds at the side's own men, and not its own men's rounds (friendly fire is known to be friendly).
-                if (!sides.TryGetValue(soldierId, out var v) || !v.Own || (sides.TryGetValue(firerId, out var f) && f.Own))
+                // Only rounds at the side's own men; its own men's rounds are marked friendly (known to be friendly).
+                if (!sides.TryGetValue(soldierId, out var v) || !v.Own)
                 {
                     return;
                 }
+
+                var friendly = sides.TryGetValue(firerId, out var f) && f.Own;
 
                 var s = v.Soldier;
                 var dx = ox - s.X;
@@ -146,8 +149,8 @@ public sealed class SideView
                 var sector = Bearings.SectorOf(dx, dy);
                 var (ux, uy) = Bearings.Dir(sector);
                 var band = Bearings.Band(Fixed.Sqrt((dx * dx) + (dy * dy)), _ai.Rules.DistanceBand);
-                var source = _spotting?.ContactOf(Side, firerId) != null ? firerId : -1;
-                list.Add(new IncomingFireView(soldierId, tick, source, sector, ux, uy, band, hit));
+                var source = !friendly && _spotting?.ContactOf(Side, firerId) != null ? firerId : -1;
+                list.Add(new IncomingFireView(soldierId, tick, source, sector, ux, uy, band, hit, friendly));
             }
 
             foreach (var n in _fire.NearMisses)
