@@ -149,54 +149,85 @@ public class UnitAiScenarioTests(ITestOutputHelper output)
     {
         var shares = Enumerable.Range(1, Seeds).Select(s => FiringLine((ulong)s)).ToList();
         output.WriteLine($"riflemen firing within 10 s: mean {shares.Average():P0}, min {shares.Min():P0}, seeds >= 75%: {shares.Count(x => x >= 0.75)}/{Seeds}");
-        Assert.True(shares.Average() >= 0.75, $"mean {shares.Average():P0}");
-        Assert.True(shares.Count(x => x >= 0.75) >= 95, $"{shares.Count(x => x >= 0.75)} seeds");
+        Assert.All(shares, s => Assert.True(s >= 0.75, $"{s:P0}"));
+    }
+
+    /// <summary>
+    /// The US squad 230 m from a German Gruppe, ordered to Move 150 m toward it after 10 s. <paramref name="enemy"/>:
+    /// 0 none (unopposed), 1 kneeling with HoldFire (contact, no fire), 2 its riflemen firing at will (rounds are near
+    /// misses, so the squad is under fire but loses nobody). The MG crew is taken out in case 2: sustained MG fire on a
+    /// squad in the open pins it by design (item 2.1 "Done when", 80%+ of seeds), and a pinned squad holds its advance. Returns how far its able men advanced in 90 s of movement and the share of
+    /// those ticks in which a team that fired in the last second stood while another team moved.
+    /// </summary>
+    private static (double Advance, double Both, double Pinned) Advance(ulong seed, int enemy)
+    {
+        var rig = Create(seed, new GameMap("fm", 200, 60), noCasualties: true);
+        var j = Jitter(seed);
+        var us = rig.Org.SpawnSquad("us_rifle_squad", M(330) + j(5), M(60) + j(5));
+        if (enemy > 0)
+        {
+            var de = rig.Org.SpawnSquad("de_gruppe", M(100) + j(5), M(60) + j(5), Posture.Kneeling);
+            rig.Command.SetRoe(de.Id, enemy == 1 ? RoeMode.HoldFire : RoeMode.FireAtWill);
+            foreach (var s in de.Soldiers.Where(s => enemy == 2 && s.Role is Role.MgGunner or Role.MgAssistant or Role.MgLoader))
+            {
+                de.SetHealth(s.Id, HealthState.Dead);
+            }
+        }
+
+        rig.World.Run(10 * World.TicksPerSecond); // spot the Germans
+        var x0 = us.Soldiers.Average(s => s.X.ToInt());
+        rig.Order(us, OrderKind.Move, 180, 60);
+        var start = rig.World.Tick;
+        while (rig.World.Tick < start + 300 && rig.Command.StatusOf(us.Id).Status is OrderStatus.None or OrderStatus.Pending or OrderStatus.Hesitating)
+        {
+            rig.World.Step(); // the order travels down the chain of command
+        }
+
+        var prev = us.Soldiers.ToDictionary(s => s.Id, s => (s.X, s.Y));
+        int ticks = 0, both = 0, pinned = 0;
+        for (var i = 0; i < 900 && rig.Command.StatusOf(us.Id).Status is OrderStatus.Executing or OrderStatus.Held; i++)
+        {
+            rig.World.Step();
+            pinned += rig.Command.StatusOf(us.Id).Status == OrderStatus.Held || us.Morale is MoraleState.Broken or MoraleState.Routing ? 1 : 0;
+            var moved = us.Soldiers.Where(s => (s.X, s.Y) != prev[s.Id]).Select(s => s.TeamIndex).ToHashSet();
+            var fired = us.Soldiers.Where(s => rig.World.Tick - rig.Fire.LastFiredTick(s.Id) <= 10).Select(s => s.TeamIndex).ToHashSet();
+            prev = us.Soldiers.ToDictionary(s => s.Id, s => (s.X, s.Y));
+            ticks++;
+            both += moved.Count > 0 && fired.Any(t => !moved.Contains(t)) ? 1 : 0;
+        }
+
+        var window = Math.Max(1, ticks + (900 - ticks)); // a squad that routs leaves the loop early: the rest counts as pinned
+        return (x0 - us.Soldiers.Where(s => s.CanLead).Average(s => s.X.ToInt()), ticks == 0 ? 0 : both / (double)ticks,
+            (pinned + (900 - ticks)) / (double)window);
     }
 
     [Fact]
-    public void Fire_and_movement_one_group_fires_while_the_other_moves()
+    public void Fire_and_movement_one_group_fires_while_the_other_moves_and_the_squad_makes_real_progress()
     {
-        var fractions = new List<double>();
-        var advanced = new List<double>();
-        for (ulong seed = 1; seed <= Seeds; seed++)
+        var free = Enumerable.Range(1, Seeds).Select(s => Advance((ulong)s, 0).Advance).Average();
+        foreach (var enemy in new[] { 1, 2 })
         {
-            var map = new GameMap("fm", 200, 60);
-            var rig = Create(seed, map);
-            var j = Jitter(seed);
-            var us = rig.Org.SpawnSquad("us_rifle_squad", M(330) + j(5), M(60) + j(5));
-            var de = rig.Org.SpawnSquad("de_gruppe", M(100) + j(5), M(60) + j(5), Posture.Kneeling);
-            rig.Command.SetRoe(de.Id, RoeMode.HoldFire);
-            rig.World.Run(10 * World.TicksPerSecond); // spot the Germans
-            var x0 = us.Soldiers.Average(s => s.X.ToInt());
-            rig.Order(us, OrderKind.Move, 180, 60);
-            for (var i = 0; i < 300 && !rig.Move.IsMoving(us.Id); i++)
+            var runs = Enumerable.Range(1, Seeds).Select(s => Advance((ulong)s, enemy)).ToList();
+            var mean = runs.Average(r => r.Advance);
+            var slow = runs.Where(r => r.Advance < 0.6 * free).ToList();
+            output.WriteLine(
+                $"enemy={(enemy == 1 ? "contact, holding fire" : "riflemen firing (near misses)")}: a team fired while another moved in {runs.Average(r => r.Both):P0} of advance ticks "
+                + $"(seeds >= 10%: {runs.Count(r => r.Both >= 0.1)}); mean advance {mean:F0} m vs {free:F0} m unopposed ({mean / free:P0}); min {runs.Min(r => r.Advance):F0} m; "
+                + $"seeds below 60%: {slow.Count}, pinned (Held) or broken for {(slow.Count == 0 ? 0 : slow.Average(r => r.Pinned)):P0} of their time");
+            if (enemy == 1)
             {
-                rig.World.Step(); // the order travels down the chain of command
+                Assert.True(mean >= 0.6 * free, $"advance {mean:F0} m < 60% of {free:F0} m");
+                Assert.True(runs.Average(r => r.Both) >= 0.3, $"{runs.Average(r => r.Both):P0}");
+                Assert.True(runs.Count(r => r.Both >= 0.1) >= 90);
             }
-
-            var prev = us.Soldiers.ToDictionary(s => s.Id, s => (s.X, s.Y));
-            int advance = 0, both = 0;
-            for (var i = 0; i < 900 && rig.Move.IsMoving(us.Id); i++)
+            else
             {
-                rig.World.Step();
-                var moved = us.Soldiers.Where(s => (s.X, s.Y) != prev[s.Id]).Select(s => s.TeamIndex).ToHashSet();
-                var fired = us.Soldiers.Where(s => rig.World.Tick - rig.Fire.LastFiredTick(s.Id) <= 10).Select(s => s.TeamIndex).ToHashSet();
-                prev = us.Soldiers.ToDictionary(s => s.Id, s => (s.X, s.Y));
-                advance++;
-                if (moved.Count > 0 && fired.Any(t => !moved.Contains(t)))
-                {
-                    both++;
-                }
+                // Under sustained fire the squad is pinned by the item 2.1 suppression rule, and a pinned squad holds its
+                // advance (CommandSystem). Open question for the owner; here we check the drill itself never stalls it:
+                // every slow seed spent most of its time pinned or broken.
+                Assert.All(slow, r => Assert.True(r.Pinned >= 0.5, $"advanced {r.Advance:F0} m, pinned only {r.Pinned:P0}"));
             }
-
-            fractions.Add(advance == 0 ? 0 : both / (double)advance);
-            advanced.Add(x0 - us.Soldiers.Where(s => s.CanLead).Average(s => s.X.ToInt()));
         }
-
-        output.WriteLine($"fire and movement: a team fired while another moved in {fractions.Average():P0} of advance ticks (min {fractions.Min():P0}); mean advance {advanced.Average():F0} m in 90 s; advances: {string.Join(" ", advanced.Select(a => a.ToString("F0")))}");
-        Assert.True(fractions.Average() >= 0.3, $"{fractions.Average():P0}");
-        Assert.True(fractions.Count(f => f >= 0.1) >= 90);
-        Assert.True(advanced.Average() >= 30, $"advanced {advanced.Average():F0} m"); // bounding is slow: each group covers half the time
     }
 
     [Fact]

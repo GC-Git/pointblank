@@ -17,7 +17,8 @@ internal interface IAiEffects
 {
     void SetPosture(int soldierId, Posture posture);
 
-    bool MoveSoldier(int squadId, int soldierId, TilePos goal);
+    /// <summary>A short local move; <paramref name="fast"/> at MoveFast speed (a dash into position), else at Move speed.</summary>
+    bool MoveSoldier(int squadId, int soldierId, TilePos goal, bool fast);
 
     void SetHeldTeams(int squadId, int teamMask);
 
@@ -101,7 +102,6 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
             hasher.Add(m.Group);
             hasher.Add(m.Stall);
             hasher.Add(m.BestProgress);
-            hasher.Add(m.Swaps);
             hasher.Add(m.Phase);
             hasher.Add(m.PhaseLeft);
             hasher.Add(m.TaskTeam);
@@ -313,7 +313,6 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
                         if (m.Stall == 0 || progress > m.BestProgress + Fixed.One)
                         {
                             (m.BestProgress, m.Stall) = (progress, 1);
-                            m.Swaps = progress > m.BestProgress + Fixed.One ? 0 : m.Swaps;
                         }
                         else if (!bound.Any(s => s.Moving))
                         {
@@ -324,15 +323,12 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
                     var along = (((Mean(bound, true) - Mean(cover, true)) * ox) + ((Mean(bound, false) - Mean(cover, false)) * oy)) / ol;
                     if (along >= rules.BoundDistance || m.Stall > rules.StallTicks)
                     {
-                        m.Swaps = along >= rules.BoundDistance ? 0 : m.Swaps + 1;
                         m.Group ^= 1;
                         m.Stall = 0;
                     }
 
-                    // Two swaps in a row without gaining ground: the formation is jammed, so everyone moves (and fires)
-                    // until the squad gains ground again.
-                    held = m.Swaps >= 2 ? 0 : CoverMask();
-                    fireMask = held == 0 ? -1 : held;
+                    held = CoverMask();
+                    fireMask = held;
                 }
             }
 
@@ -476,8 +472,11 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
         : rules.PostureOpen;
 
     /// <summary>The unclaimed tile within <paramref name="radius"/> of a point with the best cover, then the nearest; null if none.</summary>
-    private TilePos? BestTile(Fixed x, Fixed y, Fixed radius, Fixed ux, Fixed uy, int minScore)
+    private TilePos? BestTile(
+        Fixed x, Fixed y, Fixed radius, Fixed ux, Fixed uy, int minScore,
+        Fixed cx = default, Fixed cy = default, Fixed px = default, Fixed py = default, List<Fixed>? laterals = null)
     {
+        var gap = Clearance() + Fixed.FromRatio(1, 4);
         var size = map.TileSize;
         var r = (radius / size).ToInt() + 1;
         var c = TileOf(x, y);
@@ -495,11 +494,17 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
                 }
 
                 var t = new TilePos(tx, ty);
-                var (px, py) = Centre(t);
-                var d = ((px - x) * (px - x)) + ((py - y) * (py - y));
+                var (tcx, tcy) = Centre(t);
+                var d = ((tcx - x) * (tcx - x)) + ((tcy - y) * (tcy - y));
                 if (d > r2 && !(tx == c.X && ty == c.Y))
                 {
                     continue;
+                }
+
+                var lat = ((tcx - cx) * px) + ((tcy - cy) * py);
+                if (laterals != null && laterals.Any(l => (lat - l < Fixed.Zero ? l - lat : lat - l) <= gap))
+                {
+                    continue; // the task team keeps clear of the line's lines of fire
                 }
 
                 var score = CoverScore(t, ux, uy, true);
@@ -513,14 +518,58 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
         return best;
     }
 
+    /// <summary>
+    /// A firing-line tile near a slot (within two tiles): unclaimed, and laterally (across the threat) further than the AI
+    /// fire clearance from every tile already given to the line, so no man in the line masks another once it is formed.
+    /// Tiles snap slots to the grid, which could otherwise bring two men within the clearance. Best cover first, then nearest.
+    /// </summary>
+    private TilePos? LineTile(Fixed x, Fixed y, Fixed cx, Fixed cy, Fixed px, Fixed py, Fixed ux, Fixed uy, List<Fixed> laterals)
+    {
+        var gap = Clearance() + Fixed.FromRatio(1, 4);
+        var c = TileOf(x, y);
+        TilePos? best = null;
+        var bestScore = -1;
+        var bestD = Fixed.MaxValue;
+        for (var ty = c.Y - 2; ty <= c.Y + 2; ty++)
+        {
+            for (var tx = c.X - 2; tx <= c.X + 2; tx++)
+            {
+                if (!map.InBounds(tx, ty) || _claimed.Contains((ty * map.Width) + tx))
+                {
+                    continue;
+                }
+
+                var t = new TilePos(tx, ty);
+                var (tcx, tcy) = Centre(t);
+                var lat = ((tcx - cx) * px) + ((tcy - cy) * py);
+                if (laterals.Any(l => (lat - l < Fixed.Zero ? l - lat : lat - l) <= gap))
+                {
+                    continue;
+                }
+
+                var d = ((tcx - x) * (tcx - x)) + ((tcy - y) * (tcy - y));
+                var score = CoverScore(t, ux, uy, true);
+                if (score > bestScore || (score == bestScore && d < bestD))
+                {
+                    (best, bestScore, bestD) = (t, score, d);
+                }
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>The AI fire clearance (see <see cref="FireSystem"/>): the near-miss radius, or the mask clearance if larger.</summary>
+    private Fixed Clearance() => fireRules.NearMissRadius > fireRules.MaskClearance ? fireRules.NearMissRadius : fireRules.MaskClearance;
+
     private void Claim(TilePos t) => _claimed.Add((t.Y * map.Width) + t.X);
 
-    private void Send(IAiEffects fx, SquadView q, SoldierView s, TilePos goal)
+    private void Send(IAiEffects fx, SquadView q, SoldierView s, TilePos goal, bool fast = false)
     {
         Claim(goal);
         if (goal != TileOf(s.X, s.Y))
         {
-            fx.MoveSoldier(q.Id, s.Id, goal);
+            fx.MoveSoldier(q.Id, s.Id, goal, fast);
         }
     }
 
@@ -581,19 +630,33 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
             var lb = ((b.X - cx) * px) + ((b.Y - cy) * py);
             return la != lb ? la.CompareTo(lb) : a.Id.CompareTo(b.Id);
         });
-        var half = rules.LineSpacing * Fixed.FromInt(line.Count - 1) / Fixed.FromInt(2);
+        // Slots snap to tiles, which can shift a man up to half a tile across the line: the spacing allows for that on
+        // top of the AI fire clearance, so neighbours stay clear of each other's line of fire.
+        var spacing = Clearance() + map.TileSize;
+        spacing = spacing > rules.LineSpacing ? spacing : rules.LineSpacing;
+        var half = spacing * Fixed.FromInt(line.Count - 1) / Fixed.FromInt(2);
+        var laterals = new List<Fixed>();
+
+        // The line forms one tile ahead of the squad's front man (toward the threat), so every man who moves, the task
+        // team included, moves behind the firers and never masks them on his way.
+        var depth = Fixed.MaxValue;
+        foreach (var s in able)
+        {
+            var d = ((s.X - cx) * ux) + ((s.Y - cy) * uy);
+            depth = d < depth ? d : depth;
+        }
+
+        depth -= map.TileSize;
         for (var i = 0; i < line.Count; i++)
         {
-            // Abreast across the threat; a man keeps his depth within two spacings of the centre, so few walk far.
-            var off = (rules.LineSpacing * Fixed.FromInt(i)) - half;
-            var depth = ((line[i].X - cx) * ux) + ((line[i].Y - cy) * uy);
-            var lim = rules.LineSpacing * Fixed.FromInt(2);
-            depth = depth > lim ? lim : depth < -lim ? -lim : depth;
+            var off = (spacing * Fixed.FromInt(i)) - half;
             var sx = cx + (px * off) + (ux * depth);
             var sy = cy + (py * off) + (uy * depth);
-            if (BestTile(sx, sy, map.TileSize, ux, uy, 0) is { } goal)
+            if (LineTile(sx, sy, cx, cy, px, py, ux, uy, laterals) is { } goal)
             {
-                Send(fx, q, line[i], goal);
+                var (gx, gy) = Centre(goal);
+                laterals.Add(((gx - cx) * px) + ((gy - cy) * py));
+                Send(fx, q, line[i], goal, true);
             }
         }
 
@@ -611,7 +674,7 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
             var reach = half + task.FlankOffset;
             var bx = cx + (px * reach * Fixed.FromInt(side));
             var by = cy + (py * reach * Fixed.FromInt(side));
-            if (BestTile(bx, by, task.SearchRadius, ux, uy, 0) is { } t && CoverScore(t, ux, uy, true) > spotScore)
+            if (BestTile(bx, by, task.SearchRadius, ux, uy, 0, cx, cy, px, py, laterals) is { } t && CoverScore(t, ux, uy, true) > spotScore)
             {
                 (spot, spotScore) = (t, CoverScore(t, ux, uy, true));
             }
@@ -623,13 +686,13 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
         }
 
         var team = able.Where(s => s.TeamIndex == taskTeam).OrderBy(s => s.Role == task.Role ? 0 : 1).ThenBy(s => s.Id).ToList();
-        Send(fx, q, team[0], first);
+        Send(fx, q, team[0], first, true);
         var (fx0, fy0) = Centre(first);
         for (var i = 1; i < team.Count; i++)
         {
-            if (BestTile(fx0, fy0, map.TileSize * Fixed.FromInt(3), ux, uy, 0) is { } t)
+            if (BestTile(fx0, fy0, map.TileSize * Fixed.FromInt(3), ux, uy, 0, cx, cy, px, py, laterals) is { } t)
             {
-                Send(fx, q, team[i], t);
+                Send(fx, q, team[i], t, true);
             }
         }
     }
@@ -665,8 +728,6 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
 
         public Fixed BestProgress { get; set; }
 
-        /// <summary>Fire and movement: swaps in a row forced by a stall.</summary>
-        public int Swaps { get; set; }
 
         /// <summary>Rushes: 0 none, 1 rushing, 2 down.</summary>
         public int Phase { get; set; }

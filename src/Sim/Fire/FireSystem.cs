@@ -18,7 +18,8 @@ namespace PointBlank.Sim.Fire;
 /// <item>Cadence: a shot credit grows at the weapon's rate of fire (its start phase is one RNG draw
 /// when the order starts); a weapon with <c>burst_length</c> &gt; 1 pauses <c>burst_pause</c> after each
 /// burst. A soldier fires only within his weapon's max range, and holds fire while a friendly stands
-/// within <see cref="FireRules.MaskClearance"/> of his line of fire short of the target.</item>
+/// within <see cref="FireRules.MaskClearance"/> of his line of fire short of the target; while holding, his shot credit
+/// still grows to one round, so he fires as soon as the line clears (item 2.3).</item>
 /// <item>Aim: a contact target (an enemy soldier his side knows) is aimed at live while the side tracks
 /// him; a contact not Tracked is area fire at his last-known point; area fire aims at the point. The order
 /// ends when the contact is forgotten or a Tracked target falls (<see cref="OrderNote.TargetGone"/>), or on a new order. Fire does not
@@ -29,7 +30,8 @@ namespace PointBlank.Sim.Fire;
 /// <item>AI fire (item 2.3): <see cref="SetAiFire"/> gives a squad a fire task from the unit AI, with a team mask (only
 /// those teams fire). It works like a fire order (same target rules, cadence and hold-fire) but sits below it: while
 /// the squad has a player Fire order, the AI task is ignored. New orders do not stop it; the AI does
-/// (<see cref="StopAiFire"/>). A forgotten or fallen target ends it.</item>
+/// (<see cref="StopAiFire"/>). A forgotten or fallen target ends it. AI fire holds while a friendly is within the near-miss
+/// radius of the line (not just the mask clearance), so the AI never suppresses its own men.</item>
 /// </list>
 /// Register after <see cref="SpottingSystem"/>, and pass it to <see cref="CommandSystem"/>.
 /// </summary>
@@ -536,12 +538,21 @@ public sealed class FireSystem : ISimSystem
                 continue;
             }
 
-            if (st.Reload > 0 || st.Pause > 0 || !InRange(s, w, fo.X, fo.Y) || Masked(s, squad.Side, fo.X, fo.Y))
+            if (st.Reload > 0 || st.Pause > 0 || !InRange(s, w, fo.X, fo.Y))
             {
                 continue;
             }
 
-            st.Credit += w.RoundsPerMinute * perTick * (_suppression?.RateFactor(s.Id) ?? Fixed.One);
+            var gain = w.RoundsPerMinute * perTick * (_suppression?.RateFactor(s.Id) ?? Fixed.One);
+            if (Masked(s, squad.Side, fo.X, fo.Y, ai ? AiClearance : Rules.MaskClearance))
+            {
+                // Holding fire for a friend in the way, he stays aimed and ready: the cadence runs on to one round, which he
+                // fires the moment the line clears (item 2.3).
+                st.Credit = st.Credit + gain > Fixed.One ? (st.Credit > Fixed.One ? st.Credit : Fixed.One) : st.Credit + gain;
+                continue;
+            }
+
+            st.Credit += gain;
             while (st.Credit >= Fixed.One && st.Magazine > 0)
             {
                 Shoot(world, s, fo.X, fo.Y, target);
@@ -572,7 +583,13 @@ public sealed class FireSystem : ISimSystem
     }
 
     /// <summary>Whether a friendly stands within the mask clearance of the line from the soldier to the aim point, short of it.</summary>
-    private bool Masked(Soldier firer, string side, Fixed x, Fixed y)
+    /// <summary>
+    /// The hold-fire clearance of AI fire (item 2.3): the near-miss radius (or the mask clearance if larger), so the unit AI
+    /// never fires a round that would pass close enough to suppress one of its own men. Player orders keep the mask clearance.
+    /// </summary>
+    private Fixed AiClearance => Rules.NearMissRadius > Rules.MaskClearance ? Rules.NearMissRadius : Rules.MaskClearance;
+
+    private bool Masked(Soldier firer, string side, Fixed x, Fixed y, Fixed clearance)
     {
         var dx = x - firer.X;
         var dy = y - firer.Y;
@@ -607,7 +624,7 @@ public sealed class FireSystem : ISimSystem
                 }
 
                 var lateral = ((rx * dy) - (ry * dx)) / d;
-                if (lateral <= Rules.MaskClearance && -lateral <= Rules.MaskClearance)
+                if (lateral <= clearance && -lateral <= clearance)
                 {
                     return true;
                 }

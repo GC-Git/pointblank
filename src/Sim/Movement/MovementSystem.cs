@@ -30,7 +30,7 @@ public enum MoveResult : byte
 /// not share a final tile: a tile that another squad's idle man holds, or an earlier man of the same
 /// squad has claimed, is skipped. Dead and incapacitated men do not move. Item 2.3 adds, for the unit AI:
 /// held teams (<see cref="SetHeldTeams"/>: their men wait where they are, the leash ignores them, and the guide waits
-/// while every man is held) and local moves (<see cref="MoveSoldier"/>: one man walks to a tile while his squad has no
+/// while every man is held; while any team is held, the others on a Move bound at MoveFast speed) and local moves (<see cref="MoveSoldier"/>: one man walks to a tile while his squad has no
 /// move; a squad move cancels them). Register after <see cref="OrgSystem"/>.
 /// </summary>
 public sealed class MovementSystem : ISimSystem
@@ -357,9 +357,11 @@ public sealed class MovementSystem : ISimSystem
             anyFree |= (heldMask & (1 << s.TeamIndex)) == 0;
         }
 
+        // While some teams are held (fire and movement), the others bound: they rush at MoveFast speed on the same path.
+        var pace = heldMask != 0 && guide.Mode is MoveMode.Move or MoveMode.MoveFast ? MoveMode.MoveFast : guide.Mode;
         if (!guide.Done && anyFree && !AnyBeyondLeash(active, slots, heldMask))
         {
-            AdvanceGuide(guide);
+            AdvanceGuide(guide, pace);
         }
 
         var finished = guide.Done;
@@ -384,7 +386,7 @@ public sealed class MovementSystem : ISimSystem
                 Replan(m, soldier, goals[i], guide.Mode);
             }
 
-            MoveMember(m, soldier, guide.Mode);
+            MoveMember(m, soldier, pace);
             finished &= m.Path == null && m.HasGoal && m.Goal == goals[i];
         }
 
@@ -423,13 +425,13 @@ public sealed class MovementSystem : ISimSystem
         return false;
     }
 
-    private void AdvanceGuide(Guide g)
+    private void AdvanceGuide(Guide g, MoveMode mode)
     {
         var tile = _map.TileSize;
-        var budget = Rules.Speed(g.Mode) * World.TickDuration;
+        var budget = Rules.Speed(mode) * World.TickDuration;
         while (budget > Fixed.Zero && !g.Done)
         {
-            var cost = Paths.StepCost(g.Path[g.Seg - 1], g.Path[g.Seg], g.Mode) * tile;
+            var cost = Paths.StepCost(g.Path[g.Seg - 1], g.Path[g.Seg], mode) * tile;
             var need = cost * (Fixed.One - g.P);
             if (budget >= need)
             {

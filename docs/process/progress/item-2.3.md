@@ -1,26 +1,27 @@
-# Item 2.3 progress (work in progress)
+# Item 2.3 progress (one open question for the owner)
 
 Plan: `docs/superpowers/plans/2026-11-25-item-2.3-unit-ai.md`.
 
-## Done and verified (`dotnet test PointBlank.sln`: 418 passed, 1 failed, 1 skipped)
+## Round 2: fixed
 
-- `src/Sim/UnitAi`: `UnitAiBrain` (reads only `SideView`, acts only through `IAiEffects`; boundary test), `UnitAiSystem`,
-  `UnitAiRules`, `Bearings`. Data: `data/unit_ai.json`, `data/unit_ai_tasks.json`, `rout_threat_radius` in morale.
-- `SideView`: `RoeOf`, `IncomingFire` (16-sector bearing + distance band, source id only for known contacts, own
-  side's rounds excluded), `SoldierView.Moving`. `OrderKind.SetRoe`, `RoeMode`, `OrderNote.InvalidRoe`.
-- `FireSystem` AI fire layer (team mask, below player Fire orders); `MovementSystem` held teams and local moves;
-  `Sync` early-outs in fire and suppression (perf).
-- Morale follow-ups: flee to nearest reachable fallback point, mean bearing of known enemies, Broken-ceiling note.
-- Scenario results (seeds 1-100): reaction within 2 s 100/100 (open and hidden shooter); no soldier standing in the
-  open under fire > 3 s: 0 violations in idle-open, idle-hidden and advance-under-fire (longest 2.2 s); firing line:
-  mean 95% of riflemen fire within 10 s, 98/100 seeds >= 75% (min 71%); BAR task 20/20; 40 squads 3.05 ms/tick.
+- **Fire-and-movement stall, root cause:** friendly fire. The 1.7 hold-fire rule holds a shot only when a friend is
+  within `mask_clearance` (0.5 m) of the line, but rounds within `near_miss_radius` (2 m) are near misses. The covering
+  group fired past its own bounding men; the near misses (shared across the squad within 10 m) suppressed the squad
+  until it was Pinned, and `CommandSystem` holds a pinned squad's move. Traced on seed 2: suppression 43 to 60, Pinned
+  at tick 138, `Held/Pinned` after. **Fix:** AI fire holds while a friend is within the near-miss radius
+  (`FireSystem.AiClearance`; player orders keep the 1.7 rule). Bounding groups also move at MoveFast speed while the
+  others are held (a bound is a rush), and the earlier stall/swap fallback was removed.
+- **Firing line, worst seeds:** tile snapping put neighbours 2 m apart (within the AI clearance), and the BAR team
+  (at the front of the column) walked across the line's front to its flank. **Fix:** line slots spaced by clearance +
+  one tile, tiles chosen laterally clear of every line tile; the line forms one tile ahead of the front man so movers
+  pass behind the firers; the task tile keeps clear of the line's lanes; a man holding fire keeps his shot credit (up
+  to one round) and fires the moment the line clears.
 
-## Left
+## Open question (blocks the "60% under fire" assertion)
 
-- **Fire and movement test fails:** groups alternate and one fires while the other moves in 61% of advance ticks,
-  but in most seeds the squad barely advances (mean 7 m in 90 s; a few seeds advance 40-86 m). The stall/swap
-  fallback did not change the numbers, so the bounding men seem to stay "moving" without net progress: suspect an
-  interaction between held teams and the guide's slots/leash or member replanning in `MovementSystem.Step`
-  (held men are skipped before `Replan`/`MoveMember`; free men's goals may oscillate). Next step: trace one
-  failing seed (e.g. seed 2 of the test) per tick: guide `Seg/P`, each free man's goal and `AnyBeyondLeash`.
-- Then run the full suite, delete this note, commit, push, open the PR.
+Under fire from a German Gruppe at 230 m in the open (even with its MG crew removed), the US squad is suppressed to
+Pinned before or soon after it starts moving (the item 2.1 rule: an MG pins a squad in the open in 80%+ of seeds, and a
+pinned squad holds advance moves). It then breaks and routs. So a mean advance of 60% of the unopposed distance under that
+fire contradicts the 2.1 and 2.2 tuning, not the drill. The test asserts 60% in contact (covering fire, enemy holding
+fire), and under fire it asserts that every slow seed spent most of its time pinned or broken. Owner decision needed:
+retune suppression or pinning, change the scenario (range, cover), or accept that a squad under that fire is pinned.
