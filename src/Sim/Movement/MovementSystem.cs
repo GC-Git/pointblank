@@ -40,11 +40,13 @@ public sealed class MovementSystem : ISimSystem
 
     private readonly GameMap _map;
     private readonly OrgSystem _org;
+    private readonly Suppression.SuppressionSystem? _suppression;
     private readonly Dictionary<int, Guide> _guides = [];
     private readonly Dictionary<int, Member> _members = [];
 
-    public MovementSystem(GameMap map, OrgSystem org, MovementRules rules)
+    public MovementSystem(GameMap map, OrgSystem org, MovementRules rules, Suppression.SuppressionSystem? suppression = null)
     {
+        _suppression = suppression;
         _map = map;
         _org = org;
         Rules = rules;
@@ -370,7 +372,7 @@ public sealed class MovementSystem : ISimSystem
         }
 
         var tile = _map.TileSize;
-        var budget = Rules.Speed(mode) * World.TickDuration;
+        var budget = Rules.Speed(mode) * World.TickDuration * (_suppression?.SpeedFactor(s.Id) ?? Fixed.One); // a suppressed man slows, a pinned one crawls
         while (budget > Fixed.Zero && m.Path != null)
         {
             var b = m.Path[m.Seg];

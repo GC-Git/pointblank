@@ -3,6 +3,7 @@ using PointBlank.Sim.Orders;
 using PointBlank.Sim.Org;
 using PointBlank.Sim.Sight;
 using PointBlank.Sim.Spotting;
+using PointBlank.Sim.Suppression;
 
 namespace PointBlank.Sim.Fire;
 
@@ -19,9 +20,11 @@ namespace PointBlank.Sim.Fire;
 /// burst. A soldier fires only within his weapon's max range, and holds fire while a friendly stands
 /// within <see cref="FireRules.MaskClearance"/> of his line of fire short of the target.</item>
 /// <item>Aim: a contact target (an enemy soldier his side knows) is aimed at live while the side tracks
-/// him, else at his last-known point; area fire aims at the point. The order ends when the contact is
-/// forgotten or the target falls (<see cref="OrderNote.TargetGone"/>), or on a new order. Fire does not
+/// him; a contact not Tracked is area fire at his last-known point; area fire aims at the point. The order
+/// ends when the contact is forgotten or a Tracked target falls (<see cref="OrderNote.TargetGone"/>), or on a new order. Fire does not
 /// stop a move under way (the firer then has the moving factor).</item>
+/// <item>Suppression (optional <see cref="SuppressionSystem"/>): it scales dispersion and the shot credit,
+/// and receives every near miss and hit.</item>
 /// <item>Every shot calls <see cref="SpottingSystem.NoteFired"/>. No automatic return fire (item 2.3);
 /// it can read <see cref="Shots"/>, <see cref="NearMisses"/> and <see cref="LastFiredTick"/>.</item>
 /// </list>
@@ -35,6 +38,7 @@ public sealed class FireSystem : ISimSystem
     private readonly OrgSystem _org;
     private readonly SightRules _sight;
     private readonly SpottingSystem? _spotting;
+    private readonly SuppressionSystem? _suppression;
     private readonly ShotTracer _tracer;
     private readonly List<State> _states = [];
     private readonly Dictionary<int, int> _indexOf = [];
@@ -44,8 +48,9 @@ public sealed class FireSystem : ISimSystem
     private readonly List<NearMissEvent> _nearMisses = [];
     private readonly List<(Fixed S, Fixed Lateral, Soldier Soldier)> _candidates = [];
 
-    public FireSystem(GameMap map, OrgSystem org, SightRules sight, FireRules rules, SpottingSystem? spotting = null)
+    public FireSystem(GameMap map, OrgSystem org, SightRules sight, FireRules rules, SpottingSystem? spotting = null, SuppressionSystem? suppression = null)
     {
+        _suppression = suppression;
         _org = org;
         _sight = sight;
         _spotting = spotting;
@@ -287,6 +292,7 @@ public sealed class FireSystem : ISimSystem
                 {
                     outcome = ShotOutcome.Hit;
                     hitResult = Wound(rng, s);
+                    _suppression?.OnHit(world, s);
                 }
 
                 break;
@@ -379,8 +385,8 @@ public sealed class FireSystem : ISimSystem
     private static Fixed Normal(SimRng rng) =>
         (rng.NextFixed() + rng.NextFixed() + rng.NextFixed() - Fixed.FromRatio(3, 2)) * Fixed.FromInt(2);
 
-    /// <summary>The firer's suppression as a dispersion factor. 1 for now; item 2.1 raises it.</summary>
-    private static Fixed SuppressionFactor(Soldier firer) => Fixed.One;
+    /// <summary>The firer's suppression as a dispersion factor (1 without a <see cref="SuppressionSystem"/>).</summary>
+    private Fixed SuppressionFactor(Soldier firer) => _suppression?.DispersionFactor(firer.Id) ?? Fixed.One;
 
     /// <summary>The firer's morale as a dispersion factor. 1 for now; item 2.2 sets it.</summary>
     private static Fixed MoraleFactor(Soldier firer) => Fixed.One;
@@ -403,8 +409,12 @@ public sealed class FireSystem : ISimSystem
         return health;
     }
 
-    private void NearMiss(World world, Soldier s, Soldier firer, WeaponStats weapon, Fixed distance) =>
-        _nearMisses.Add(new NearMissEvent(world.Tick, s.Id, firer.Id, firer.X, firer.Y, weapon.Calibre, distance));
+    private void NearMiss(World world, Soldier s, Soldier firer, WeaponStats weapon, Fixed distance)
+    {
+        var e = new NearMissEvent(world.Tick, s.Id, firer.Id, firer.X, firer.Y, weapon.Calibre, distance);
+        _nearMisses.Add(e);
+        _suppression?.OnNearMiss(world, e, Rules.NearMissRadius);
+    }
 
     private void FireSquad(World world, Squad squad, FireOrder fo)
     {
@@ -413,20 +423,27 @@ public sealed class FireSystem : ISimSystem
         {
             var contact = _spotting?.ContactOf(squad.Side, fo.TargetId);
             target = _org.FindSoldier(fo.TargetId);
-            if (contact is not { } c || target is not { CanLead: true })
+            if (contact is not { } c)
             {
-                End(squad.Id, OrderNote.TargetGone);
+                End(squad.Id, OrderNote.TargetGone); // forgotten
                 return;
             }
 
-            if (c.Quality == ContactQuality.Tracked)
+            if (c.Quality != ContactQuality.Tracked)
             {
-                (fo.X, fo.Y) = (target.X, target.Y);
+                // Out of sight: area fire at the last-known point. Whether the unseen man still stands is
+                // not the side's knowledge, so it neither ends the order nor steers the shots.
+                (fo.X, fo.Y) = (c.X, c.Y);
+                target = null;
+            }
+            else if (target is not { CanLead: true })
+            {
+                End(squad.Id, OrderNote.TargetGone); // seen to fall
+                return;
             }
             else
             {
-                (fo.X, fo.Y) = (c.X, c.Y);
-                target = null; // out of sight: fire at the last-known point
+                (fo.X, fo.Y) = (target.X, target.Y);
             }
         }
 
@@ -447,7 +464,7 @@ public sealed class FireSystem : ISimSystem
                 continue;
             }
 
-            st.Credit += w.RoundsPerMinute * perTick;
+            st.Credit += w.RoundsPerMinute * perTick * (_suppression?.RateFactor(s.Id) ?? Fixed.One);
             while (st.Credit >= Fixed.One && st.Magazine > 0)
             {
                 Shoot(world, s, fo.X, fo.Y, target);

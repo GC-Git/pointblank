@@ -99,7 +99,7 @@ Status: draft, awaiting owner sign-off
   query never returns unspotted enemies. A contact that moves out of sight shows its
   last-known position, not its live one.
 
-- [ ] **1.7 Small-arms fire** (O)
+- [x] **1.7 Small-arms fire** (O)
   Projectile-level shots with accuracy from data and range, cover from terrain, and ammo
   consumption.
   *Done when:* hit rate falls with range and with target cover. A unit with no ammo

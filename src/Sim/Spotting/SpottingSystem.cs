@@ -2,6 +2,7 @@ using PointBlank.Sim.Map;
 using PointBlank.Sim.Movement;
 using PointBlank.Sim.Org;
 using PointBlank.Sim.Sight;
+using PointBlank.Sim.Suppression;
 
 namespace PointBlank.Sim.Spotting;
 
@@ -119,7 +120,7 @@ public sealed class SpottingDebug
 /// <see cref="SpottingRules.ForgetAfterTicks"/>.</item>
 /// <item>Motion: a soldier whose position changed within the last cycle is moving, at his squad's
 /// move mode (Move if none). Firing: <see cref="NoteFired"/> (item 1.7). Observer state:
-/// <c>ObserverFactor</c>, 1 for now (item 2.1 adds suppression).</item>
+/// <c>ObserverFactor</c>, from the observer's suppression (item 2.1).</item>
 /// <item>Dead and incapacitated soldiers, and soldiers off the map, neither observe nor are seen.</item>
 /// </list>
 /// Register after <see cref="MovementSystem"/>.
@@ -132,14 +133,16 @@ public sealed class SpottingSystem : ISimSystem
     private readonly OrgSystem _org;
     private readonly MovementSystem _move;
     private readonly LineOfSight _los;
+    private readonly SuppressionSystem? _suppression;
     private readonly long _tileRaw;
     private readonly List<Entry> _entries = [];
     private readonly Dictionary<int, int> _indexOf = [];
     private readonly Dictionary<long, Fixed> _progress = [];
     private readonly SortedDictionary<string, SideKnowledge> _sides = new(StringComparer.Ordinal);
 
-    public SpottingSystem(GameMap map, OrgSystem org, MovementSystem move, LineOfSight los, SpottingRules rules)
+    public SpottingSystem(GameMap map, OrgSystem org, MovementSystem move, LineOfSight los, SpottingRules rules, SuppressionSystem? suppression = null)
     {
+        _suppression = suppression;
         _map = map;
         _org = org;
         _move = move;
@@ -321,8 +324,8 @@ public sealed class SpottingSystem : ISimSystem
 
     private static long Key(int observer, int target) => ((long)observer << 32) | (uint)target;
 
-    /// <summary>The observer's own state as a rate factor. 1 for now; item 2.1 lowers it under suppression.</summary>
-    private static Fixed ObserverFactor(Soldier observer) => Fixed.One;
+    /// <summary>The observer's own state as a rate factor: lowered by his suppression (1 without a <see cref="SuppressionSystem"/>).</summary>
+    private Fixed ObserverFactor(Soldier observer) => _suppression?.ObserverFactor(observer.Id) ?? Fixed.One;
 
     private static ContactKind KindOf(Soldier s) =>
         s.Role is Role.MgGunner or Role.MgAssistant or Role.MgLoader ? ContactKind.MachineGun : ContactKind.Infantry;
