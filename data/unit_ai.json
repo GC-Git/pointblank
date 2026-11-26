@@ -59,6 +59,11 @@
         "silent_chance": { "value": "0", "unit": "probability", "source": { "kind": "placeholder", "note": "Placeholder:  chance a man does not fire at all through a fire task." } },
         "shaken_silent_chance": { "value": "0.35", "unit": "probability", "source": { "kind": "placeholder", "note": "Placeholder:  the same when his squad is shaken, pinned or rallying." } },
         "defend_open_range": { "value": "120", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder:  a squad on Defend or Ambush holds its fire until an enemy is this close, unless it is fired on." } },
+        "bolt_delay": { "value": "3", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder:  each man of a routing squad gets up within this long of the flee starting, by his own draw (the leader within a quarter of it)." } },
+        "bolt_suppression_delay": { "value": "3", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder:  a man at suppression 100 takes this much longer to get up (linear in his level)." } },
+        "bolt_burst_delay": { "value": "2", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder:  a man whose last shell burst was at 0 m takes this much longer to get up, falling linearly to 0 at bolt_burst_radius." } },
+        "bolt_burst_radius": { "value": "50", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder:  see bolt_burst_delay." } },
+        "rush_jitter": { "value": "1.5", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder:  each man's rush and drop cycle on a rout is offset by up to this much, by his own draw." } },
         "defend_search_radius": { "value": "15", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: a man of a squad ordered to Defend or Ambush moves to a firing position at a hedge facing the order point within this distance." } },
         "cover_search_radius": {
           "value": "6",

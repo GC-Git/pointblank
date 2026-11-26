@@ -50,6 +50,38 @@ public class SpottingTests(ITestOutputHelper output)
     }
 
     [Theory]
+    [InlineData(Posture.Standing, true)]
+    [InlineData(Posture.Kneeling, false)]
+    [InlineData(Posture.Prone, false)]
+    public void At_1m_behind_a_hedge_from_100m_a_still_silent_standing_man_is_spotted_but_kneeling_or_prone_is_not(Posture posture, bool spotted)
+    {
+        var map = new GameMap("hedge", 150, 30);
+        for (var y = 0; y < map.Height; y++)
+        {
+            map.SetHedge(49, y, EdgeSide.East, true); // the 1.4 m hedge on the line x = 100 m
+        }
+
+        var rig = Setup(map);
+        var us = rig.Org.SpawnSquad("us_rifle_squad", M(1), M(30), Posture.Standing);
+        var de = rig.Org.SpawnSquad("de_gruppe", M(101), M(30), posture);
+        foreach (var s in us.Soldiers.Skip(1))
+        {
+            us.SetHealth(s.Id, HealthState.Dead);
+        }
+
+        foreach (var s in de.Soldiers.Skip(1))
+        {
+            de.SetHealth(s.Id, HealthState.Dead);
+        }
+
+        (us.Soldiers[0].X, us.Soldiers[0].Y) = (M(1), M(30));
+        (de.Soldiers[0].X, de.Soldiers[0].Y) = (M(101), M(30));
+        var ticks = TicksUntilSpotted(rig, de, 1200);
+        output.WriteLine($"{posture}, still and silent, 1 m behind the hedge, from 100 m: {(ticks == int.MaxValue ? "never" : $"{ticks} ticks")}");
+        Assert.Equal(spotted, ticks < 1200);
+    }
+
+    [Theory]
     [InlineData(Posture.Prone)]
     [InlineData(Posture.Kneeling)]
     public void A_still_silent_man_at_a_hedge_is_unspotted_from_100m_until_he_fires(Posture posture)

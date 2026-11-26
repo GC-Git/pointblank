@@ -172,7 +172,6 @@ public sealed class SpottingSystem : ISimSystem
             ? new ContactView(c.EnemyId, c.Kind, c.Quality, c.X, c.Y, c.LastSeen, c.FirstSeen, c.SeenBy)
             : null;
 
-    /// <summary>The tick a soldier was last noted firing, or a large negative number.</summary>
     /// <summary>When the soldier last moved (for tests and traces).</summary>
     internal long LastMovedTick(int soldierId)
     {
@@ -180,6 +179,7 @@ public sealed class SpottingSystem : ISimSystem
         return _indexOf.TryGetValue(soldierId, out var i) ? _entries[i].LastMoved : long.MinValue / 2;
     }
 
+    /// <summary>The tick a soldier was last noted firing, or a large negative number.</summary>
     internal long LastFiredTick(int soldierId)
     {
         Sync();
@@ -268,7 +268,8 @@ public sealed class SpottingSystem : ISimSystem
         var rate = los.Visible
             ? Rules.Rate(distance, Concealment(t.Soldier), los.Obscurement, t.Soldier.Posture, Motion(t, tick), Firing(t, tick), ObserverFactor(o.Soldier))
             : Fixed.Zero;
-        if (rate > Fixed.Zero && !Firing(t, tick) && AtHedge(t.Soldier, o.Soldier))
+        // Only a man whose eyes are below the hedge top (prone or kneeling) is hidden by it; a standing man shows over it.
+        if (rate > Fixed.Zero && !Firing(t, tick) && _los.Rules.EyeHeight(t.Soldier.Posture) < _los.Rules.HedgeHeight && AtHedge(t.Soldier, o.Soldier))
         {
             // At a hedge and silent: picked out only close in, closer still when he keeps still.
             var limit = Motion(t, tick) == TargetMotion.Still ? Rules.HedgeStillRange : Rules.HedgeMovingRange;

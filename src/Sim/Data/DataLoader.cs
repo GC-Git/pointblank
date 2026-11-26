@@ -91,7 +91,8 @@ public static class DataLoader
             ("cover_min", N), ("cover_search_radius", N), ("line_spacing", N), ("line_reform_sectors", N), ("bound_distance", N),
             ("stall_time", N), ("rush_time", N), ("down_time", N), ("posture_open", T), ("posture_cover", T), ("posture_contact", T),
             ("defend_search_radius", N), ("fire_hold_suppression", N), ("open_delay", N), ("join_delay_min", N), ("join_delay_max", N),
-            ("silent_chance", N), ("shaken_silent_chance", N), ("defend_open_range", N),
+            ("silent_chance", N), ("shaken_silent_chance", N), ("defend_open_range", N), ("bolt_delay", N), ("bolt_suppression_delay", N),
+            ("bolt_burst_delay", N), ("bolt_burst_radius", N), ("rush_jitter", N),
         ],
         ["unit_ai_tasks"] = [("name", T), ("role", T), ("target_kind", T), ("flank_offset", N), ("search_radius", N)],
         ["artillery"] =

@@ -56,10 +56,13 @@ public sealed class MoraleSystem(
         e.Squad.SetMoraleLevel(e.Level);
     }
 
-    /// <summary>A morale shock that is not a casualty (item 2.4: a shell burst nearby): the level drops by <paramref name="amount"/>.</summary>
     /// <summary>A shell burst fell within <c>cower_radius</c> of one of the squad's able men (item 2.4).</summary>
     internal void NoteShelled(int squadId, long tick) => Get(squadId).LastShelled = tick;
 
+    /// <summary>Set when a unit AI runs (item 2.4): a flee starts with every man held, and the AI releases them one by one.</summary>
+    private bool HoldForAi { get; set; }
+
+    /// <summary>A morale shock that is not a casualty (item 2.4: a shell burst nearby): the level drops by <paramref name="amount"/>.</summary>
     internal void AddShock(int squadId, Fixed amount)
     {
         var e = Get(squadId);
@@ -91,6 +94,12 @@ public sealed class MoraleSystem(
     }
 
     public void Tick(World world)
+    {
+        HoldForAi = world.FindSystem<UnitAi.UnitAiSystem>() != null;
+        TickInner(world);
+    }
+
+    private void TickInner(World world)
     {
         Sync();
         var dt = World.TickDuration;
@@ -177,13 +186,7 @@ public sealed class MoraleSystem(
                     e.FleePending |= e.Core == MoraleState.Routing; // caught by shellfire on the run: down, then run again
                 }
 
-                foreach (var s in squad.Soldiers)
-                {
-                    if (s.CanLead)
-                    {
-                        s.Posture = Sight.Posture.Prone;
-                    }
-                }
+                // The men go flat through the unit AI, each on his own reaction (no squad-wide posture flip).
             }
             else if (e.FleePending)
             {
@@ -385,8 +388,21 @@ public sealed class MoraleSystem(
         candidates.Sort((a, b) => a.D2 != b.D2 ? a.D2.CompareTo(b.D2) : a.Order.CompareTo(b.Order));
         foreach (var c in candidates)
         {
+            var before = squad.Soldiers.Select(s => s.Posture).ToArray();
             if (move.Execute(new MoveOrder(squad.Id, c.X, c.Y, MoveMode.MoveFast)) == MoveResult.Started)
             {
+                if (HoldForAi)
+                {
+                    // Item 2.4 review: no one gets up on the same tick. Every man stays as he was, held, and the unit AI
+                    // lets each go after his own delay (UnitAiBrain.BoltDelay).
+                    for (var i = 0; i < squad.Soldiers.Count; i++)
+                    {
+                        var s = squad.Soldiers[i];
+                        s.Posture = before[i];
+                        move.SetHeldSoldier(s.Id, s.CanLead);
+                    }
+                }
+
                 return;
             }
         }

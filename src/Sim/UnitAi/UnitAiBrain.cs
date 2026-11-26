@@ -29,6 +29,9 @@ internal interface IAiEffects
 
     /// <summary>Keeps one of the squad's men from firing on its AI fire task, or lets him fire again (his own decision).</summary>
     void SetSilent(int squadId, int soldierId, bool silent);
+
+    /// <summary>Holds one man of the squad's move where he is, or frees him (per-man rush and drop).</summary>
+    void SetHeldSoldier(int squadId, int soldierId, bool held);
 }
 
 /// <summary>
@@ -121,6 +124,21 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
             hasher.Add(m.LastShelled);
             hasher.Add(m.FireStart);
             hasher.Add(m.FireEnd);
+            hasher.Add(m.BoltStart);
+            hasher.Add(m.CowerStart);
+            hasher.Add(m.BoltAt.Count);
+            foreach (var (sid, at) in m.BoltAt)
+            {
+                hasher.Add(sid);
+                hasher.Add(at);
+            }
+
+            hasher.Add(m.BurstDist.Count);
+            foreach (var (sid, bd) in m.BurstDist)
+            {
+                hasher.Add(sid);
+                hasher.Add(bd);
+            }
         }
     }
 
@@ -157,6 +175,7 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
         if (e.Explosion)
         {
             m.LastShelled = Math.Max(m.LastShelled, e.Tick);
+            m.BurstDist[victim.Id] = e.Distance;
             return; // a shell burst (item 2.4): men go to ground, but there is no one to fire back at
         }
 
@@ -189,9 +208,16 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
                 (m.Firing, m.FireEnd) = (false, tick);
             }
 
+            // Each man drops on his own reaction (no squad-wide flip), within rush_jitter of the squad starting to cower.
+            if (m.CowerStart < 0)
+            {
+                m.CowerStart = tick;
+            }
+
+            ClearBolt(fx, q, m);
             foreach (var s in able)
             {
-                if (s.Posture != Posture.Prone)
+                if (s.Posture != Posture.Prone && tick >= m.CowerStart + Draw(s.Id, m.CowerStart, 6, rules.RushJitterTicks))
                 {
                     fx.SetPosture(s.Id, Posture.Prone);
                 }
@@ -200,6 +226,7 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
             return;
         }
 
+        m.CowerStart = -1;
         if (able.Count == 0 || q.Morale == MoraleState.Routing)
         {
             if (m.Firing)
@@ -215,9 +242,12 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
             else
             {
                 m.Phase = 0;
+                ClearBolt(fx, q, m);
                 foreach (var s in able)
                 {
-                    if (tick - m.LastUnderFire <= rules.UnderFireMemoryTicks && s.Posture != rules.PostureOpen)
+                    // Each man on his own reaction (no squad-wide flip): within rush_jitter of the fire spell starting.
+                    if (tick - m.LastUnderFire <= rules.UnderFireMemoryTicks && s.Posture != rules.PostureOpen
+                        && tick >= m.UnderFireSince + Draw(s.Id, m.UnderFireSince, 7, rules.RushJitterTicks))
                     {
                         fx.SetPosture(s.Id, rules.PostureOpen); // routed and stopped under fire: down
                     }
@@ -227,6 +257,7 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
             return;
         }
 
+        ClearBolt(fx, q, m);
         var cx = Fixed.Zero;
         var cy = Fixed.Zero;
         var range = Fixed.Zero;
@@ -584,36 +615,67 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
     /// </summary>
     private void Flee(IAiEffects fx, SquadView q, List<SoldierView> able, Mind m, long tick)
     {
-        if (tick - m.LastUnderFire > rules.UnderFireMemoryTicks)
+        // Item 2.4 review: each man on his own. He gets up after his own delay from the start of the flee (BoltDelay), and
+        // under fire his rush and drop cycle is offset by his own draw, so the squad never stands or drops on one tick.
+        // The squad still runs one way: the move (MoraleSystem chose where) is shared; a held man just waits.
+        if (m.BoltStart < 0)
         {
-            m.Phase = 0;
-            fx.SetHeldTeams(q.Id, 0, false);
-            return;
+            m.BoltStart = tick;
         }
 
-        if (m.Phase == 0)
-        {
-            (m.Phase, m.PhaseLeft) = (1, rules.RushTicks);
-        }
-        else if (--m.PhaseLeft <= 0)
-        {
-            (m.Phase, m.PhaseLeft) = m.Phase == 1 ? (2, rules.DownTicks) : (1, rules.RushTicks);
-        }
-
-        var all = 0;
+        var underFire = tick - m.LastUnderFire <= rules.UnderFireMemoryTicks;
+        var period = Math.Max(1, rules.RushTicks + rules.DownTicks);
         foreach (var s in able)
         {
-            all |= 1 << s.TeamIndex;
-        }
+            if (!m.BoltAt.TryGetValue(s.Id, out var start))
+            {
+                m.BoltAt[s.Id] = start = m.BoltStart + BoltDelay(q, s, m, tick); // fixed once: his rush cycle keeps its length
+            }
 
-        fx.SetHeldTeams(q.Id, m.Phase == 2 ? all : 0, m.Phase == 1);
-        var want = m.Phase == 2 ? rules.PostureOpen : moveRules.PostureOf(MoveMode.MoveFast);
-        foreach (var s in able)
-        {
+            var down = tick < start
+                || (underFire && (tick - start + Draw(s.Id, m.BoltStart, 5, rules.RushJitterTicks)) % period >= rules.RushTicks);
+            fx.SetHeldSoldier(q.Id, s.Id, down);
+            var want = down ? rules.PostureOpen : moveRules.PostureOf(MoveMode.MoveFast);
             if (s.Posture != want)
             {
                 fx.SetPosture(s.Id, want);
             }
+        }
+
+        fx.SetHeldTeams(q.Id, 0, underFire);
+    }
+
+    /// <summary>
+    /// The ticks a man of a routing squad waits before getting up: his own draw within <c>bolt_delay</c> (the leader within a
+    /// quarter of it), plus <c>bolt_suppression_delay</c> × his suppression / 100, plus <c>bolt_burst_delay</c> if the last
+    /// burst he noticed (within the under-fire memory) was close, falling to 0 at <c>bolt_burst_radius</c>.
+    /// </summary>
+    private int BoltDelay(SquadView q, SoldierView s, Mind m, long tick)
+    {
+        var delay = Draw(s.Id, m.BoltStart, 4, s.Id == q.LeaderId ? rules.BoltDelayTicks / 4 : rules.BoltDelayTicks);
+        delay += (Fixed.FromInt(rules.BoltSuppressionTicks) * s.Suppression / Fixed.FromInt(100)).ToInt();
+        if (tick - m.LastShelled <= rules.UnderFireMemoryTicks + rules.BoltDelayTicks && m.BurstDist.TryGetValue(s.Id, out var d)
+            && rules.BoltBurstRadius > Fixed.Zero && d < rules.BoltBurstRadius)
+        {
+            delay += (Fixed.FromInt(rules.BoltBurstTicks) * (Fixed.One - (d / rules.BoltBurstRadius))).ToInt();
+        }
+
+        return delay;
+    }
+
+    /// <summary>Frees every man the per-man flee held and forgets its start (the squad is no longer fleeing).</summary>
+    private void ClearBolt(IAiEffects fx, SquadView q, Mind m)
+    {
+        if (m.BoltStart < 0)
+        {
+            return;
+        }
+
+        m.BoltStart = -1;
+        m.BoltAt.Clear();
+        foreach (var s in q.Soldiers)
+        {
+            fx.SetHeldSoldier(q.Id, s.Id, false);
         }
     }
 
@@ -1003,6 +1065,18 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
 
         /// <summary>When its last AI fire task ended: a task that resumes within the under-fire memory keeps its start (and delays).</summary>
         public long FireEnd { get; set; } = long.MinValue / 2;
+
+        /// <summary>When the squad's current flee began (per-man bolt delays count from it), or -1.</summary>
+        public long BoltStart { get; set; } = -1;
+
+        /// <summary>When the squad began to cower, or -1.</summary>
+        public long CowerStart { get; set; } = -1;
+
+        /// <summary>Each man's distance (band) to the last shell burst he noticed.</summary>
+        public SortedDictionary<int, Fixed> BurstDist { get; } = [];
+
+        /// <summary>The tick each man of a fleeing squad gets up (drawn once, when the flee starts).</summary>
+        public SortedDictionary<int, long> BoltAt { get; } = [];
 
         public bool Firing { get; set; }
 

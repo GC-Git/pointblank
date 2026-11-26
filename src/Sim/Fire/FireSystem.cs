@@ -602,13 +602,13 @@ public sealed class FireSystem : ISimSystem
         }
     }
 
-    /// <summary>Whether a friendly stands within the mask clearance of the line from the soldier to the aim point, short of it.</summary>
     /// <summary>
     /// The hold-fire clearance of AI fire (item 2.3): the near-miss radius (or the mask clearance if larger), so the unit AI
     /// never fires a round that would pass close enough to suppress one of its own men. Player orders keep the mask clearance.
     /// </summary>
     private Fixed AiClearance => Rules.NearMissRadius > Rules.MaskClearance ? Rules.NearMissRadius : Rules.MaskClearance;
 
+    /// <summary>Whether a friendly stands within the mask clearance of the line from the soldier to the aim point, short of it.</summary>
     private bool Masked(Soldier firer, string side, Fixed x, Fixed y, Fixed clearance)
     {
         var dx = x - firer.X;

@@ -111,6 +111,20 @@ public sealed class UnitAiRules
     /// <summary>A squad on Defend or Ambush opens fire on its own only at enemies within this range (m), unless fired on.</summary>
     public Fixed DefendOpenRange { get; init; }
 
+    /// <summary>Per-man bolt (item 2.4): each man of a routing squad gets up within this many ticks of the flee starting (the leader within a quarter of it).</summary>
+    public int BoltDelayTicks { get; init; }
+
+    /// <summary>Extra ticks before a man gets up at suppression 100 (linear).</summary>
+    public int BoltSuppressionTicks { get; init; }
+
+    /// <summary>Extra ticks for a man whose last shell burst was at 0 m, falling linearly to 0 at <see cref="BoltBurstRadius"/>.</summary>
+    public int BoltBurstTicks { get; init; }
+
+    public Fixed BoltBurstRadius { get; init; }
+
+    /// <summary>Each man's rush and drop cycle is offset by up to this many ticks (his own draw).</summary>
+    public int RushJitterTicks { get; init; }
+
     public Fixed LineSpacing { get; init; }
 
     public int LineReformSectors { get; init; }
@@ -185,6 +199,11 @@ public sealed class UnitAiRules
             SilentChance = N("silent_chance"),
             ShakenSilentChance = N("shaken_silent_chance"),
             DefendOpenRange = N("defend_open_range"),
+            BoltDelayTicks = (N("bolt_delay") * Fixed.FromInt(World.TicksPerSecond)).ToInt(),
+            BoltSuppressionTicks = (N("bolt_suppression_delay") * Fixed.FromInt(World.TicksPerSecond)).ToInt(),
+            BoltBurstTicks = (N("bolt_burst_delay") * Fixed.FromInt(World.TicksPerSecond)).ToInt(),
+            BoltBurstRadius = N("bolt_burst_radius"),
+            RushJitterTicks = (N("rush_jitter") * Fixed.FromInt(World.TicksPerSecond)).ToInt(),
             LineSpacing = Pos("line_spacing"),
             LineReformSectors = Math.Max(1, N("line_reform_sectors").ToInt()),
             BoundDistance = N("bound_distance"),

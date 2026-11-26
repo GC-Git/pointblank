@@ -14,8 +14,8 @@ namespace PointBlank.Sim.Tests.Artillery;
 /// <item>Reported: survivors first found close in, and never found.</item>
 /// <item>The barrage leaves fewer, weaker defenders and costs the creeping squad fewer men than the control.</item>
 /// </list>
-/// The checklist bar "in at least 30% of seeds the attacker has not spotted every surviving defender" is reported (fog at the
-/// creep start), not asserted: see the PR for why.
+/// The checklist bar "in at least 30% of seeds the attacker has not spotted every surviving defender" is asserted (fog at the
+/// creep start), and so is suppression against the control.
 /// </summary>
 [Collection(TimingCollection.Name)]
 public class BombardCreepTests(ITestOutputHelper output)
@@ -66,7 +66,8 @@ public class BombardCreepTests(ITestOutputHelper output)
         }
 
         var fog = barrage.Count(r => r["known_at_start"] < r["survivors"]);
-        output.WriteLine($"checklist bar (reported): seeds where the US knows fewer survivors than the truth at the creep start: {fog}/{Seeds}");
+        output.WriteLine($"checklist bar: seeds where the US knows fewer survivors than the truth at the creep start: {fog}/{Seeds}");
+        Assert.True(fog >= Seeds * 3 / 10, $"fog in {fog}/{Seeds} seeds"); // item 2.4 criterion 3: at least 30%
 
         // (1) Staggered opening fire.
         var spread = barrage.Concat(control).Where(r => r["fire_spread"] >= 0).Select(r => r["fire_spread"]).ToList();
@@ -94,6 +95,7 @@ public class BombardCreepTests(ITestOutputHelper output)
         // (4) The barrage against the control.
         Assert.True(Mean(barrage, "survivors") < Mean(control, "survivors") - 1);
         Assert.True(Mean(barrage, "de_morale") < Mean(control, "de_morale") - 20);
+        Assert.True(Mean(barrage, "de_peak_suppression") >= Mean(control, "de_peak_suppression") + 30, "suppression degraded");
         Assert.True(Mean(barrage, "us_creep_casualties") < Mean(control, "us_creep_casualties"));
     }
 

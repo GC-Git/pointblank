@@ -348,9 +348,9 @@ public class ArtilleryTests(ITestOutputHelper output)
         Assert.InRange(ticks, 1, 40 * World.TicksPerSecond);
     }
 
-    private static (Rig Rig, Squad De) RoutingScene()
+    private static (Rig Rig, Squad De) RoutingScene(ulong seed = 1)
     {
-        var rig = new Rig(new GameMap("open", 150, 60));
+        var rig = new Rig(new GameMap("open", 150, 60), seed, ai: true); // the unit AI lays the men flat, each on his own
         var de = rig.Org.SpawnSquad("de_gruppe", M(150), M(60), Posture.Kneeling);
         rig.Org.SpawnSquad("de_zugtrupp", M(40), M(60), Posture.Prone); // somewhere to run to
         rig.World.Step();
@@ -394,6 +394,66 @@ public class ArtilleryTests(ITestOutputHelper output)
 
         output.WriteLine($"shelling lifted at tick {lastBurst}; the squad bolted at tick {bolted} (cower_lift {lift} ticks)");
         Assert.InRange(bolted - lastBurst, lift, lift + 20);
+    }
+
+    [Fact]
+    public void After_the_lift_each_man_bolts_on_his_own_and_no_tick_flips_the_whole_squad()
+    {
+        var spreads = new List<double>();
+        var wholeFlips = 0;
+        var pinFlips = 0;
+        for (ulong seed = 1; seed <= 20; seed++)
+        {
+            var (rig, de) = RoutingScene(seed);
+            var quiet = Us with { LethalChance = Fixed.Zero };
+            for (var t = 0; t < 300; t++)
+            {
+                if (t % 50 == 0)
+                {
+                    rig.Arty.Burst(rig.World, quiet, M(165), M(60 + (int)(seed % 7)));
+                }
+
+                rig.World.Step();
+            }
+
+            // An enemy squad keeps firing on the run (rush and drop under fire), and each man's first step is recorded.
+            var us = rig.Org.SpawnSquad("us_rifle_squad", M(290), M(60), Posture.Prone);
+            var men = de.Soldiers.Where(s => s.CanLead).ToList();
+            var start = men.ToDictionary(s => s.Id, s => (s.X, s.Y));
+            var first = new Dictionary<int, long>();
+            var postures = men.ToDictionary(s => s.Id, s => s.Posture);
+            var wasPinned = false;
+            for (var t = 0; t < 600; t++)
+            {
+                rig.World.Step();
+                var able = men.Where(s => s.CanLead).ToList();
+                var flipped = able.Count(s => s.Posture != postures[s.Id]);
+                var pinnedNow = rig.Suppression.SquadStateOf(de.Id) == SuppressionState.Pinned;
+                pinFlips += able.Count >= 3 && flipped == able.Count && pinnedNow && !wasPinned ? 1 : 0;
+                flipped = pinnedNow && !wasPinned ? 0 : flipped; // the 2.1 squad pin (all prone at once) is not the rush and drop cycle
+                wasPinned = pinnedNow;
+                wholeFlips += able.Count >= 3 && flipped == able.Count ? 1 : 0;
+                foreach (var s in men)
+                {
+                    postures[s.Id] = s.Posture;
+                    if (!first.ContainsKey(s.Id) && (s.X, s.Y) != start[s.Id])
+                    {
+                        first[s.Id] = rig.World.Tick;
+                    }
+                }
+            }
+
+            _ = us;
+            if (first.Count >= 2)
+            {
+                spreads.Add((first.Values.Max() - first.Values.Min()) / (double)World.TicksPerSecond);
+            }
+        }
+
+        output.WriteLine($"bolt spread first to last man (s): {string.Join(", ", spreads.Select(s => s.ToString("F1")))}; whole-squad posture flips in the rush and drop cycle: {wholeFlips}; squad-pin flips (2.1 rule, not desynced): {pinFlips}");
+        Assert.True(spreads.Count >= 18, $"{spreads.Count} squads bolted");
+        Assert.True(spreads.Count(s => s >= 1.5) >= spreads.Count * 9 / 10, "spread >= 1.5 s in nearly all squads");
+        Assert.Equal(0, wholeFlips);
     }
 
     [Fact]
