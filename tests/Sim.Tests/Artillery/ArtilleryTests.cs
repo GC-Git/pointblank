@@ -401,7 +401,7 @@ public class ArtilleryTests(ITestOutputHelper output)
     {
         var spreads = new List<double>();
         var wholeFlips = 0;
-        var pinFlips = 0;
+        var pinSpreads = new List<double>();
         for (ulong seed = 1; seed <= 20; seed++)
         {
             var (rig, de) = RoutingScene(seed);
@@ -423,14 +423,27 @@ public class ArtilleryTests(ITestOutputHelper output)
             var first = new Dictionary<int, long>();
             var postures = men.ToDictionary(s => s.Id, s => s.Posture);
             var wasPinned = false;
+            var pinAt = -1L;
+            var drops = new List<long>();
             for (var t = 0; t < 600; t++)
             {
                 rig.World.Step();
                 var able = men.Where(s => s.CanLead).ToList();
-                var flipped = able.Count(s => s.Posture != postures[s.Id]);
+                var flipped = able.Count(s => s.Posture != postures[s.Id]); // every change counts, the 2.1 squad pin included
                 var pinnedNow = rig.Suppression.SquadStateOf(de.Id) == SuppressionState.Pinned;
-                pinFlips += able.Count >= 3 && flipped == able.Count && pinnedNow && !wasPinned ? 1 : 0;
-                flipped = pinnedNow && !wasPinned ? 0 : flipped; // the 2.1 squad pin (all prone at once) is not the rush and drop cycle
+                if (pinnedNow && !wasPinned)
+                {
+                    pinAt = rig.World.Tick;
+                    drops.Clear();
+                }
+
+                drops.AddRange(able.Where(s => pinAt >= 0 && s.Posture == Posture.Prone && postures[s.Id] != Posture.Prone).Select(_ => rig.World.Tick));
+                if (pinAt >= 0 && rig.World.Tick - pinAt == 20)
+                {
+                    pinSpreads.Add(drops.Count >= 2 ? (drops.Max() - drops.Min()) / (double)World.TicksPerSecond : 0);
+                    pinAt = -1;
+                }
+
                 wasPinned = pinnedNow;
                 wholeFlips += able.Count >= 3 && flipped == able.Count ? 1 : 0;
                 foreach (var s in men)
@@ -450,7 +463,7 @@ public class ArtilleryTests(ITestOutputHelper output)
             }
         }
 
-        output.WriteLine($"bolt spread first to last man (s): {string.Join(", ", spreads.Select(s => s.ToString("F1")))}; whole-squad posture flips in the rush and drop cycle: {wholeFlips}; squad-pin flips (2.1 rule, not desynced): {pinFlips}");
+        output.WriteLine($"bolt spread first to last man (s): {string.Join(", ", spreads.Select(s => s.ToString("F1")))}; whole-squad posture flips: {wholeFlips}; drop spread after a squad pin, first to last man (s): {string.Join(", ", pinSpreads.Select(s => s.ToString("F1")))}");
         Assert.True(spreads.Count >= 18, $"{spreads.Count} squads bolted");
         Assert.True(spreads.Count(s => s >= 1.5) >= spreads.Count * 9 / 10, "spread >= 1.5 s in nearly all squads");
         Assert.Equal(0, wholeFlips);

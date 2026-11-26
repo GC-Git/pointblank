@@ -72,7 +72,7 @@ public static class DataLoader
             ("distance_falloff", N), ("share_factor", N), ("share_radius", N), ("hit_nearby", N), ("hit_radius", N),
             ("decay_rate", N), ("under_fire_decay_factor", N), ("under_fire_window", N), ("suppressed_threshold", N),
             ("pinned_threshold", N), ("pinned_release", N), ("dispersion_max", N), ("rate_min", N), ("rate_pinned", N),
-            ("observer_min", N), ("speed_suppressed", N), ("speed_pinned", N),
+            ("observer_min", N), ("speed_suppressed", N), ("speed_pinned", N), ("pin_drop_delay", N),
         ],
         ["morale"] =
         [

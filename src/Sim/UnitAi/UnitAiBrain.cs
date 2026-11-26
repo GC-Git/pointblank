@@ -632,6 +632,17 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
                 m.BoltAt[s.Id] = start = m.BoltStart + BoltDelay(q, s, m, tick); // fixed once: his rush cycle keeps its length
             }
 
+            if (s.SuppressionState == Suppression.SuppressionState.Pinned)
+            {
+                // A pinned man does not get up for the next rush: he stays where he is, and SuppressionSystem lays him flat
+                // on his own reaction. (Re-standing every pinned man on the tick after a pin was the last squad-wide flip.)
+                // Once he is no longer pinned he still takes his own moment (a draw within rush_jitter) before he gets up.
+                var after = tick + 1 + Draw(s.Id, m.BoltStart, 8, rules.RushJitterTicks);
+                m.BoltAt[s.Id] = m.BoltAt.TryGetValue(s.Id, out var was) ? Math.Max(was, after) : Math.Max(m.BoltStart + BoltDelay(q, s, m, tick), after);
+                fx.SetHeldSoldier(q.Id, s.Id, true);
+                continue;
+            }
+
             var down = tick < start
                 || (underFire && (tick - start + Draw(s.Id, m.BoltStart, 5, rules.RushJitterTicks)) % period >= rules.RushTicks);
             fx.SetHeldSoldier(q.Id, s.Id, down);

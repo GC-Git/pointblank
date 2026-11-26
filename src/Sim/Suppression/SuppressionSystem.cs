@@ -10,9 +10,10 @@ namespace PointBlank.Sim.Suppression;
 /// <list type="bullet">
 /// <item>Per soldier: a level (0 to 100) built by <see cref="OnNearMiss"/> and <see cref="OnHit"/>
 /// (called by <see cref="FireSystem"/>) and <see cref="AddExplosion"/> (the hook for item 2.4), and
-/// a state (<see cref="SuppressionState"/>). A man who becomes Pinned goes prone.</item>
+/// a state (<see cref="SuppressionState"/>). A man who becomes Pinned goes prone on his own reaction (within
+/// <c>pin_drop_delay</c>, his own deterministic draw).</item>
 /// <item>Per squad: the mean level of its able men, with the same thresholds. When a squad becomes
-/// Pinned all its able men go prone, and <c>CommandSystem</c> holds its advance-type orders
+/// Pinned each able man still up goes prone on his own reaction (no squad-wide drop on one tick), and <c>CommandSystem</c> holds its advance-type orders
 /// (<c>OrderStatus.Held</c>) until it drops below the release threshold.</item>
 /// <item>Effects (read by the other systems): <see cref="DispersionFactor"/> (FireSystem accuracy),
 /// <see cref="RateFactor"/> (FireSystem cadence), <see cref="ObserverFactor"/> (spotting) and
@@ -151,9 +152,11 @@ public sealed class SuppressionSystem(OrgSystem org, SuppressionRules rules) : I
             st.Level = st.Level > decay ? st.Level - decay : Fixed.Zero;
             var before = st.State;
             st.State = Classify(st.Level, before);
-            if (st.State == SuppressionState.Pinned && before != SuppressionState.Pinned && st.Soldier.CanLead)
+            if (st.State == SuppressionState.Pinned && st.Soldier.CanLead && st.Soldier.Posture != Posture.Prone)
             {
-                st.Soldier.Posture = Posture.Prone;
+                // A pinned man goes down on his own reaction, not on the same tick as every man near him. Checked every tick,
+                // not only when he becomes pinned: a pinned man stood up by a move goes back down (he crawls).
+                QueueDrop(world, st);
             }
         }
 
@@ -176,11 +179,53 @@ public sealed class SuppressionSystem(OrgSystem org, SuppressionRules rules) : I
             q.State = n == 0 ? SuppressionState.None : Classify(q.Level, before);
             if (q.State == SuppressionState.Pinned && before != SuppressionState.Pinned)
             {
-                foreach (var s in squad.Soldiers.Where(s => s.CanLead))
+                foreach (var s in squad.Soldiers)
                 {
-                    s.Posture = Posture.Prone;
+                    if (s.CanLead)
+                    {
+                        QueueDrop(world, _states[_indexOf[s.Id]]); // each man on his own reaction: no squad-wide drop
+                    }
                 }
             }
+
+            foreach (var s in squad.Soldiers)
+            {
+                var st = _states[_indexOf[s.Id]];
+                if (st.DropAt < 0 || world.Tick < st.DropAt)
+                {
+                    continue;
+                }
+
+                st.DropAt = -1;
+                if (s.CanLead && (st.State == SuppressionState.Pinned || q.State == SuppressionState.Pinned))
+                {
+                    s.Posture = Posture.Prone; // still pinned (himself or his squad) when his reaction comes: down
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Schedules a man's drop to prone at his own reaction: a deterministic draw from 0 to <c>pin_drop_delay</c> ticks (a
+    /// hash of his id and the tick, so World.Rng's stream is untouched). An earlier pending drop is kept.
+    /// </summary>
+    private void QueueDrop(World world, Entry st)
+    {
+        if (st.DropAt >= 0 || st.Soldier.Posture == Posture.Prone)
+        {
+            return;
+        }
+
+        var z = unchecked(((ulong)st.Soldier.Id * 0x9E3779B97F4A7C15UL) ^ ((ulong)world.Tick * 0xBF58476D1CE4E5B9UL) ^ 0x2545F4914F6CDD1DUL);
+        z = unchecked((z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL);
+        z = unchecked((z ^ (z >> 27)) * 0x94D049BB133111EBUL);
+        z ^= z >> 31;
+        var range = Math.Max(0, Rules.PinDropDelayTicks);
+        st.DropAt = world.Tick + (long)(z % (ulong)(range + 1));
+        if (st.DropAt == world.Tick)
+        {
+            st.DropAt = -1;
+            st.Soldier.Posture = Posture.Prone;
         }
     }
 
@@ -194,6 +239,7 @@ public sealed class SuppressionSystem(OrgSystem org, SuppressionRules rules) : I
             hasher.Add(st.Level);
             hasher.Add((byte)st.State);
             hasher.Add(st.LastUnderFire);
+            hasher.Add(st.DropAt);
         }
 
         hasher.Add(_squads.Count);
@@ -275,6 +321,9 @@ public sealed class SuppressionSystem(OrgSystem org, SuppressionRules rules) : I
         public SuppressionState State { get; set; }
 
         public long LastUnderFire { get; set; } = long.MinValue / 2;
+
+        /// <summary>The tick his pending drop to prone falls due (his own reaction to a pin), or -1.</summary>
+        public long DropAt { get; set; } = -1;
     }
 
     private sealed class SquadState

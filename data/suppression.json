@@ -25,7 +25,8 @@
         "rate_pinned": { "value": "0.15", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: rate-of-fire factor of a Pinned man." } },
         "observer_min": { "value": "0.3", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: spotting rate factor of an observer at level 100 (linear from 1)." } },
         "speed_suppressed": { "value": "0.8", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: movement speed factor of a Suppressed man." } },
-        "speed_pinned": { "value": "0.25", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: movement speed factor of a Pinned man (a crawl)." } }
+        "speed_pinned": { "value": "0.25", "unit": "factor", "source": { "kind": "placeholder", "note": "Placeholder: movement speed factor of a Pinned man (a crawl)." } },
+        "pin_drop_delay": { "value": "1", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: a man who becomes Pinned (on his own or with his squad) goes prone after his own deterministic reaction within this delay, so no pin drops a whole squad on one tick." } }
       }
     }
   ]
