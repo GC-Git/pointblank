@@ -13,6 +13,7 @@ using Xunit.Abstractions;
 namespace PointBlank.Sim.Tests.Fire;
 
 /// <summary>Item 1.7: small-arms fire.</summary>
+[Collection(TimingCollection.Name)]
 public class FireTests(ITestOutputHelper output)
 {
     private static readonly DataSet Data = PathFinderTests.Data;

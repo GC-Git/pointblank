@@ -173,6 +173,13 @@ public sealed class SpottingSystem : ISimSystem
             : null;
 
     /// <summary>The tick a soldier was last noted firing, or a large negative number.</summary>
+    /// <summary>When the soldier last moved (for tests and traces).</summary>
+    internal long LastMovedTick(int soldierId)
+    {
+        Sync();
+        return _indexOf.TryGetValue(soldierId, out var i) ? _entries[i].LastMoved : long.MinValue / 2;
+    }
+
     internal long LastFiredTick(int soldierId)
     {
         Sync();
@@ -267,6 +274,16 @@ public sealed class SpottingSystem : ISimSystem
             var limit = Motion(t, tick) == TargetMotion.Still ? Rules.HedgeStillRange : Rules.HedgeMovingRange;
             rate = distance > limit ? Fixed.Zero : rate;
         }
+
+        // Close range (item 2.4 follow-up): a man in sight this close is noticed whatever his posture, stillness or cover,
+        // at no less than close_rate × (1 − d / close_range) × (1 − obscurement) × the observer's suppression factor (a
+        // pinned man still looks around, only less).
+        if (los.Visible && distance < Rules.CloseRange)
+        {
+            var close = Rules.CloseRate * (Fixed.One - (distance / Rules.CloseRange)) * (Fixed.One - Min1(los.Obscurement)) * ObserverFactor(o.Soldier);
+            rate = close > rate ? close : rate;
+        }
+
         if (rate <= Fixed.Zero)
         {
             _progress.Remove(key);
@@ -332,6 +349,8 @@ public sealed class SpottingSystem : ISimSystem
 
     /// <summary>The observer's own state as a rate factor: lowered by his suppression (1 without a <see cref="SuppressionSystem"/>).</summary>
     private Fixed ObserverFactor(Soldier observer) => _suppression?.ObserverFactor(observer.Id) ?? Fixed.One;
+
+    private static Fixed Min1(Fixed x) => x > Fixed.One ? Fixed.One : x;
 
     private static ContactKind KindOf(Soldier s) =>
         s.Role is Role.MgGunner or Role.MgAssistant or Role.MgLoader ? ContactKind.MachineGun : ContactKind.Infantry;

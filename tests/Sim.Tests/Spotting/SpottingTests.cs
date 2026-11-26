@@ -13,6 +13,7 @@ using Xunit.Abstractions;
 namespace PointBlank.Sim.Tests.Spotting;
 
 /// <summary>Item 1.6: spotting and fog of war.</summary>
+[Collection(TimingCollection.Name)]
 public class SpottingTests(ITestOutputHelper output)
 {
     private static readonly DataSet Data = PathFinderTests.Data;
@@ -103,7 +104,13 @@ public class SpottingTests(ITestOutputHelper output)
         var close = Scene(out var t3);
         t3.Soldiers[0].X = M(101);
         close.Org.Squads[0].Soldiers[0].X = M(75); // 26 m: close enough to make him out
-        Assert.True(TicksUntilSpotted(close, t3, 1200) < 1200);
+        var closeTicks = TicksUntilSpotted(close, t3, 1200);
+        output.WriteLine($"{posture} at the hedge, still and silent: spotted from 26 m after {closeTicks} ticks");
+        Assert.True(closeTicks <= 5 * World.TicksPerSecond, $"{closeTicks} ticks"); // within a few seconds (close-range term)
+
+        var outside = Scene(out var t4);
+        outside.Org.Squads[0].Soldiers[0].X = M(55); // 46 m: beyond the 40 m concealment range
+        Assert.Equal(int.MaxValue, TicksUntilSpotted(outside, t4, 1200));
     }
 
     private sealed class FiredInput(int soldierId) : ISimInput

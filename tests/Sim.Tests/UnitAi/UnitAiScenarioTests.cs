@@ -10,6 +10,7 @@ using static PointBlank.Sim.Tests.UnitAi.AiRig;
 namespace PointBlank.Sim.Tests.UnitAi;
 
 /// <summary>Item 2.3 "Done when", over seeds 1 to 100.</summary>
+[Collection(TimingCollection.Name)]
 public class UnitAiScenarioTests(ITestOutputHelper output)
 {
     private const int Seeds = 100;

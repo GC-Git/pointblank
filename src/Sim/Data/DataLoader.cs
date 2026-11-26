@@ -57,7 +57,7 @@ public static class DataLoader
             ("posture_standing", N), ("posture_kneeling", N), ("posture_prone", N), ("motion_still", N),
             ("motion_sneak", N), ("motion_move", N), ("motion_move_fast", N), ("firing_factor", N),
             ("firing_window", N), ("lost_after", N), ("forget_after", N), ("hedge_position_distance", N), ("hedge_still_range", N),
-            ("hedge_moving_range", N),
+            ("hedge_moving_range", N), ("close_range", N), ("close_rate", N),
         ],
         ["fire"] =
         [

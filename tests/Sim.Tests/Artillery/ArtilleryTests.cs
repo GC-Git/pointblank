@@ -17,6 +17,7 @@ using Xunit.Abstractions;
 namespace PointBlank.Sim.Tests.Artillery;
 
 /// <summary>Item 2.4: call for fire, missions, dispersion, HE effects and what each side sees.</summary>
+[Collection(TimingCollection.Name)]
 public class ArtilleryTests(ITestOutputHelper output)
 {
     private static readonly Lazy<DataSet> Data = new(() => DataLoader.LoadDirectory(DataPaths.DataDirectory()));
@@ -309,6 +310,42 @@ public class ArtilleryTests(ITestOutputHelper output)
         Assert.True(felt, "German men near the bursts notice them as incoming fire");
         Assert.NotEmpty(us.ShellImpacts);
         Assert.Equal(us.ShellImpacts, ger.ShellImpacts);
+    }
+
+    [Fact]
+    public void A_pinned_observer_still_makes_out_a_still_man_at_a_hedge_25m_away_within_tens_of_seconds()
+    {
+        var map = new GameMap("hedge", 100, 30);
+        for (var y = 0; y < map.Height; y++)
+        {
+            map.SetHedge(49, y, EdgeSide.East, true); // x = 100 m
+        }
+
+        var rig = new Rig(map);
+        var us = rig.Org.SpawnSquad("us_rifle_squad", M(126), M(30), Posture.Prone);
+        var de = rig.Org.SpawnSquad("de_gruppe", M(99), M(30), Posture.Prone);
+        foreach (var s in us.Soldiers.Skip(1))
+        {
+            us.SetHealth(s.Id, HealthState.Dead);
+        }
+
+        foreach (var s in de.Soldiers.Skip(1))
+        {
+            de.SetHealth(s.Id, HealthState.Dead);
+        }
+
+        (us.Soldiers[0].X, us.Soldiers[0].Y) = (M(126), M(30)); // 25 m east of the man at the hedge
+        (de.Soldiers[0].X, de.Soldiers[0].Y) = (M(99), M(30));
+        var ticks = -1;
+        for (var t = 0; t < 600 && ticks < 0; t++)
+        {
+            rig.Suppression.SetLevel(us.Soldiers[0].Id, M(100)); // pinned throughout
+            rig.World.Step();
+            ticks = rig.World.ViewFor("us").KnownEnemies.Any(c => c.EnemyId == de.Soldiers[0].Id) ? t + 1 : -1;
+        }
+
+        output.WriteLine($"pinned observer, still man at a hedge 25 m away: spotted after {ticks} ticks");
+        Assert.InRange(ticks, 1, 40 * World.TicksPerSecond);
     }
 
     [Fact]

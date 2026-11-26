@@ -22,7 +22,9 @@
         "forget_after": { "value": "120", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: an unseen contact is forgotten after this long." } },
         "hedge_position_distance": { "value": "2", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: a man this close to a hedge between him and the observer is in a firing position behind it (about one tile)." } },
         "hedge_still_range": { "value": "40", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: a still, silent man at a hedge cannot be picked out from further than this." } },
-        "hedge_moving_range": { "value": "100", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: a man moving at a hedge (not firing) cannot be picked out from further than this; firing gives him away at any range." } }
+        "hedge_moving_range": { "value": "100", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: a man moving at a hedge (not firing) cannot be picked out from further than this; firing gives him away at any range." } },
+        "close_range": { "value": "40", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: within this distance a man in sight is noticed whatever his posture or cover (the close-range term falls linearly to 0 here, matching hedge_still_range)." } },
+        "close_rate": { "value": "1", "unit": "per s", "source": { "kind": "placeholder", "note": "Placeholder: close-range spotting progress per second at zero distance (1 = spotted in 1 s); about 2.7 s at 25 m for an unsuppressed observer, about 9 s if he is pinned (observer_min 0.3)." } }
       }
     }
   ]

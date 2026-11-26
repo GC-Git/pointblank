@@ -10,6 +10,7 @@ using Xunit.Abstractions;
 namespace PointBlank.Sim.Tests.Sight;
 
 /// <summary>Item 1.2: line of sight.</summary>
+[Collection(TimingCollection.Name)]
 public class LineOfSightTests(ITestOutputHelper output)
 {
     private static readonly SightRules Rules =
@@ -230,12 +231,13 @@ public class LineOfSightTests(ITestOutputHelper output)
         HedgeLine(map, 49);
         var rules = Rules with { HedgeObscurement = Fixed.FromRatio(1, 2) };
 
-        var r = Check(map, At(1), At(101, Posture.Prone), rules);
+        // Item 2.4: the target lies 4 m back (1 m would be a firing position at the hedge, capped by hedge_adjacent_obscurement).
+        var r = Check(map, At(1), At(104, Posture.Prone), rules);
         Assert.True(r.Visible);
         Assert.Equal(Fixed.FromRatio(1, 2), r.Obscurement);
 
         HedgeLine(map, 30);
-        var two = Check(map, At(1), At(101, Posture.Prone), rules);
+        var two = Check(map, At(1), At(104, Posture.Prone), rules);
         Assert.False(two.Visible);
         Assert.Equal(LosBlocker.Hedge, two.Blocker);
         Assert.Equal(new TilePos(49, 5), two.BlockerTile);
