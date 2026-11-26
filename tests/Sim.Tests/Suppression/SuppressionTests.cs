@@ -59,7 +59,7 @@ public class SuppressionTests(ITestOutputHelper output)
     [Fact]
     public void Rules_come_from_the_data_file()
     {
-        Assert.Equal(M(6), Rules.NearMiss);
+        Assert.Equal(M(10), Rules.NearMiss); // tuned in item 2.2
         Assert.Equal(M(60), Rules.PinnedThreshold);
         Assert.Equal(M(40), Rules.PinnedRelease);
         Assert.Equal(30, Rules.UnderFireWindowTicks);

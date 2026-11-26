@@ -11,7 +11,7 @@ public static class DataLoader
 {
     /// <summary>The tables, in the fixed order used by reports.</summary>
     public static readonly string[] TableNames =
-        ["units", "weapons", "ammo", "materials", "organisation", "terrain", "postures", "sight", "movement", "formation", "command", "spotting", "fire", "suppression"];
+        ["units", "weapons", "ammo", "materials", "organisation", "terrain", "postures", "sight", "movement", "formation", "command", "spotting", "fire", "suppression", "morale"];
 
     private const int MaxIntegerDigits = 9;
     private const int MaxFractionDigits = 9;
@@ -45,7 +45,7 @@ public static class DataLoader
         [
             ("name", T), ("base_delay", N), ("no_leader_delay", N), ("out_of_contact_delay", N), ("shaken_delay", N),
             ("broken_delay", N), ("spread_min", N), ("spread_max", N), ("command_radius", N), ("hesitate_chance", N),
-            ("hesitate_delay", N), ("shaken_refuse_chance", N), ("broken_refuse_chance", N),
+            ("hesitate_delay", N), ("shaken_refuse_chance", N), ("broken_refuse_chance", N), ("low_morale_delay", N),
         ],
         ["spotting"] =
         [
@@ -68,6 +68,16 @@ public static class DataLoader
             ("decay_rate", N), ("under_fire_decay_factor", N), ("under_fire_window", N), ("suppressed_threshold", N),
             ("pinned_threshold", N), ("pinned_release", N), ("dispersion_max", N), ("rate_min", N), ("rate_pinned", N),
             ("observer_min", N), ("speed_suppressed", N), ("speed_pinned", N),
+        ],
+        ["morale"] =
+        [
+            ("name", T), ("start_level", N), ("suppression_drain", N), ("casualty_shock", N), ("shock_spread_min", N),
+            ("shock_spread_max", N), ("leader_shock", N), ("support_shock_reduction", N), ("casualty_ceiling", N),
+            ("leaderless_ceiling", N), ("isolated_ceiling", N), ("out_of_contact_ceiling", N), ("drift_rate", N),
+            ("recovery_rate", N), ("leader_recovery_weight", N), ("support_recovery_bonus", N), ("hq_rally_bonus", N),
+            ("support_radius", N), ("hq_rally_radius", N), ("loss_window", N), ("leader_killed_memory", N),
+            ("heavy_casualty_fraction", N), ("shaken_below", N), ("shaken_release", N), ("broken_below", N),
+            ("broken_release", N), ("rout_below", N), ("steady_above", N), ("rout_distance", N),
         ],
     };
 

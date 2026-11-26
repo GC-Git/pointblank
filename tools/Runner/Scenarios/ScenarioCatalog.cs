@@ -5,7 +5,7 @@ namespace PointBlank.Runner;
 /// <summary>Every scenario the runner can run or replay.</summary>
 public static class ScenarioCatalog
 {
-    private static readonly IScenario[] All = [new WanderScenario(), new PinScenario(hedges: false), new PinScenario(hedges: true)];
+    private static readonly IScenario[] All = [new WanderScenario(), new PinScenario(hedges: false), new PinScenario(hedges: true), new PinScenario(hedges: false, noCasualties: true)];
 
     public static IReadOnlyList<string> Ids { get; } = All.Select(s => s.Id).ToArray();
 

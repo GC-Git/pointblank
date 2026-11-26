@@ -1,4 +1,5 @@
 using PointBlank.Sim.Fire;
+using PointBlank.Sim.Morale;
 using PointBlank.Sim.Movement;
 using PointBlank.Sim.Orders;
 using PointBlank.Sim.Org;
@@ -20,7 +21,9 @@ public readonly record struct SoldierView(
 /// A copy of one of the side's own squads. <see cref="LeaderId"/> is -1 while the post is vacant. <see cref="Ammo"/>
 /// reads <see cref="AmmoState.OutOfAmmo"/> when none of its able, armed men has a round left. <see cref="SuppressionLevel"/>
 /// is the mean suppression of its able men (0 to 100) and <see cref="Suppression"/> the squad's state (Pinned: it holds
-/// advance orders). Enemy suppression is never shown (fog of war).
+/// advance orders). <see cref="Morale"/> is the morale state (Pinned mirrors the suppression state unless Broken or Routing),
+/// <see cref="MoraleLevel"/> its level (0 to 100), <see cref="MoraleReasons"/> why, and <see cref="MoraleTopReasons"/> the three
+/// most important of those reasons first (item 2.2). Enemy suppression and morale are never shown (fog of war).
 /// </summary>
 public readonly record struct SquadView(
     int Id,
@@ -34,7 +37,10 @@ public readonly record struct SquadView(
     AmmoState Ammo,
     IReadOnlyList<SoldierView> Soldiers,
     Fixed SuppressionLevel,
-    SuppressionState Suppression);
+    SuppressionState Suppression,
+    Fixed MoraleLevel,
+    MoraleReason MoraleReasons,
+    IReadOnlyList<MoraleReason> MoraleTopReasons);
 
 /// <summary>
 /// What one side may know, and the only API for UI and AI code (project rule, see CLAUDE.md). It
@@ -52,6 +58,7 @@ public sealed class SideView
     private readonly SpottingSystem? _spotting;
     private readonly FireSystem? _fire;
     private readonly SuppressionSystem? _suppression;
+    private readonly MoraleSystem? _morale;
 
     internal SideView(World world, string side)
     {
@@ -63,6 +70,7 @@ public sealed class SideView
         _spotting = world.FindSystem<SpottingSystem>();
         _fire = world.FindSystem<FireSystem>();
         _suppression = world.FindSystem<SuppressionSystem>();
+        _morale = world.FindSystem<MoraleSystem>();
     }
 
     public string Side { get; }
@@ -132,5 +140,8 @@ public sealed class SideView
             s.Id, s.Key, s.Role, s.Rank, s.WeaponId, s.TeamIndex, s.X, s.Y, s.Posture, s.Health, _fire?.RoundsOf(s.Id) ?? -1,
             _suppression?.LevelOf(s.Id) ?? Fixed.Zero, _suppression?.StateOf(s.Id) ?? SuppressionState.None)).ToArray(),
         _suppression?.SquadLevelOf(q.Id) ?? Fixed.Zero,
-        _suppression?.SquadStateOf(q.Id) ?? SuppressionState.None);
+        _suppression?.SquadStateOf(q.Id) ?? SuppressionState.None,
+        q.MoraleLevel,
+        _morale?.ReasonsOf(q.Id) ?? MoraleReason.None,
+        MoraleReasons.Top(_morale?.ReasonsOf(q.Id) ?? MoraleReason.None, 3));
 }

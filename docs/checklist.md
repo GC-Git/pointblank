@@ -108,7 +108,7 @@ Status: draft, awaiting owner sign-off
 
 ## Milestone 2 — Core simulation (first playable, part 2)
 
-- [ ] **2.1 Suppression** (O)
+- [x] **2.1 Suppression** (O)
   Incoming fire (near misses, volume, calibre) builds suppression, which decays over
   time.
   *Done when:* a suppressed unit's rate and accuracy of fire drop measurably. A squad
