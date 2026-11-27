@@ -198,8 +198,8 @@ Status: draft, awaiting owner sign-off
   Owner decisions: changing the rules of engagement keeps a pending move order, and the
   change travels beside it with its own delay; the Smoke order is deferred until item 5.5
   (smoke is not built). Ambush is to be offered only if real ambush behaviour exists: the
-  sim handles Ambush exactly like Defend, so it is not offered; open design question for
-  the owner (what should an ambush do that Defend does not?).
+  sim currently treats Ambush exactly like Defend, so it is not offered; the owner deferred
+  the Ambush order to item 2.8.
 
 - [ ] **2.4c Squad masked by friendlies** (S)
   Do before 2.7. From the 2.6 review: in `fix-assault` seed 1 the second squad was mostly
@@ -224,6 +224,15 @@ Status: draft, awaiting owner sign-off
   scripted defender.
   *Done when:* both run start to finish from the runner and in Godot with no errors.
   **Owner plays both and signs off on the feel (Milestone 3 in the spec).**
+
+- [ ] **2.8 Ambush order** (S)
+  After the 2.7 play-through. Proposed behaviour, to be confirmed by the owner before
+  building: men stay hidden and hold fire until the enemy is close or their leader opens
+  fire, then each man joins after his own reaction; it differs from Defend and is offered
+  in the view. Also from the 2.5a build: a delivered Defend order reads 'not available
+  yet'; selection rings and nearby squad names can overlap.
+  *Done when:* the owner has confirmed the behaviour, tests show it differs from Defend with
+  no all-at-once opening, the view offers it, and the two display follow-ups are fixed.
 
 ## Milestone 3 — Art style
 
