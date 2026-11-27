@@ -137,7 +137,7 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
 
         foreach (var q in squads)
         {
-            ThinkSquad(view, fx, q, known, tick);
+            ThinkSquad(view, fx, squads, q, known, tick);
         }
     }
 
@@ -173,6 +173,44 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
             hasher.Add(m.BoltStart);
             hasher.Add(m.CowerStart);
             hasher.Add(m.StoppedSince);
+            hasher.Add(m.Aim != null);
+            hasher.Add(m.Aim?.X ?? Fixed.Zero);
+            hasher.Add(m.Aim?.Y ?? Fixed.Zero);
+            hasher.Add(m.MaskedSince.Count);
+            foreach (var (sid, at) in m.MaskedSince)
+            {
+                hasher.Add(sid);
+                hasher.Add(at);
+            }
+
+            hasher.Add(m.LookAgainAt.Count);
+            foreach (var (sid, at) in m.LookAgainAt)
+            {
+                hasher.Add(sid);
+                hasher.Add(at);
+            }
+
+            hasher.Add(m.ShiftTo.Count);
+            foreach (var (sid, to) in m.ShiftTo)
+            {
+                hasher.Add(sid);
+                hasher.Add(to.X);
+                hasher.Add(to.Y);
+            }
+
+            hasher.Add(m.StillSince.Count);
+            foreach (var (sid, at) in m.StillSince)
+            {
+                hasher.Add(sid);
+                hasher.Add(at);
+            }
+
+            hasher.Add(m.Waiting.Count);
+            foreach (var sid in m.Waiting)
+            {
+                hasher.Add(sid);
+            }
+
             hasher.Add(m.BoltAt.Count);
             foreach (var (sid, at) in m.BoltAt)
             {
@@ -242,7 +280,8 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
         }
     }
 
-    private void ThinkSquad(SideView view, IAiEffects fx, SquadView q, IReadOnlyList<ContactView> known, long tick)
+    private void ThinkSquad(
+        SideView view, IAiEffects fx, IReadOnlyList<SquadView> squads, SquadView q, IReadOnlyList<ContactView> known, long tick)
     {
         var m = MindOf(q.Id);
         var able = q.Soldiers.Where(Able).ToList();
@@ -613,6 +652,18 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
             }
         }
 
+        // Item 2.4c: in a stationary squad with a fire task (ordered or the AI's own), masked men step aside.
+        var aim = playerFire ? PlayerAim(order!, known) : fireId >= -1 ? (fireX, fireY) : ((Fixed X, Fixed Y)?)null;
+        m.Aim = !moving && q.Morale != MoraleState.Broken ? aim : null;
+        if (m.Aim is { } at)
+        {
+            ClearOwnLine(squads, fx, q, able, m, at, playerFire ? fireRules.MaskClearance : Clearance(), tick);
+        }
+        else
+        {
+            m.MaskedSince.Clear();
+        }
+
         // A badly suppressed man keeps low (item 2.4 follow-up), whatever the squad is doing, unless he is on the move.
         foreach (var s in able)
         {
@@ -620,6 +671,207 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
             {
                 fx.SetPosture(s.Id, rules.PostureOpen);
             }
+        }
+    }
+
+    private static (Fixed X, Fixed Y) PlayerAim(Order order, IReadOnlyList<ContactView> known)
+    {
+        foreach (var c in known)
+        {
+            if (c.EnemyId == order.TargetId)
+            {
+                return (c.X, c.Y);
+            }
+        }
+
+        return (order.X, order.Y);
+    }
+
+    /// <summary>
+    /// Item 2.4c: each man's own drill when friendlies are on his line of fire (the same test as <see cref="FireSystem"/>'s
+    /// hold-fire). Once he has been masked for his own delay he looks, within <c>unmask_search_radius</c>, for a tile that
+    /// has a clear line, is in range, is not on any comrade's line of fire, is no nearer the target than a tile's width
+    /// and gives no less cover; the best covered, then nearest, one. He walks there in his present posture. With no such
+    /// tile he stays. A badly suppressed man does not move. After looking he waits <c>unmask_retry_time</c>. Squads on a
+    /// move are left alone. It uses only the side's own men (<see cref="SideView.Squads"/>, as they were at the start of the
+    /// think).
+    /// </summary>
+    private void ClearOwnLine(
+        IReadOnlyList<SquadView> squads, IAiEffects fx, SquadView q, List<SoldierView> able, Mind m, (Fixed X, Fixed Y) aim,
+        Fixed clearance, long tick)
+    {
+        foreach (var s in able)
+        {
+            if (s.Moving)
+            {
+                m.MaskedSince.Remove(s.Id);
+                continue;
+            }
+
+            m.ShiftTo.Remove(s.Id); // arrived, or his move was ended
+            var w = fireRules.TryWeapon(s.WeaponId);
+            if (w == null || s.Rounds == 0 || s.Suppression >= rules.FireHoldSuppression || !Within(s.X, s.Y, aim, w.MaxRange))
+            {
+                m.MaskedSince.Remove(s.Id);
+                continue;
+            }
+
+            if ((tick + s.Id) % MaskCheckTicks != 0)
+            {
+                continue; // looked at twice a second, men staggered (the cost grows with men squared)
+            }
+
+            var line = new FireLine(s.X, s.Y, aim, clearance);
+            if (!Masked(squads, s.Id, line))
+            {
+                m.MaskedSince.Remove(s.Id);
+                continue;
+            }
+
+            if (!m.MaskedSince.TryGetValue(s.Id, out var since))
+            {
+                m.MaskedSince[s.Id] = since = tick;
+            }
+
+            var wait = rules.UnmaskDelayMinTicks + Draw(s.Id, since, 8, rules.UnmaskDelayMaxTicks - rules.UnmaskDelayMinTicks);
+            if (tick < since + wait || tick < m.LookAgainAt.GetValueOrDefault(s.Id))
+            {
+                continue;
+            }
+
+            m.LookAgainAt[s.Id] = tick + rules.UnmaskRetryTicks;
+            if (ClearTile(squads, s, w.MaxRange, aim) is { } goal && fx.MoveSoldier(q.Id, s.Id, goal, false))
+            {
+                m.ShiftTo[s.Id] = goal;
+                m.MaskedSince.Remove(s.Id);
+            }
+        }
+    }
+
+    private TilePos? ClearTile(IReadOnlyList<SquadView> squads, SoldierView s, Fixed range, (Fixed X, Fixed Y) aim)
+    {
+        var gap = Clearance() + Fixed.FromRatio(1, 4);
+
+        // Where every other man is (or is stepping to), and what he is firing at.
+        var others = new List<(Fixed X, Fixed Y, FireLine? Line)>();
+        foreach (var o in squads)
+        {
+            var om = MindOf(o.Id);
+            foreach (var f in o.Soldiers.Where(f => f.Id != s.Id && Able(f)))
+            {
+                var (x, y) = om.ShiftTo.TryGetValue(f.Id, out var to) ? Centre(to) : (f.X, f.Y);
+                others.Add((x, y, om.Aim is { } a ? new FireLine(x, y, a, gap) : null));
+            }
+        }
+
+        var here = TileOf(s.X, s.Y);
+        var d0 = Len(aim.X - s.X, aim.Y - s.Y);
+        if (d0 <= Fixed.One)
+        {
+            return null;
+        }
+
+        var (ux, uy) = ((aim.X - s.X) / d0, (aim.Y - s.Y) / d0);
+        var minScore = CoverScore(here, ux, uy, true);
+        var nearest = d0 - map.TileSize;
+        var radius = rules.UnmaskSearchRadius;
+        var r = (radius / map.TileSize).ToInt() + 1;
+        TilePos? best = null;
+        var bestScore = -1;
+        var bestD = Fixed.MaxValue;
+        for (var ty = here.Y - r; ty <= here.Y + r; ty++)
+        {
+            for (var tx = here.X - r; tx <= here.X + r; tx++)
+            {
+                var t = new TilePos(tx, ty);
+                if (!map.InBounds(tx, ty) || t == here)
+                {
+                    continue;
+                }
+
+                var (x, y) = Centre(t);
+                var d = ((x - s.X) * (x - s.X)) + ((y - s.Y) * (y - s.Y));
+                if (d > radius * radius || !Within(x, y, aim, range) || Len(aim.X - x, aim.Y - y) < nearest)
+                {
+                    continue;
+                }
+
+                var score = CoverScore(t, ux, uy, true);
+                if (score < minScore || score < bestScore || (score == bestScore && d >= bestD))
+                {
+                    continue;
+                }
+
+                var line = new FireLine(x, y, aim, gap);
+                if (others.Any(f => TileOf(f.X, f.Y) == t || line.Crosses(f.X, f.Y) || (f.Line is { } theirs && theirs.Crosses(x, y))))
+                {
+                    continue;
+                }
+
+                (best, bestScore, bestD) = (t, score, d);
+            }
+        }
+
+        return best;
+    }
+
+    private static bool Within(Fixed x, Fixed y, (Fixed X, Fixed Y) aim, Fixed range)
+    {
+        var dx = aim.X - x;
+        var dy = aim.Y - y;
+        return (dx * dx) + (dy * dy) <= range * range;
+    }
+
+    private const int MaskCheckTicks = 5;
+
+    private static bool Masked(IReadOnlyList<SquadView> squads, int firerId, FireLine line)
+    {
+        foreach (var q in squads)
+        {
+            foreach (var f in q.Soldiers)
+            {
+                if (f.Id != firerId && Able(f) && line.Crosses(f.X, f.Y))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// A line of fire from a point to an aim point. <see cref="Crosses"/>: whether a man is within the clearance of it,
+    /// short of the aim point (the hold-fire test of <see cref="FireSystem"/>, with one square root per line).
+    /// </summary>
+    private readonly struct FireLine
+    {
+        private readonly Fixed _x;
+        private readonly Fixed _y;
+        private readonly Fixed _dx;
+        private readonly Fixed _dy;
+        private readonly Fixed _d2;
+        private readonly Fixed _limit; // clearance times the length: compared with the cross product
+
+        public FireLine(Fixed x, Fixed y, (Fixed X, Fixed Y) aim, Fixed clearance)
+        {
+            (_x, _y, _dx, _dy) = (x, y, aim.X - x, aim.Y - y);
+            _d2 = (_dx * _dx) + (_dy * _dy);
+            _limit = clearance * Fixed.Sqrt(_d2);
+        }
+
+        public bool Crosses(Fixed x, Fixed y)
+        {
+            var rx = x - _x;
+            var ry = y - _y;
+            var along = (rx * _dx) + (ry * _dy);
+            if (along <= Fixed.Zero || along >= _d2)
+            {
+                return false;
+            }
+
+            var cross = (rx * _dy) - (ry * _dx);
+            return cross <= _limit && -cross <= _limit;
         }
     }
 
@@ -705,7 +957,28 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
             var rise = start + Draw(s.Id, m.BoltStart, 5, rules.RushJitterTicks);
             var down = tick < rise || (underFire && (tick - rise) % period >= rules.RushTicks);
             fx.SetHeldSoldier(q.Id, s.Id, down);
-            var want = down ? rules.PostureOpen : moveRules.PostureOf(MoveMode.MoveFast);
+
+            // A man who has run out of route (he waits for the others' way to open) does not stand about under fire: once he
+            // has stood still for his reaction time he gets down, until he has somewhere to run again.
+            if (s.Moving)
+            {
+                m.StillSince.Remove(s.Id);
+                m.Waiting.Remove(s.Id);
+            }
+            else if (down || s.Posture != Posture.Standing || s.PendingPosture != null)
+            {
+                m.StillSince.Remove(s.Id);
+            }
+            else if (!m.StillSince.TryGetValue(s.Id, out var still))
+            {
+                m.StillSince[s.Id] = tick;
+            }
+            else if (underFire && tick - still >= rules.ReactionTicks)
+            {
+                m.Waiting.Add(s.Id);
+            }
+
+            var want = down || m.Waiting.Contains(s.Id) ? rules.PostureOpen : moveRules.PostureOf(MoveMode.MoveFast);
             // Dropping out of a rush is already offset man by man. Getting up (a new rush, or the fire lifting) and the drop
             // of a man still waiting to bolt take his own reaction, as every other decision does: men whose timers happen
             // to end together do not get up together.
@@ -736,6 +1009,8 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
     /// <summary>Frees every man the per-man flee held and forgets its start (the squad is no longer fleeing).</summary>
     private void ClearBolt(IAiEffects fx, SquadView q, Mind m)
     {
+        m.StillSince.Clear();
+        m.Waiting.Clear();
         if (m.BoltStart < 0)
         {
             return;
@@ -1148,6 +1423,23 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
 
         /// <summary>The tick each man of a fleeing squad gets up (drawn once, when the flee starts).</summary>
         public SortedDictionary<int, long> BoltAt { get; } = [];
+
+        /// <summary>The point the stationary squad is firing at (item 2.4c), or null.</summary>
+        public (Fixed X, Fixed Y)? Aim { get; set; }
+
+        /// <summary>Since when each man has been masked by friendlies.</summary>
+        public SortedDictionary<int, long> MaskedSince { get; } = [];
+
+        /// <summary>The tick before which a man does not look for a clear line again.</summary>
+        public SortedDictionary<int, long> LookAgainAt { get; } = [];
+
+        /// <summary>The tile each man is stepping to for a clear line.</summary>
+        public SortedDictionary<int, TilePos> ShiftTo { get; } = [];
+
+        /// <summary>Since when each man of a fleeing squad has stood still, and the men who got down because of it.</summary>
+        public SortedDictionary<int, long> StillSince { get; } = [];
+
+        public SortedSet<int> Waiting { get; } = [];
 
         public bool Firing { get; set; }
 

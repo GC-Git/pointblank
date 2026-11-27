@@ -174,7 +174,7 @@ Status: draft, awaiting owner sign-off
   criterion: each man is judged by his own state, consistent with pinned men dropping
   individually.
 
-- [ ] **2.5a View and control follow-ups** (S)
+- [x] **2.5a View and control follow-ups** (S)
   Do before 2.7. From the 2.5 review: the rules-of-engagement key pressed just after a move
   silently cancels the pending move (needs an owner decision on whether it should); at default
   zoom squads are tiny blobs and men and postures can't be told apart; with several squads
@@ -209,6 +209,18 @@ Status: draft, awaiting owner sign-off
   *Done when:* the cause is measured over seeds 1-50, and a squad that cannot fire because
   friendlies are in the way realistically shifts for a clear line or the reason it stays is
   documented; no scenario reshaping and no retuning.
+  Measured over seeds 1-50 (`MaskedFireMetrics`, run with `PB_MASK_REPORT=1`), share of
+  on-task man-time masked by friendlies, before then after: `fix-assault` base of fire 73% to
+  29% (it stood in ranks along its own line of fire under a Fire order, which forms no firing
+  line); `bombard-creep` stationary squads 72/70/43% to 31/34/13%; `fix-assault` assault squad
+  60% to 66% and `bombard-creep` assault squad 67% to 52%. Now: in a stationary squad with a
+  fire task, a masked man steps to a clear line after his own delay (looked at twice a second).
+  Still masked, by design
+  or for want of a decision: squads on a move (98% of the `fix-assault` assault squad's masked
+  time; whether a moving squad should spread out or hold to shoot awaits the owner); men with no
+  clear line within the search distance that costs no cover or ground; badly suppressed men;
+  distant friendly squads that a short step cannot clear (moving a whole squad without an order
+  awaits the owner). The masking test is flat (it ignores height), kept as is.
 
 - [ ] **2.4d Posture follow-ups** (S)
   Do before 2.7 unless the owner defers it. From the 2.4b review (seeds 1-50): the posture
@@ -219,6 +231,13 @@ Status: draft, awaiting owner sign-off
   morale says Pinned but suppression does not.
   *Done when:* each is measured, then fixed or documented as realistic, with tests; no
   retuning or scenario reshaping.
+
+- [ ] **2.9 Defend halts a move** (S)
+  Do before 2.7 (owner decision). From the 2.5a review: a delivered Defend order does not stop
+  a move already under way (4 of 4 squads still moving 3 s later; same on main before 2.5a),
+  and the panel then shows 'Defend: Done' while the squad marches.
+  *Done when:* a delivered Defend halts the move through the chain of command with per-man
+  reactions, with tests.
 
 - [ ] **2.7 First playable scenarios** (S) ⛳
   Two scenarios: *fix and assault* (US platoon + tank vs German MG position) and
@@ -374,3 +393,5 @@ Status: draft, awaiting owner sign-off
 - [ ] **8.3 Credits, attributions, licences** (S)
 - [ ] **8.4 Windows build and installer** (S) ⛳
   **Owner signs off on the release candidate.**
+  Note: Release-configuration test runs currently show 13 failures (9 predate 2.5a); mostly
+  debug-only overlays being inert, two game boundary failures undiagnosed. Resolve here.

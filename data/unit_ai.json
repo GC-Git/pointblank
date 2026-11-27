@@ -75,6 +75,38 @@
             "note": "Placeholder: how far the leader looks for a covered tile when a man under fire stands in the open."
           }
         },
+        "unmask_delay_min": {
+          "value": "2",
+          "unit": "s",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: a man masked by friendlies waits at least this long before he steps aside for a clear line (item 2.4c)."
+          }
+        },
+        "unmask_delay_max": {
+          "value": "6",
+          "unit": "s",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: the longest such wait; each man draws his own (item 2.4c)."
+          }
+        },
+        "unmask_retry_time": {
+          "value": "10",
+          "unit": "s",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: after looking for a clear line, found or not, a man does not look again for this long, so he does not shuffle to and fro (item 2.4c)."
+          }
+        },
+        "unmask_search_radius": {
+          "value": "12",
+          "unit": "m",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: how far from where he is a masked man looks for a clear line (item 2.4c)."
+          }
+        },
         "line_spacing": {
           "value": "3",
           "unit": "m",

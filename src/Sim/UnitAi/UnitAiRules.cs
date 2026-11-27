@@ -128,6 +128,17 @@ public sealed class UnitAiRules
     /// <summary>The longest a man takes to change posture on a unit-AI decision (<c>ai_posture_delay</c>).</summary>
     public int AiPostureDelayTicks { get; init; }
 
+    /// <summary>Item 2.4c: a man masked this long (his own draw between min and max) steps aside for a clear line.</summary>
+    public int UnmaskDelayMinTicks { get; init; }
+
+    public int UnmaskDelayMaxTicks { get; init; }
+
+    /// <summary>After looking for a clear line (found or not), a man does not look again for this long.</summary>
+    public int UnmaskRetryTicks { get; init; }
+
+    /// <summary>How far from where he is a masked man looks for a clear line.</summary>
+    public Fixed UnmaskSearchRadius { get; init; }
+
     public Fixed LineSpacing { get; init; }
 
     public int LineReformSectors { get; init; }
@@ -208,6 +219,10 @@ public sealed class UnitAiRules
             BoltBurstRadius = N("bolt_burst_radius"),
             AiPostureDelayTicks = (N("ai_posture_delay") * Fixed.FromInt(World.TicksPerSecond)).ToInt(),
             RushJitterTicks = (N("rush_jitter") * Fixed.FromInt(World.TicksPerSecond)).ToInt(),
+            UnmaskDelayMinTicks = Ticks("unmask_delay_min"),
+            UnmaskDelayMaxTicks = Math.Max(Ticks("unmask_delay_min"), Ticks("unmask_delay_max")),
+            UnmaskRetryTicks = Math.Max(1, Ticks("unmask_retry_time")),
+            UnmaskSearchRadius = N("unmask_search_radius"),
             LineSpacing = Pos("line_spacing"),
             LineReformSectors = Math.Max(1, N("line_reform_sectors").ToInt()),
             BoundDistance = N("bound_distance"),
