@@ -188,10 +188,117 @@ public class ViewFollowUpTests
         }
 
         Assert.True(drawn >= 20, $"only {drawn} rounds came in");
+    }
 
-        // The mark fades once the fire stops: nothing is remembered for ever.
-        c.ForgetIncoming(c.Battle.View.Tick + GameController.IncomingTicks + 1);
-        Assert.DoesNotContain(c.Frame().OfType<LinePrim>(), l => l.Colour == Palette.Incoming && l.Width > 1 && !c.Battle.View.IncomingFire.Any());
+    [Fact]
+    public void An_incoming_fire_mark_goes_when_its_bearing_has_been_quiet()
+    {
+        var c = Start("fix-assault", true);
+        var last = new Dictionary<(int Squad, int Sector), long>(); // from the side's own view, tick by tick
+        var expired = 0;
+        for (var tick = 0; tick < 1800; tick++)
+        {
+            c.Step();
+            var now = c.Battle.View.Tick;
+            foreach (var f in c.Battle.View.IncomingFire.Where(f => !f.Friendly))
+            {
+                var q = c.Battle.View.Squads.First(s => s.Soldiers.Any(m => m.Id == f.SoldierId));
+                last[(q.Id, f.Sector)] = now;
+            }
+
+            foreach (var key in last.Where(e => now - e.Value > GameController.IncomingTicks).Select(e => e.Key).ToArray())
+            {
+                last.Remove(key);
+                expired++;
+            }
+
+            // One shaft (the widest line) for each bearing still fresh, and no other.
+            Assert.Equal(last.Count, c.Frame().OfType<LinePrim>().Count(l => l.Colour == Palette.Incoming && l.Width == 3));
+        }
+
+        Assert.True(expired > 0, "no bearing ever went quiet");
+    }
+
+    private static (GameController C, SquadView Squad, Fixed X, Fixed Y) Rejected()
+    {
+        var c = Start("bombard-creep");
+        var q = c.Battle.View.Squads.First(s => !s.IsHq && !s.HasRadio);
+        var man = q.Soldiers[0];
+        c.Select([q.Id]);
+        var (x, y) = (man.X - Fixed.FromInt(20), man.Y);
+        c.Battle.View.Issue(q.Id, new Order(OrderKind.CallFire, x, y));
+        for (var i = 0; i < 600 && c.Battle.View.StatusOf(q.Id)!.Status != OrderStatus.Rejected; i++)
+        {
+            c.Step();
+        }
+
+        Assert.Equal(OrderStatus.Rejected, c.Battle.View.StatusOf(q.Id)!.Status);
+        return (c, c.Battle.View.Squad(q.Id)!.Value, x, y);
+    }
+
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(2f)]
+    [InlineData(-1.5f)]
+    public void A_refused_order_whose_point_is_off_screen_is_marked_toward_it_at_the_edge(float pan)
+    {
+        var (c, q, x, y) = Rejected();
+        var man = q.Soldiers[0];
+        c.Camera.Set(F(man.X) + pan, F(man.Y) + pan, 90); // the point, 20 m away, is far outside the picture
+        var at = c.Camera.ToScreen(F(x), F(y));
+        Assert.False(c.Layout.Map.Contains(at));
+        var able = q.Soldiers.Where(s => s.Health is HealthState.Ok or HealthState.Wounded).ToArray();
+        var from = c.Camera.ToScreen(able.Average(s => F(s.X)), able.Average(s => F(s.Y)));
+
+        var lines = c.Frame().OfType<LinePrim>().Where(l => l.Colour == Palette.Rejected).ToArray();
+
+        // One line, along the true bearing to the point, ending at the map's edge: no cross where the point is not.
+        var line = Assert.Single(lines);
+        var (dx, dy) = (at.X - from.X, at.Y - from.Y);
+        var length = MathF.Sqrt((dx * dx) + (dy * dy));
+        foreach (var p in new[] { line.A, line.B })
+        {
+            Assert.True(MathF.Abs(((p.X - from.X) * dy) - ((p.Y - from.Y) * dx)) / length < 0.5f, $"{p} is off the bearing");
+        }
+
+        var map = c.Layout.Map;
+        var edge = new[] { line.B.X - map.X, map.Right - line.B.X, line.B.Y - map.Y, map.Bottom - line.B.Y };
+        Assert.InRange(edge.Min(), -0.5f, 0.5f);
+        Assert.Contains(c.Frame().OfType<TextPrim>(), t => t.Colour == Palette.Rejected && map.Contains(t.At)
+            && t.Text.Contains("Call fire not possible", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_refused_orders_mark_expires()
+    {
+        var (c, _, _, _) = Rejected();
+        bool Marked() => c.Frame().Any(p => (p is LinePrim l && l.Colour == Palette.Rejected)
+            || (p is TextPrim t && t.Colour == Palette.Rejected));
+
+        // Rejected() stops on the tick the refusal is first seen.
+        Run(c, GameController.RejectedTicks);
+        Assert.True(Marked());
+        Run(c, 1);
+        Assert.False(Marked());
+    }
+
+    [Fact]
+    public void A_delivered_defend_order_is_not_called_unavailable()
+    {
+        var c = Start("fix-assault");
+        var q = c.Battle.View.Squads[0];
+        c.Select([q.Id]);
+        c.Battle.View.Issue(q.Id, new Order(OrderKind.Defend, q.Soldiers[0].X, q.Soldiers[0].Y));
+        for (var i = 0; i < 600 && c.Battle.View.StatusOf(q.Id)!.Status != OrderStatus.Done; i++)
+        {
+            c.Step();
+        }
+
+        var status = c.Battle.View.StatusOf(q.Id)!;
+        Assert.Equal((OrderKind.Defend, OrderStatus.Done), (status.Order!.Kind, status.Status));
+        var texts = Texts(c).Select(t => t.Text).ToArray();
+        Assert.Contains("Order: Defend: Done", texts);
+        Assert.DoesNotContain(texts, t => t.Contains("not available", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

@@ -1,0 +1,3 @@
+# Item 2.5a: no persistent MSBuild worker nodes. A node left running keeps Godot's headless
+# --build-solutions command (its Windows console wrapper) from exiting until the node idles out.
+-nodeReuse:false

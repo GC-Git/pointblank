@@ -109,6 +109,27 @@ public class RoeFollowUpTests
         Assert.Null(a.Battle.World.ViewFor("de").RoeStatusOf(0));
     }
 
+    // Only the change on its way differs between the two battles, so only its ticket can tell their hashes apart.
+    [Fact]
+    public void The_command_state_hash_covers_the_rules_of_engagement_ticket()
+    {
+        static ulong Hash(RoeMode to)
+        {
+            var c = Start();
+            c.Battle.View.Issue(0, new Order(OrderKind.SetRoe, Fixed.Zero, Fixed.Zero, (int)to));
+            c.Step();
+            Assert.Equal(OrderStatus.Pending, c.Battle.View.RoeStatusOf(0)!.Status);
+            Assert.Equal(RoeMode.FireAtWill, c.Battle.View.RoeOf(0));
+            Assert.Equal(OrderStatus.None, c.Battle.View.StatusOf(0)!.Status);
+            var hasher = new StateHasher();
+            c.Battle.World.GetSystem<CommandSystem>().AppendState(hasher);
+            return hasher.Value;
+        }
+
+        Assert.Equal(Hash(RoeMode.HoldFire), Hash(RoeMode.HoldFire));
+        Assert.NotEqual(Hash(RoeMode.ReturnFireOnly), Hash(RoeMode.HoldFire));
+    }
+
     [Fact]
     public void The_panel_shows_the_pending_change_beside_the_pending_move()
     {

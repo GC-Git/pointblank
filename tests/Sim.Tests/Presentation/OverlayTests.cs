@@ -410,9 +410,12 @@ public class OverlayTests
             var move = c.Battle.World.GetSystem<MovementSystem>();
             var fire = c.Battle.World.GetSystem<FireSystem>();
             var lastShot = new Dictionary<int, long>();
+            var steps = new IntentFollowUpTests.Steps();
+            steps.Watch(Squads(c));
             for (var tick = 1; tick <= 1800; tick++)
             {
                 StepRecording(c, lastShot);
+                steps.Watch(Squads(c));
                 if (tick % 10 != 0)
                 {
                     continue;
@@ -432,20 +435,24 @@ public class OverlayTests
                             .Where(w => w != "none able")
                             .ToDictionary(w => w[..w.LastIndexOf(' ')], w => int.Parse(w[(w.LastIndexOf(' ') + 1)..], CultureInfo.InvariantCulture));
                         seen.UnionWith(tally.Keys);
-                        Assert.Equal(able.Count(s => move.GoalOf(s.Id) is { Local: false, Held: false }), tally.GetValueOrDefault("moving"));
-                        Assert.Equal(able.Count(s => move.GoalOf(s.Id) is { Local: true }), tally.GetValueOrDefault("own move"));
-                        Assert.Equal(able.Count(s => move.GoalOf(s.Id) is { Held: true }), tally.GetValueOrDefault("held"));
+                        // A man with a path is moving only if he is changing place (item 2.5a); otherwise he is held there.
+                        Assert.Equal(able.Count(s => move.GoalOf(s.Id) is { Local: false } && steps.Stepped(s.Id)), tally.GetValueOrDefault("moving"));
+                        Assert.Equal(able.Count(s => move.GoalOf(s.Id) is { Local: true } && steps.Stepped(s.Id)), tally.GetValueOrDefault("own move"));
+                        Assert.Equal(able.Count(s => move.GoalOf(s.Id) != null && !steps.Stepped(s.Id)), tally.GetValueOrDefault("held"));
                         Assert.Equal(
                             able.Count(s => FiredLately(lastShot, s.Id, now) && IntentFollowUpTests.Free(fire, q, s)
                                 && fire.ActivityOf(q, s, now).Activity != IntentKind.Blocked),
                             tally.GetValueOrDefault("firing"));
 
-                        // A bounding team is free to walk; a covering one is held.
+                        // A man of a free team who is walking bounds; one of a held team who stays put covers, unless he reads as down.
                         var held = move.HeldTeamsOf(q.Id);
                         if (tally.ContainsKey("bounding") || tally.ContainsKey("covering"))
                         {
-                            Assert.Equal(able.Count(s => (held & (1 << s.TeamIndex)) == 0), tally.GetValueOrDefault("bounding"));
-                            Assert.Equal(able.Count(s => (held & (1 << s.TeamIndex)) != 0), tally.GetValueOrDefault("covering"));
+                            Assert.Equal(
+                                able.Count(s => (held & (1 << s.TeamIndex)) == 0 && steps.Stepped(s.Id)), tally.GetValueOrDefault("bounding"));
+                            var still = able.Count(s => (held & (1 << s.TeamIndex)) != 0 && !steps.Stepped(s.Id));
+                            var down = tally.GetValueOrDefault("down between rushes");
+                            Assert.InRange(tally.GetValueOrDefault("covering"), still - down, still);
                         }
 
                         if (tally.ContainsKey("defending"))

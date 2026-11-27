@@ -65,8 +65,9 @@ public sealed class UnitAiSystem : ISimSystem
     public void AppendState(StateHasher hasher) => _brain.AppendState(hasher);
 
     /// <summary>The drill the unit AI has the man on (<see cref="UnitAiBrain.TaskOf"/>). Read only (debug overlay, item 2.6).</summary>
-    internal IntentKind TaskOf(Squad squad, Soldier s, OrderKind? done, bool shooting, long tick, bool cowering) => _brain.TaskOf(
-        squad.Id, s.Id, s.TeamIndex, s.Posture == Posture.Prone, _move.IsSoldierMoving(s.Id), shooting, tick,
+    internal IntentKind TaskOf(Squad squad, Soldier s, OrderKind? done, bool walking, bool shooting, long tick, bool cowering) =>
+        _brain.TaskOf(
+        squad.Id, s.Id, s.TeamIndex, s.Posture == Posture.Prone, walking, shooting, tick,
         _move.ModeOf(squad.Id) != null, squad.Morale == MoraleState.Routing, done, _move.HeldTeamsOf(squad.Id), cowering);
 
     /// <summary>The brain's hands, for one side only.</summary>

@@ -68,7 +68,11 @@ public sealed class GameController
     /// <summary>How long an incoming-fire mark stays after the last round of its bearing (display only).</summary>
     public const int IncomingTicks = 20;
 
+    /// <summary>How long a refused or impossible order stays marked on the map (display only).</summary>
+    public const int RejectedTicks = 100;
+
     private readonly Dictionary<(int Squad, int Sector), (long Tick, float DirX, float DirY, bool Explosion)> _incoming = [];
+    private readonly Dictionary<(int Squad, bool Roe), (long Issued, long Seen)> _refusals = [];
     private readonly SortedSet<int> _selected = [];
     private readonly Dictionary<int, (long Tick, OrderKind Kind)> _queued = [];
     private readonly Dictionary<int, (long Tick, RoeMode Roe)> _queuedRoe = [];
@@ -152,7 +156,29 @@ public sealed class GameController
     {
         Battle.Step();
         RememberIncoming();
+        RememberRefusals();
     }
+
+    /// <summary>Notes when each own squad's refused or impossible order was first seen to be so.</summary>
+    private void RememberRefusals()
+    {
+        var view = Battle.View;
+        foreach (var q in view.Squads)
+        {
+            foreach (var (order, roe) in new[] { (view.StatusOf(q.Id), false), (view.RoeStatusOf(q.Id), true) })
+            {
+                if (order is { Status: OrderStatus.Refused or OrderStatus.Rejected }
+                    && !(_refusals.TryGetValue((q.Id, roe), out var had) && had.Issued == order.IssuedTick))
+                {
+                    _refusals[(q.Id, roe)] = (order.IssuedTick, view.Tick);
+                }
+            }
+        }
+    }
+
+    /// <summary>Whether the map mark for this refused order has had its time.</summary>
+    internal bool RefusalExpired(int squad, bool roe, long issued) =>
+        _refusals.TryGetValue((squad, roe), out var r) && r.Issued == issued && Battle.View.Tick - r.Seen > RejectedTicks;
 
     /// <summary>The bearings of recent enemy fire on the player's own squads, as the side knows them.</summary>
     internal IEnumerable<(int Squad, float DirX, float DirY, bool Explosion)> Incoming =>

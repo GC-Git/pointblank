@@ -211,12 +211,17 @@ public static class FrameBuilder
         }
     }
 
-    /// <summary>A refused or impossible order: a cross at its point (the squad itself if that is off the map) and why.</summary>
+    /// <summary>
+    /// A refused or impossible order, marked for a while: a cross at its point and why. A point outside the picture gets a
+    /// line toward it that ends at the picture's edge, with no cross; an order with no point on the map (a rules-of-engagement
+    /// change, or a target off the map) gets its cross beside the squad.
+    /// </summary>
     private static void RejectedOrder(List<Prim> list, GameController c, SquadView q)
     {
-        foreach (var order in new[] { c.Battle.View.StatusOf(q.Id), c.Battle.View.RoeStatusOf(q.Id) })
+        foreach (var (order, roe) in new[] { (c.Battle.View.StatusOf(q.Id), false), (c.Battle.View.RoeStatusOf(q.Id), true) })
         {
-            if (order is not { Status: OrderStatus.Refused or OrderStatus.Rejected, Order: { } o } || c.Queued(q.Id) != null)
+            if (order is not { Status: OrderStatus.Refused or OrderStatus.Rejected, Order: { } o } || c.Queued(q.Id) != null
+                || c.RefusalExpired(q.Id, roe, order.IssuedTick))
             {
                 continue;
             }
@@ -224,13 +229,65 @@ public static class FrameBuilder
             var (x, y) = GameController.Centre(q);
             var from = c.Camera.ToScreen(x, y);
             var at = c.Camera.ToScreen(o.X.F(), o.Y.F());
-            var pointed = o.Kind != OrderKind.SetRoe && c.Layout.Map.Contains(at);
+            var tile = c.Map.TileSize.F();
+            var pointed = o.Kind != OrderKind.SetRoe && o.X.F() >= 0 && o.Y.F() >= 0
+                && o.X.F() < c.Map.Width * tile && o.Y.F() < c.Map.Height * tile;
             at = pointed ? at : new Pt(from.X + 40, from.Y);
-            list.Add(new LinePrim(from, at, Palette.Rejected, 1));
-            list.Add(new LinePrim(new Pt(at.X - 7, at.Y - 7), new Pt(at.X + 7, at.Y + 7), Palette.Rejected, 3));
-            list.Add(new LinePrim(new Pt(at.X - 7, at.Y + 7), new Pt(at.X + 7, at.Y - 7), Palette.Rejected, 3));
-            Label(list, new Pt(at.X + 10, at.Y + 4), $"#{q.Id} {OrderText(order)}", Palette.Rejected);
+            var cross = c.Layout.Map.Contains(at);
+            if (Clip(c.Layout.Map, from, at) is not var (a, b))
+            {
+                continue;
+            }
+
+            list.Add(new LinePrim(a, b, Palette.Rejected, 1));
+            if (cross)
+            {
+                list.Add(new LinePrim(new Pt(at.X - 7, at.Y - 7), new Pt(at.X + 7, at.Y + 7), Palette.Rejected, 3));
+                list.Add(new LinePrim(new Pt(at.X - 7, at.Y + 7), new Pt(at.X + 7, at.Y - 7), Palette.Rejected, 3));
+            }
+
+            var text = $"#{q.Id} {OrderText(order)}";
+            var label = new Pt(b.X + 10, b.Y + 4);
+            if (!cross)
+            {
+                // Keep the words inside the picture, by the end of the line.
+                var width = TextBox.Of(new TextPrim(label, text, Palette.Rejected, 11)).W;
+                label = new Pt(
+                    Math.Clamp(label.X, c.Layout.Map.X + 2, c.Layout.Map.Right - width - 2),
+                    Math.Clamp(label.Y, c.Layout.Map.Y + 14, c.Layout.Map.Bottom - 6));
+            }
+
+            Label(list, label, text, Palette.Rejected);
         }
+    }
+
+    /// <summary>The part of the segment inside the area, or null if none of it is.</summary>
+    private static (Pt A, Pt B)? Clip(Area area, Pt a, Pt b)
+    {
+        var (dx, dy) = (b.X - a.X, b.Y - a.Y);
+        var (enter, leave) = (0f, 1f);
+        foreach (var (p, q) in new[] { (-dx, a.X - area.X), (dx, area.Right - a.X), (-dy, a.Y - area.Y), (dy, area.Bottom - a.Y) })
+        {
+            if (p == 0)
+            {
+                if (q < 0)
+                {
+                    return null;
+                }
+            }
+            else if (p < 0)
+            {
+                enter = MathF.Max(enter, q / p);
+            }
+            else
+            {
+                leave = MathF.Min(leave, q / p);
+            }
+        }
+
+        return enter <= leave
+            ? (new Pt(a.X + (enter * dx), a.Y + (enter * dy)), new Pt(a.X + (leave * dx), a.Y + (leave * dy)))
+            : null;
     }
 
     /// <summary>A rules-of-engagement change on its way, or refused; null when there is none to tell of.</summary>
@@ -437,7 +494,8 @@ public static class FrameBuilder
         else if (order?.Order is { } o)
         {
             line($"Order: {Words.Of(o.Kind)}: {Words.Of(order.Status)}", Palette.DelayBar, 13);
-            if (order.Note != OrderNote.None)
+            // A delivered Defend order carries the sim's "no behaviour of its own" note, but the men do defend.
+                if (order.Note != OrderNote.None && !(o.Kind == OrderKind.Defend && order.Note == OrderNote.NotImplemented))
             {
                 line($"  {Words.Of(order.Note)}", Palette.DimText, 12);
             }

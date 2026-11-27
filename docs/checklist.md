@@ -193,7 +193,9 @@ Status: draft, awaiting owner sign-off
   under test; "cowering" covers a whole squad before each man reacts and "firing line" includes
   non-firing men; release builds still highlight F2-F4 although inert.
   During review the headless `--build-solutions` Godot command once reached build DONE then did
-  not exit for over 8 minutes (not yet checked on main).
+  not exit for over 8 minutes (not yet checked on main). Fixed in 2.5a: the console wrapper
+  waits for every process the build starts, and MSBuild left a reusable worker node running;
+  `Directory.Build.rsp` and `Directory.Build.props` stop persistent build processes.
   *Done when:* each is fixed or explicitly deferred by the owner, with tests.
   Owner decisions: changing the rules of engagement keeps a pending move order, and the
   change travels beside it with its own delay; the Smoke order is deferred until item 5.5
@@ -229,10 +231,10 @@ Status: draft, awaiting owner sign-off
   After the 2.7 play-through. Proposed behaviour, to be confirmed by the owner before
   building: men stay hidden and hold fire until the enemy is close or their leader opens
   fire, then each man joins after his own reaction; it differs from Defend and is offered
-  in the view. Also from the 2.5a build: a delivered Defend order reads 'not available
-  yet'; selection rings and nearby squad names can overlap.
+  in the view. Also from the 2.5a build: selection rings and nearby squad names can
+  overlap (the Defend order's 'not available yet' reading was fixed in 2.5a).
   *Done when:* the owner has confirmed the behaviour, tests show it differs from Defend with
-  no all-at-once opening, the view offers it, and the two display follow-ups are fixed.
+  no all-at-once opening, the view offers it, and the display follow-up is fixed.
 
 ## Milestone 3 — Art style
 

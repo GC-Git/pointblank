@@ -97,7 +97,7 @@ public enum IntentKind : byte
     /// <summary>Walking on a move of his own (the unit AI's).</summary>
     LocalMove,
 
-    /// <summary>On his squad's move but held where he is.</summary>
+    /// <summary>On a move but staying where he is: held, or not stepping just now.</summary>
     Held,
 
     /// <summary>On a fire task with nothing stopping him, and he has fired within the last few seconds.</summary>
@@ -135,6 +135,12 @@ public enum IntentKind : byte
     Fleeing,
 
     Cowering,
+
+    /// <summary>Of a routing squad and lying still (item 2.5a).</summary>
+    BrokenLying,
+
+    /// <summary>Of a routing squad, up but not going anywhere (item 2.5a).</summary>
+    BrokenStill,
 }
 
 /// <summary>
@@ -307,9 +313,11 @@ public sealed class SpottingSystem : ISimSystem
                     PendingPosture: s.PendingPosture);
                 if (s.CanLead)
                 {
+                    // Movement words go by whether he has changed place just now, not by his having a path (item 2.5a).
+                    var walking = _indexOf.TryGetValue(s.Id, out var i) && world.Tick - _entries[i].LastMoved <= SteppedTicks;
                     if (_move.GoalOf(s.Id) is { } goal)
                     {
-                        var move = goal.Local ? IntentKind.LocalMove : goal.Held ? IntentKind.Held : IntentKind.Move;
+                        var move = !walking ? IntentKind.Held : goal.Local ? IntentKind.LocalMove : IntentKind.Move;
                         man = man with { Move = move, MoveX = goal.X, MoveY = goal.Y };
                     }
 
@@ -324,7 +332,7 @@ public sealed class SpottingSystem : ISimSystem
 
                     var shoots = man.Fire is IntentKind.Firing or IntentKind.Aiming;
                     var cowering = ((world.FindSystem<MoraleSystem>()?.ReasonsOf(q.Id) ?? MoraleReason.None) & MoraleReason.Cowering) != 0;
-                    man = man with { Task = ai?.TaskOf(q, s, done, shoots, world.Tick, cowering) ?? IntentKind.None };
+                    man = man with { Task = ai?.TaskOf(q, s, done, walking, shoots, world.Tick, cowering) ?? IntentKind.None };
                 }
 
                 soldiers.Add(man);
@@ -333,6 +341,9 @@ public sealed class SpottingSystem : ISimSystem
 
         return new SpottingDebug(this, soldiers.AsReadOnly(), squads.AsReadOnly());
     }
+
+    /// <summary>A man is walking if he changed place within this many ticks (debug overlay only).</summary>
+    private const int SteppedTicks = 2;
 
     /// <summary>The line of sight spotting uses, for a side's view of the ground (item 2.6).</summary>
     internal bool Sees(Soldier observer, Fixed x, Fixed y, Posture target)

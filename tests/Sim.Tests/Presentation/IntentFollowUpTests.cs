@@ -21,7 +21,7 @@ public class IntentFollowUpTests
     [
         IntentKind.Reloading, IntentKind.Aiming, IntentKind.NoAmmo,
         IntentKind.DownBetweenRushes, IntentKind.FiringLine, IntentKind.Flanking, IntentKind.Ambushing, IntentKind.Fleeing,
-        IntentKind.Cowering, IntentKind.Firing,
+        IntentKind.Cowering, IntentKind.Firing, IntentKind.BrokenLying,
     ];
 
     /// <summary>Whether the man is one of those his squad's fire task asks to shoot.</summary>
@@ -37,6 +37,26 @@ public class IntentFollowUpTests
         var task = fire.FireTaskOf(q.Id)!.Value;
         var (dx, dy) = (task.X - s.X, task.Y - s.Y);
         return Fixed.Sqrt((dx * dx) + (dy * dy)) <= fire.Rules.Weapon(s.WeaponId).MaxRange;
+    }
+
+    /// <summary>
+    /// Whether each man's position changed in either of the last two ticks, worked out by watching the positions: what a
+    /// movement word must match, whatever path or order he has.
+    /// </summary>
+    internal sealed class Steps
+    {
+        private readonly Dictionary<int, (Fixed X, Fixed Y, int Since)> _men = [];
+
+        public void Watch(IEnumerable<Squad> squads)
+        {
+            foreach (var s in squads.SelectMany(q => q.Soldiers))
+            {
+                var had = _men.TryGetValue(s.Id, out var m);
+                _men[s.Id] = !had ? (s.X, s.Y, 1000) : (s.X, s.Y, (m.X, m.Y) != (s.X, s.Y) ? 0 : m.Since + 1);
+            }
+        }
+
+        public bool Stepped(int soldierId) => _men[soldierId].Since <= 1;
     }
 
     [Fact]
@@ -71,9 +91,12 @@ public class IntentFollowUpTests
                 }
             }
 
+            var steps = new Steps();
+            steps.Watch(squads);
             for (var tick = 0; tick < (orders ? 6000 : 1800); tick++)
             {
                 c.Step();
+                steps.Watch(squads);
                 if (orders && tick % 300 == 299)
                 {
                     // Fire orders lapse (a pinned or shaken squad, a new order); give them again.
@@ -137,20 +160,32 @@ public class IntentFollowUpTests
                     var marching = move.ModeOf(q.Id) != null;
                     var cowering = (world.GetSystem<MoraleSystem>().ReasonsOf(q.Id) & MoraleReason.Cowering) != 0;
                     var order = command.StatusOf(q.Id);
+                    var stepped = steps.Stepped(s.Id);
+                    var prone = s.Posture == Posture.Prone;
+                    var routing = q.Morale == MoraleState.Routing;
+                    var held = (move.HeldTeamsOf(q.Id) & (1 << s.TeamIndex)) != 0;
                     var ok = man.Task switch
                     {
-                        IntentKind.Cowering => cowering && s.Posture == Posture.Prone,
-                        IntentKind.Fleeing => q.Morale == MoraleState.Routing && marching,
-                        IntentKind.Rushing => marching && move.IsSoldierMoving(s.Id),
-                        IntentKind.DownBetweenRushes => marching,
-                        IntentKind.Bounding => marching && (move.HeldTeamsOf(q.Id) & (1 << s.TeamIndex)) == 0,
-                        IntentKind.Covering => marching && (move.HeldTeamsOf(q.Id) & (1 << s.TeamIndex)) != 0,
+                        IntentKind.Cowering => cowering && prone && !stepped,
+                        IntentKind.Fleeing => routing && stepped,
+                        IntentKind.BrokenLying => routing && prone && !stepped,
+                        IntentKind.BrokenStill => routing && !prone && !stepped,
+                        IntentKind.Rushing => marching && stepped,
+                        IntentKind.DownBetweenRushes => marching && prone && !stepped,
+                        IntentKind.Bounding => marching && !held && stepped,
+                        IntentKind.Covering => marching && held && !stepped,
                         IntentKind.FiringLine => !marching && part && Free(fire, q, s),
-                        IntentKind.Flanking => !marching && (move.IsSoldierMoving(s.Id) || (part && Free(fire, q, s))),
+                        IntentKind.Flanking => !marching && (stepped || (part && Free(fire, q, s))),
                         IntentKind.Defending => !marching && order.Status == OrderStatus.Done && order.Order!.Kind == OrderKind.Defend,
                         IntentKind.Ambushing => !marching && order.Status == OrderStatus.Done && order.Order!.Kind == OrderKind.Ambush,
                         _ => man.Task == IntentKind.None,
                     };
+                    Assert.True(man.Move is not (IntentKind.Move or IntentKind.LocalMove) || stepped, at + $", move {man.Move}");
+                    Assert.True(man.Move != IntentKind.Held || !stepped, at + ", held");
+
+                    // A routing man always has a word for what he is doing, unless he is cowering.
+                    Assert.True(
+                        !routing || cowering || man.Task is IntentKind.Fleeing or IntentKind.BrokenLying or IntentKind.BrokenStill, at);
                     Assert.True(ok, at);
                     notYetCowering += cowering && man.Task != IntentKind.Cowering ? 1 : 0;
                     silentOnTheLine += !marching && task is { Ai: true } && !part && man.Task == IntentKind.None ? 1 : 0;
@@ -201,15 +236,18 @@ public class IntentFollowUpTests
             var de = rig.Org.SpawnSquad("de_gruppe", AiRig.M(200), AiRig.M(60));
             rig.World.ViewFor("us").Issue(hq.Id, new Order(OrderKind.Move, AiRig.M(150), AiRig.M(60)));
             rig.World.ViewFor("de").Issue(de.Id, new Order(OrderKind.Fire, AiRig.M(80), AiRig.M(60)));
+            var steps = new Steps();
+            steps.Watch(rig.Org.Squads);
             for (var tick = 0; tick < 900; tick++)
             {
                 rig.World.Step();
+                steps.Watch(rig.Org.Squads);
                 foreach (var man in rig.Spot.DebugTruth(rig.World).Soldiers.Where(m => m.SquadId == hq.Id))
                 {
                     if (man.Task is IntentKind.Rushing or IntentKind.DownBetweenRushes)
                     {
                         Assert.NotNull(rig.Move.ModeOf(hq.Id));
-                        Assert.True(man.Task != IntentKind.Rushing || rig.Move.IsSoldierMoving(man.Id), $"seed {seed} tick {tick}, man {man.Id}");
+                        Assert.True(man.Task != IntentKind.Rushing || steps.Stepped(man.Id), $"seed {seed} tick {tick}, man {man.Id}");
                         seen.Add(man.Task);
                     }
                 }

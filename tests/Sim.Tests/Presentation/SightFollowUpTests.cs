@@ -76,9 +76,12 @@ public class SightFollowUpTests(ITestOutputHelper output)
         Assert.True(c.SightChecksLastFrame <= GameController.SightChecksPerFrame);
     }
 
-    /// <summary>Not a pass mark (machines differ): the figures are written to the test output for the record.</summary>
+    /// <summary>
+    /// Times differ between machines, so the pass mark is the work: never more than the budget of checks in a frame, and
+    /// dots on screen throughout. The times are written to the test output for the record.
+    /// </summary>
     [Fact]
-    public void Measure_the_cost_of_a_frame()
+    public void A_running_battles_frames_stay_within_the_budget_and_keep_their_dots()
     {
         foreach (var (name, pan) in new[] { ("still", 0f), ("panning", 6f) })
         {
@@ -86,6 +89,7 @@ public class SightFollowUpTests(ITestOutputHelper output)
             c.Frame();
             var times = new List<double>();
             var dots = 0;
+            var checks = 0;
             for (var frame = 0; frame < 120; frame++)
             {
                 if (frame % 6 == 0)
@@ -98,8 +102,12 @@ public class SightFollowUpTests(ITestOutputHelper output)
                 var shown = Dots(c).Count;
                 times.Add(watch.Elapsed.TotalMilliseconds);
                 dots += shown;
+                checks += c.SightChecksLastFrame;
+                Assert.InRange(c.SightChecksLastFrame, 0, GameController.SightChecksPerFrame);
+                Assert.True(shown > 0, $"{name} frame {frame}: no dots");
             }
 
+            Assert.True(checks > GameController.SightChecksPerFrame, $"{name}: only {checks} checks, nothing was measured");
             times.Sort();
             output.WriteLine($"{name}: median {times[60]:0.0} ms, p95 {times[114]:0.0} ms, max {times[^1]:0.0} ms, mean dots {dots / 120}");
         }
