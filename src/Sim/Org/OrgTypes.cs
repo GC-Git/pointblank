@@ -99,6 +99,9 @@ public sealed class Soldier
     /// <summary>Whether he waits where he is until the pending change is done.</summary>
     internal bool AwaitingPosture { get; set; }
 
+    /// <summary>Whether a pin is about to put him flat (see <see cref="PostureChange.Drop"/>).</summary>
+    internal bool Dropping { get; set; }
+
     public HealthState Health { get; internal set; }
 
     public bool CanLead => Health is HealthState.Ok or HealthState.Wounded;

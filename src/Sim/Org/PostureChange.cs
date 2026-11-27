@@ -5,8 +5,10 @@ namespace PointBlank.Sim.Org;
 /// <summary>
 /// A man's pending posture change (item 2.4a): no order, unit-AI decision or pin changes a posture directly. It is
 /// requested here, waits the man's own reaction delay (a hash of his id and the tick, so World.Rng's stream is
-/// untouched) and is applied by <see cref="Apply"/>, the only place a posture changes after spawning. The latest request
-/// wins but keeps the time already running, so a stream of new decisions cannot put a man off for ever.
+/// untouched) and is applied by <see cref="Apply"/>, the only place a posture changes after spawning. The newest decision
+/// wins: a different posture replaces the pending one but keeps the time already running (a stream of new decisions cannot
+/// put a man off for ever), and the posture he is already in cancels it. A pin drop (<see cref="Drop"/>) is a reflex, not
+/// a decision: it is held apart, and no order or decision cancels it.
 /// </summary>
 internal static class PostureChange
 {
@@ -29,19 +31,14 @@ internal static class PostureChange
     /// <summary>
     /// A decision at <paramref name="tick"/>, taking effect after the man's own draw of 0 to <paramref name="maxDelay"/>
     /// ticks. With <paramref name="wait"/> he does not walk until it is done. A <paramref name="maxDelay"/> of 0 means the
-    /// caller has already waited the man's own delay: it takes effect at the next <see cref="Apply"/>, and asking that way
-    /// for the posture he is in drops any pending change. A delayed request for the posture he is in changes nothing: a man
-    /// finishes the move he has started (dropping it on every passing second thought would put him off for ever).
+    /// caller has already waited the man's own delay: it takes effect at the next <see cref="Apply"/>. A request for the
+    /// posture he is in drops any pending change.
     /// </summary>
     public static void Request(Soldier s, Posture posture, long tick, int maxDelay, bool wait = false)
     {
         if (s.Posture == posture)
         {
-            if (maxDelay == 0)
-            {
-                Cancel(s);
-            }
-
+            Cancel(s);
             return;
         }
 
@@ -54,13 +51,32 @@ internal static class PostureChange
         s.AwaitingPosture |= wait;
     }
 
+    /// <summary>
+    /// A pinned man goes flat at the next <see cref="Apply"/> (SuppressionSystem has already waited his own reaction).
+    /// </summary>
+    public static void Drop(Soldier s) => s.Dropping = s.Posture != Posture.Prone;
+
+    /// <summary>
+    /// The squad's move is stopped: drops the posture the move asked for, and any pending rise. A man already on his way
+    /// lower still gets there (a Hold is no reason to stay up).
+    /// </summary>
+    public static void Halt(Soldier s)
+    {
+        if (s.AwaitingPosture || s.PendingPosture < s.Posture)
+        {
+            Cancel(s);
+        }
+    }
+
+    /// <summary>Drops a pending decision (not a pin drop).</summary>
     public static void Cancel(Soldier s) => (s.PendingPosture, s.PostureDueAt, s.AwaitingPosture) = (null, 0, false);
 
     /// <summary>
-    /// Applies every due change. In a squad of 3 or more able men they never all move on one tick: if every able man is
+    /// Applies every due change. A man who is <paramref name="pinned"/> does not get up: a rise that falls due then is
+    /// dropped, whoever decided it. In a squad of 3 or more able men they never all move on one tick: if every able man is
     /// due at once, one (by his own draw) follows on the next tick.
     /// </summary>
-    public static void Apply(IEnumerable<Squad> squads, long tick, int orderDelay)
+    public static void Apply(IEnumerable<Squad> squads, long tick, int orderDelay, Func<Soldier, bool> pinned)
     {
         var due = new List<Soldier>();
         foreach (var q in squads)
@@ -72,10 +88,17 @@ internal static class PostureChange
                 if (!s.CanLead)
                 {
                     Cancel(s);
+                    s.Dropping = false;
                     continue;
                 }
 
                 able++;
+                if (s.Dropping)
+                {
+                    due.Add(s);
+                    continue;
+                }
+
                 if (s.PendingPosture == null)
                 {
                     continue;
@@ -88,20 +111,32 @@ internal static class PostureChange
 
                 if (s.PostureDueAt <= tick)
                 {
-                    due.Add(s);
+                    if (s.PendingPosture < s.Posture && pinned(s)) // a rise (Standing is lowest in the enum)
+                    {
+                        Cancel(s); // he stays down (and, on a move, crawls); going lower is still allowed
+                    }
+                    else
+                    {
+                        due.Add(s);
+                    }
                 }
             }
 
             if (able >= 3 && due.Count == able)
             {
                 var late = due.MaxBy(s => (Draw(s.Id, tick, int.MaxValue - 1), s.Id))!;
-                late.PostureDueAt = tick + 1;
+                if (!late.Dropping)
+                {
+                    late.PostureDueAt = tick + 1; // a drop stays due by itself
+                }
+
                 due.Remove(late);
             }
 
             foreach (var s in due)
             {
-                s.Posture = s.PendingPosture!.Value;
+                s.Posture = s.Dropping ? Posture.Prone : s.PendingPosture!.Value;
+                s.Dropping = false;
                 Cancel(s);
             }
         }

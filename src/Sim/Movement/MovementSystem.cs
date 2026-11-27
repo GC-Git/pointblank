@@ -212,13 +212,15 @@ public sealed class MovementSystem : ISimSystem
         {
             _members.Remove(s.Id);
             _local.Remove(s.Id);
-            PostureChange.Cancel(s); // a later Hold is not overridden by the posture of the move it ends
+            PostureChange.Halt(s); // a later Hold is not overridden by the posture of the move it ends
         }
     }
 
     public void Tick(World world)
     {
-        PostureChange.Apply(_org.Squads, world.Tick, Rules.OrderPostureDelayTicks); // before anyone steps
+        // Before anyone steps.
+        PostureChange.Apply(_org.Squads, world.Tick, Rules.OrderPostureDelayTicks,
+            s => _suppression?.StateOf(s.Id) == Suppression.SuppressionState.Pinned);
 
         if (_local.Count > 0)
         {

@@ -97,7 +97,9 @@ lines.
    "Done when" list are written first. Tick the item only when its PR is merged.
 8. **Never push to `main`**, never force push, never merge your own PR. The owner's
    merge is the sign-off, except where the merge rule below applies.
-9. **Delete only inside the repo**, using relative paths.
+9. **Don't run delete commands** (`rm`, `rmdir`, `Remove-Item`; see rule 14). If a delete is
+   ever genuinely needed, raise it with the owner; it uses a relative path and stays inside
+   the repo.
 10. **Run `git push` and `gh pr create` as separate commands.** Combined in one line,
     `--base main` trips the push-to-main deny rule.
 11. **Fog of war: UI and AI code may only use `SideView`** (`world.ViewFor(side)`). It shows
@@ -113,9 +115,8 @@ lines.
     tune or reshape a scenario only to make a test pass; report the conflict instead.
 13. **Split scope creep into new checklist items**: when a new realism or scope problem
     appears mid-item, add it as a new item instead of growing the current one.
-14. **Never run a plain `git push`** (always `git push origin <branch>`) and **never delete
-    files** (`rm`, `rmdir`, `Remove-Item`); they trigger approval prompts that block the
-    owner.
+14. **Never run a plain `git push`** (always `git push origin <branch>`) and don't run delete
+    commands (rule 9); both trigger approval prompts that block the owner.
 
 ## Merge rule (owner's standing instruction, 2026-11-25)
 

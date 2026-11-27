@@ -199,7 +199,7 @@ public sealed class SuppressionSystem(OrgSystem org, SuppressionRules rules) : I
                 st.DropAt = -1;
                 if (s.CanLead && (st.State == SuppressionState.Pinned || q.State == SuppressionState.Pinned))
                 {
-                    PostureChange.Request(s, Posture.Prone, world.Tick, 0); // still pinned (himself or his squad) when his reaction comes: down
+                    PostureChange.Drop(s); // still pinned (himself or his squad) when his reaction comes: down
                 }
             }
         }
@@ -225,7 +225,7 @@ public sealed class SuppressionSystem(OrgSystem org, SuppressionRules rules) : I
         if (st.DropAt == world.Tick)
         {
             st.DropAt = -1;
-            PostureChange.Request(st.Soldier, Posture.Prone, world.Tick, 0);
+            PostureChange.Drop(st.Soldier);
         }
     }
 
