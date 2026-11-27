@@ -169,6 +169,10 @@ Status: draft, awaiting owner sign-off
   than the pre-change baseline in every scenario; a test shows `Hold` just after `Sneak`
   leaves men low, and an AI get-down is not cancelled by a pending order. Existing criteria
   stay green with no retuning.
+  Owner decision: in a routing squad that is pinned, men who are not personally pinned may get
+  up and run in rushes. This is an accepted realistic reason under the "no rises while pinned"
+  criterion: each man is judged by his own state, consistent with pinned men dropping
+  individually.
 
 - [ ] **2.5a View and control follow-ups** (S)
   Do before 2.7. From the 2.5 review: the rules-of-engagement key pressed just after a move
@@ -198,6 +202,16 @@ Status: draft, awaiting owner sign-off
   *Done when:* the cause is measured over seeds 1-50, and a squad that cannot fire because
   friendlies are in the way realistically shifts for a clear line or the reason it stays is
   documented; no scenario reshaping and no retuning.
+
+- [ ] **2.4d Posture follow-ups** (S)
+  Do before 2.7 unless the owner defers it. From the 2.4b review (seeds 1-50): the posture
+  metric excuses every routing rise, including a few personally pinned men (4 cases in
+  equal-fire and fix-assault); a new movement order replaces a pending AI get-down with a
+  higher posture (34 of 1054 man-orders in fix-assault); calm men in unpinned moving squads
+  lie prone over 5 s (240 cases in fix-assault, same before 2.4b); a few men rise while
+  morale says Pinned but suppression does not.
+  *Done when:* each is measured, then fixed or documented as realistic, with tests; no
+  retuning or scenario reshaping.
 
 - [ ] **2.7 First playable scenarios** (S) ⛳
   Two scenarios: *fix and assault* (US platoon + tank vs German MG position) and

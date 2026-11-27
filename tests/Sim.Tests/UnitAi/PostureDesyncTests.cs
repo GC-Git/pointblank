@@ -15,9 +15,10 @@ namespace PointBlank.Sim.Tests.UnitAi;
 /// <c>order_posture_delay</c> and <c>ai_posture_delay</c> set to 0 every scenario here exceeds it.
 ///
 /// Item 2.4b, on the same battles. No man gets up while his squad is pinned (as it stood when the tick began), with one
-/// documented exception: a routing squad's men who are not pinned themselves get up to run (open owner question, so not
-/// bounded here). Quick stand/drop reversals (back to the posture left, within 1 s) are no higher than the baseline:
-/// the same count measured with the same code on commit c7f461b, before item 2.4a.
+/// documented exception: a routing squad's men who are not pinned themselves may get up to run in rushes (owner decision:
+/// an accepted realistic reason, each man judged by his own state, so not bounded here). Quick stand/drop reversals (back
+/// to the posture left, within 1 s) are no higher than the baseline: the same count measured with the same code on commit
+/// c7f461b, before item 2.4a.
 /// </summary>
 public class PostureDesyncTests(ITestOutputHelper output)
 {
