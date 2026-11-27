@@ -234,6 +234,12 @@ public sealed class SideView
     /// <summary>The order state of one of the side's own units, or null (also for an enemy unit).</summary>
     public OrderView? StatusOf(int unitId) => _command != null && Own(unitId) != null ? _command.StatusOf(unitId) : null;
 
+    /// <summary>
+    /// The latest rules-of-engagement change of one of the side's own units (item 2.5a), which travels beside its other
+    /// order, or null (also for an enemy unit).
+    /// </summary>
+    public OrderView? RoeStatusOf(int unitId) => _command != null && Own(unitId) != null ? _command.RoeStatusOf(unitId) : null;
+
     /// <summary>Why an order to one of the side's own units would be delayed now, or null (also for an enemy unit).</summary>
     public DelayReason? ReasonsFor(int unitId) => _command != null && Own(unitId) is { } q ? _command.ReasonsFor(q.Id) : null;
 

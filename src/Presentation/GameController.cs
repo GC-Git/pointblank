@@ -57,6 +57,7 @@ public sealed class GameController
     private const float PickPixels = 9;
     private readonly SortedSet<int> _selected = [];
     private readonly Dictionary<int, (long Tick, OrderKind Kind)> _queued = [];
+    private readonly Dictionary<int, (long Tick, RoeMode Roe)> _queuedRoe = [];
     private readonly MapView _map;
     private readonly SightOverlay _sight = new();
 
@@ -172,13 +173,17 @@ public sealed class GameController
 
                 break;
             case Command.CycleRoe:
-                // The whole selection follows the first squad's next setting.
+                // The whole selection follows the first squad's next setting, counting from a change still on its way
+                // (queued or in the chain of command), so quick presses cycle onward.
                 if (_selected.Count > 0 && Battle.View.RoeOf(_selected.Min) is { } roe)
                 {
-                    var next = (RoeMode)(((int)roe + 1) % 3);
+                    var next = (RoeMode)(((int)(RoeOnTheWay(_selected.Min) ?? roe) + 1) % 3);
                     foreach (var id in _selected)
                     {
-                        Issue(id, new Order(OrderKind.SetRoe, Fixed.Zero, Fixed.Zero, (int)next));
+                        if (Battle.View.Issue(id, new Order(OrderKind.SetRoe, Fixed.Zero, Fixed.Zero, (int)next)) == IssueResult.Accepted)
+                        {
+                            _queuedRoe[id] = (Battle.View.Tick, next);
+                        }
                     }
                 }
 
@@ -317,6 +322,15 @@ public sealed class GameController
     /// <summary>An order given but not yet taken up by the sim (it is, on the next tick).</summary>
     internal OrderKind? Queued(int squad) =>
         _queued.TryGetValue(squad, out var q) && q.Tick == Battle.View.Tick ? q.Kind : null;
+
+    /// <summary>A rules-of-engagement change given but not yet taken up by the sim.</summary>
+    internal RoeMode? QueuedRoe(int squad) =>
+        _queuedRoe.TryGetValue(squad, out var q) && q.Tick == Battle.View.Tick ? q.Roe : null;
+
+    /// <summary>The setting a squad is about to have: queued, or still in the chain of command; null if none is.</summary>
+    internal RoeMode? RoeOnTheWay(int squad) => QueuedRoe(squad)
+        ?? (Battle.View.RoeStatusOf(squad) is { Order: { } o, Status: OrderStatus.Pending or OrderStatus.Hesitating }
+            ? (RoeMode)o.TargetId : null);
 
     /// <summary>The middle of a squad's able men (of all its men if none is able), in metres.</summary>
     internal static (float X, float Y) Centre(SquadView q)

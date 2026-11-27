@@ -173,10 +173,33 @@ public static class FrameBuilder
         _ => null,
     };
 
+    /// <summary>A rules-of-engagement change on its way, or refused; null when there is none to tell of.</summary>
+    private static string? RoeText(GameController c, int squad)
+    {
+        if (c.QueuedRoe(squad) is { } queued)
+        {
+            return $"RoE change: {Words.Of(queued)} queued";
+        }
+
+        if (c.Battle.View.RoeStatusOf(squad) is not { Order: { } o } change)
+        {
+            return null;
+        }
+
+        var to = $"RoE change: {Words.Of((RoeMode)o.TargetId)}";
+        return change.Status switch
+        {
+            OrderStatus.Pending => $"{to}, pending {Seconds(change.TicksRemaining)}",
+            OrderStatus.Hesitating => $"{to}, hesitating {Seconds(change.TicksRemaining)}",
+            OrderStatus.Refused or OrderStatus.Rejected => $"{to}, refused ({Words.Of(change.Note)})",
+            _ => null,
+        };
+    }
+
     private static void OrderLine(List<Prim> list, GameController c, SquadView q)
     {
         var order = c.Battle.View.StatusOf(q.Id);
-        if (order?.Order is not { } o || o.Kind is OrderKind.Hold or OrderKind.SetRoe
+        if (order?.Order is not { } o || o.Kind is OrderKind.Hold
             || order.Status is not (OrderStatus.Pending or OrderStatus.Hesitating or OrderStatus.Executing or OrderStatus.Held))
         {
             return;
@@ -295,6 +318,11 @@ public static class FrameBuilder
             var leader = q.Soldiers.FirstOrDefault(s => s.Id == q.LeaderId);
             Line(q.LeaderId < 0 ? $"No leader (successor in {Seconds(q.TicksToSuccession)})" : $"Leader: {Words.Of(leader.Role)}");
             Line($"Ammo: {Words.Of(q.Ammo)}   RoE: {(c.Battle.View.RoeOf(q.Id) is { } roe ? Words.Of(roe) : "-")}");
+
+            if (RoeText(c, q.Id) is { } change)
+            {
+                Line(change, Palette.DelayBar, 12);
+            }
 
             var order = c.Battle.View.StatusOf(q.Id);
             if (c.Queued(q.Id) is { } queued)
