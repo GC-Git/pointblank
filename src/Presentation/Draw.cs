@@ -92,6 +92,12 @@ public static class Palette
     public static readonly Rgb Impact = new(255, 250, 210);
     public static readonly Rgb Mission = new(196, 90, 220);
 
+    // Debug overlays (item 2.6): each colour is used for its overlay only.
+    public static readonly Rgb Sight = new(150, 250, 236);
+    public static readonly Rgb Values = new(255, 160, 72);
+    public static readonly Rgb Truth = new(255, 0, 255);
+    public static readonly Rgb Intent = new(190, 255, 60);
+
     public static bool IsEnemy(Rgb c) => c == EnemyTracked || c == EnemyStale || c == EnemyLost;
 
     public static Rgb Contact(ContactQuality quality) => quality switch

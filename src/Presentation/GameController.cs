@@ -34,6 +34,17 @@ public enum Command
     Speed4,
 }
 
+/// <summary>The debug overlays (item 2.6), each on its own key and independent of the others.</summary>
+[Flags]
+public enum Overlay
+{
+    None = 0,
+    Sight = 1,
+    Values = 2,
+    Truth = 4,
+    Intent = 8,
+}
+
 public sealed record UiButton(Command Command, string Label, Area Area);
 
 /// <summary>
@@ -47,6 +58,7 @@ public sealed class GameController
     private readonly SortedSet<int> _selected = [];
     private readonly Dictionary<int, (long Tick, OrderKind Kind)> _queued = [];
     private readonly MapView _map;
+    private readonly SightOverlay _sight = new();
 
     public GameController(PlayerBattle battle, Layout? layout = null)
     {
@@ -72,6 +84,25 @@ public sealed class GameController
 
     /// <summary>The selection box being dragged, if any.</summary>
     public Area? DragBox { get; set; }
+
+    /// <summary>The overlays that are on. All are off at the start.</summary>
+    public Overlay Overlays { get; private set; }
+
+    public void Toggle(Overlay overlay) => Overlays ^= overlay;
+
+    /// <summary>Whether the sight overlay has finished its pass (it works a slice per frame).</summary>
+    public bool SightComplete => _sight.Complete;
+
+    /// <summary>Finishes the overlays' work at once, for a screenshot.</summary>
+    public void FinishOverlays()
+    {
+        if (Overlays.HasFlag(Overlay.Sight))
+        {
+            _sight.Update(this, int.MaxValue);
+        }
+    }
+
+    internal SightOverlay Sight => _sight;
 
     public void Step() => Battle.Step();
 

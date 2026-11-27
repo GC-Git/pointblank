@@ -139,6 +139,44 @@ public sealed class FireSystem : ISimSystem
         _ai[squad.Id] = new FireOrder(targetId, x, y) { Mask = teamMask };
     }
 
+    /// <summary>A man who fired within this many ticks reads as firing (a display window of the debug overlay, not a rule).</summary>
+    internal const int FiredRecentlyTicks = 50;
+
+    /// <summary>
+    /// What the man is doing about fire, for the debug overlay (item 2.6), and the point his squad's task aims at if he
+    /// takes part (the ordered task, else the unit AI's: his team in its mask and he not kept silent).
+    /// <see cref="IntentKind.Firing"/> means a shot within <see cref="FiredRecentlyTicks"/>; a man with a task and no recent
+    /// shot reads why, by the tests fire control applies. Read only: it must not <see cref="Sync"/>, which adds hashed state.
+    /// </summary>
+    internal (IntentKind Activity, (Fixed X, Fixed Y)? Target) ActivityOf(Squad squad, Soldier s, long tick)
+    {
+        var ai = !_orders.TryGetValue(squad.Id, out var fo);
+        if (ai)
+        {
+            _ai.TryGetValue(squad.Id, out fo);
+        }
+
+        var takesPart = fo != null && (fo.Mask & (1 << s.TeamIndex)) != 0 && !(ai && _aiSilent.Contains(s.Id));
+        (Fixed X, Fixed Y)? target = takesPart ? (fo!.X, fo.Y) : null;
+        var st = _indexOf.TryGetValue(s.Id, out var i) ? _states[i] : null;
+        if (st != null && tick - st.LastFired <= FiredRecentlyTicks)
+        {
+            return (IntentKind.Firing, target);
+        }
+
+        if (!takesPart || st?.Weapon is not { } w)
+        {
+            return (IntentKind.None, null);
+        }
+
+        var activity = st.Rounds == 0 ? IntentKind.NoAmmo
+            : st.Reload > 0 ? IntentKind.Reloading
+            : !InRange(s, w, fo!.X, fo.Y) ? IntentKind.OutOfRange
+            : Masked(s, squad.Side, fo.X, fo.Y, ai ? AiClearance : Rules.MaskClearance) ? IntentKind.Blocked
+            : IntentKind.Aiming;
+        return (activity, target);
+    }
+
     /// <summary>Ends the squad's AI fire task, if any.</summary>
     internal void StopAiFire(int squadId) => _ai.Remove(squadId);
 

@@ -153,9 +153,21 @@ public partial class Main : Node2D
             Key.Key4 => Command.Speed4,
             _ => null,
         };
+        Overlay? overlay = key switch
+        {
+            Key.F1 => Overlay.Sight,
+            Key.F2 => Overlay.Values,
+            Key.F3 => Overlay.Truth,
+            Key.F4 => Overlay.Intent,
+            _ => null,
+        };
         if (command is { } c)
         {
             game.Press(c);
+        }
+        else if (overlay is { } o)
+        {
+            game.Toggle(o);
         }
         else if (key == Key.Escape)
         {
@@ -201,6 +213,18 @@ public partial class Main : Node2D
             var directory = System.IO.Path.GetFullPath(options.Out);
             System.IO.Directory.CreateDirectory(directory);
 
+            // Through the same handler as the keyboard, so a capture proves the key binding.
+            foreach (var name in options.Press)
+            {
+                var key = OS.FindKeycodeFromString(name);
+                if (key == Key.None)
+                {
+                    throw new ArgumentException($"Unknown key '{name}'.");
+                }
+
+                KeyInput(game, key);
+            }
+
             foreach (var tick in options.Ticks)
             {
                 while (game.Battle.View.Tick < tick)
@@ -208,6 +232,7 @@ public partial class Main : Node2D
                     game.Step();
                 }
 
+                game.FinishOverlays();
                 Redraw();
                 await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
                 await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);

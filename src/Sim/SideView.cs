@@ -113,6 +113,16 @@ public sealed class SideView
     /// <summary>The enemies the side has spotted, last-known data only (<see cref="SpottingSystem"/>).</summary>
     public IReadOnlyList<ContactView> KnownEnemies => _spotting?.KnownEnemies(Side) ?? [];
 
+    /// <summary>
+    /// Whether one of the side's own able men could see a target with <paramref name="target"/> posture at the point, by the
+    /// line of sight and maximum range spotting uses (item 2.6). It says nothing about who is there. False for any other
+    /// man, off the map, or without spotting.
+    /// </summary>
+    public bool CanSee(int soldierId, Fixed x, Fixed y, Posture target) =>
+        _spotting != null
+        && _org.Squads.Where(q => q.Side == Side).SelectMany(q => q.Soldiers).FirstOrDefault(s => s.Id == soldierId) is { } s
+        && _spotting.Sees(s, x, y, target);
+
     /// <summary>The rules of engagement of one of the side's own units (item 2.3), or null (also for an enemy unit).</summary>
     public RoeMode? RoeOf(int unitId) => _command != null && Own(unitId) != null ? _command.RoeOf(unitId) : null;
 

@@ -72,6 +72,39 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
     private readonly SortedDictionary<int, Mind> _minds = [];
     private readonly HashSet<int> _claimed = [];
 
+    /// <summary>
+    /// The drill a man is on, read from the squad's memory, for the debug overlay (item 2.6): it changes nothing.
+    /// <paramref name="done"/> is the kind of the squad's finished order, if any.
+    /// </summary>
+    public IntentKind TaskOf(int squadId, int teamIndex, bool moving, bool routing, OrderKind? done, int heldTeams)
+    {
+        _minds.TryGetValue(squadId, out var m);
+        if (m is { CowerStart: >= 0 })
+        {
+            return IntentKind.Cowering;
+        }
+
+        if (routing)
+        {
+            return IntentKind.Fleeing;
+        }
+
+        if (moving)
+        {
+            return m?.Phase == 2 ? IntentKind.DownBetweenRushes
+                : heldTeams != 0 ? ((heldTeams & (1 << teamIndex)) != 0 ? IntentKind.Covering : IntentKind.Bounding)
+                : m?.Phase == 1 ? IntentKind.Rushing
+                : IntentKind.None;
+        }
+
+        var inLine = m is { Firing: true, LineSector: >= 0 };
+        return inLine && m!.TaskTeam == teamIndex ? IntentKind.Flanking
+            : done == OrderKind.Defend ? IntentKind.Defending
+            : done == OrderKind.Ambush ? IntentKind.Ambushing
+            : inLine ? IntentKind.FiringLine
+            : IntentKind.None;
+    }
+
     public void Think(SideView view, IAiEffects fx)
     {
         var tick = view.Tick;

@@ -1,8 +1,11 @@
+using PointBlank.Sim.Orders;
+using PointBlank.Sim.Fire;
 using PointBlank.Sim.Map;
 using PointBlank.Sim.Movement;
 using PointBlank.Sim.Org;
 using PointBlank.Sim.Sight;
 using PointBlank.Sim.Suppression;
+using PointBlank.Sim.UnitAi;
 
 namespace PointBlank.Sim.Spotting;
 
@@ -79,8 +82,79 @@ internal sealed class SideKnowledge
     }
 }
 
-/// <summary>A live soldier as the debug overlay sees him (<see cref="SpottingDebug"/>).</summary>
-public readonly record struct TruthSoldier(int Id, string Side, Fixed X, Fixed Y, Posture Posture, HealthState Health);
+/// <summary>
+/// What a man is doing, as the debug overlay shows it (item 2.6): his movement, what he is doing about fire and the unit
+/// AI's drill are separate (<see cref="TruthSoldier"/>), each <see cref="None"/> when there is none.
+/// </summary>
+public enum IntentKind : byte
+{
+    None,
+
+    /// <summary>Walking on his squad's move.</summary>
+    Move,
+
+    /// <summary>Walking on a move of his own (the unit AI's).</summary>
+    LocalMove,
+
+    /// <summary>On his squad's move but held where he is.</summary>
+    Held,
+
+    /// <summary>He has fired within the last few seconds.</summary>
+    Firing,
+
+    /// <summary>On a fire task with a friendly in the way, so holding fire.</summary>
+    Blocked,
+
+    Reloading,
+
+    OutOfRange,
+
+    NoAmmo,
+
+    /// <summary>On a fire task, nothing stopping him, no recent shot.</summary>
+    Aiming,
+
+    // The unit AI's drills.
+    Bounding,
+
+    Covering,
+
+    Rushing,
+
+    DownBetweenRushes,
+
+    FiringLine,
+
+    Flanking,
+
+    Defending,
+
+    Ambushing,
+
+    Fleeing,
+
+    Cowering,
+}
+
+/// <summary>
+/// A copy of a soldier as the debug overlay sees him (<see cref="SpottingDebug"/>). The fields after
+/// <see cref="Health"/> are filled only by <see cref="PlayerBattle.DebugTruth"/>. <see cref="MoveX"/>, <see cref="MoveY"/>
+/// are where he is walking to (when <see cref="Move"/> is not none); <see cref="FireX"/>, <see cref="FireY"/> what his fire
+/// task aims at (when <see cref="Aims"/>).
+/// </summary>
+public readonly record struct TruthSoldier(
+    int Id, string Side, Fixed X, Fixed Y, Posture Posture, HealthState Health, int SquadId = -1, Fixed Suppression = default,
+    IntentKind Move = IntentKind.None, Fixed MoveX = default, Fixed MoveY = default, IntentKind Fire = IntentKind.None,
+    bool Aims = false, Fixed FireX = default, Fixed FireY = default, IntentKind Task = IntentKind.None,
+    Posture? PendingPosture = null);
+
+/// <summary>
+/// A copy of a squad for the debug overlay: morale, mean suppression and its latest order (<see cref="Order"/> null when it
+/// has none; <see cref="OrderX"/>, <see cref="OrderY"/> its point).
+/// </summary>
+public readonly record struct TruthSquad(
+    int Id, string Side, MoraleState Morale, Fixed MoraleLevel, Fixed Suppression, OrderKind? Order, OrderStatus OrderStatus,
+    Fixed OrderX, Fixed OrderY);
 
 /// <summary>
 /// DEBUG ONLY: the ground truth behind the fog, for overlays (item 2.6) and tests. Gameplay code (UI
@@ -90,11 +164,15 @@ public sealed class SpottingDebug
 {
     private readonly SpottingSystem _system;
 
-    internal SpottingDebug(SpottingSystem system, IReadOnlyList<TruthSoldier> soldiers)
+    internal SpottingDebug(SpottingSystem system, IReadOnlyList<TruthSoldier> soldiers, IReadOnlyList<TruthSquad> squads)
     {
         _system = system;
         Soldiers = soldiers;
+        Squads = squads;
     }
+
+    /// <summary>Every squad, both sides (empty unless asked through <see cref="PlayerBattle.DebugTruth"/>).</summary>
+    public IReadOnlyList<TruthSquad> Squads { get; }
 
     /// <summary>Every soldier, both sides, with live positions.</summary>
     public IReadOnlyList<TruthSoldier> Soldiers { get; }
@@ -197,8 +275,71 @@ public sealed class SpottingSystem : ISimSystem
     }
 
     /// <summary>DEBUG ONLY: live positions for overlays; see <see cref="SpottingDebug"/>.</summary>
-    public SpottingDebug DebugTruth() =>
-        new(this, _org.Squads.SelectMany(q => q.Soldiers.Select(s => new TruthSoldier(s.Id, q.Side, s.X, s.Y, s.Posture, s.Health))).ToArray());
+    public SpottingDebug DebugTruth() => new(
+        this,
+        Array.AsReadOnly(_org.Squads.SelectMany(q => q.Soldiers.Select(s => new TruthSoldier(s.Id, q.Side, s.X, s.Y, s.Posture, s.Health))).ToArray()),
+        []);
+
+    /// <summary>
+    /// <see cref="DebugTruth()"/> with each man's suppression and intent, and every squad (item 2.6). It only reads: the
+    /// battle is the same whether or not it is asked.
+    /// </summary>
+    internal SpottingDebug DebugTruth(World world)
+    {
+        var suppression = world.FindSystem<SuppressionSystem>();
+        var command = world.FindSystem<CommandSystem>();
+        var fire = world.FindSystem<FireSystem>();
+        var ai = world.FindSystem<UnitAiSystem>();
+        var soldiers = new List<TruthSoldier>();
+        var squads = new List<TruthSquad>();
+        foreach (var q in _org.Squads)
+        {
+            var order = command?.StatusOf(q.Id);
+            squads.Add(new TruthSquad(
+                q.Id, q.Side, q.Morale, q.MoraleLevel, suppression?.SquadLevelOf(q.Id) ?? Fixed.Zero, order?.Order?.Kind,
+                order?.Status ?? OrderStatus.None, order?.Order?.X ?? Fixed.Zero, order?.Order?.Y ?? Fixed.Zero));
+            var done = order is { Status: OrderStatus.Done } ? order.Order?.Kind : null;
+            foreach (var s in q.Soldiers)
+            {
+                var man = new TruthSoldier(
+                    s.Id, q.Side, s.X, s.Y, s.Posture, s.Health, q.Id, suppression?.LevelOf(s.Id) ?? Fixed.Zero,
+                    PendingPosture: s.PendingPosture);
+                if (s.CanLead)
+                {
+                    if (_move.GoalOf(s.Id) is { } goal)
+                    {
+                        var move = goal.Local ? IntentKind.LocalMove : goal.Held ? IntentKind.Held : IntentKind.Move;
+                        man = man with { Move = move, MoveX = goal.X, MoveY = goal.Y };
+                    }
+
+                    if (fire?.ActivityOf(q, s, world.Tick) is { } shooting)
+                    {
+                        man = man with
+                        {
+                            Fire = shooting.Activity, Aims = shooting.Target != null,
+                            FireX = shooting.Target?.X ?? Fixed.Zero, FireY = shooting.Target?.Y ?? Fixed.Zero,
+                        };
+                    }
+
+                    man = man with { Task = ai?.TaskOf(q, s, done) ?? IntentKind.None };
+                }
+
+                soldiers.Add(man);
+            }
+        }
+
+        return new SpottingDebug(this, soldiers.AsReadOnly(), squads.AsReadOnly());
+    }
+
+    /// <summary>The line of sight spotting uses, for a side's view of the ground (item 2.6).</summary>
+    internal bool Sees(Soldier observer, Fixed x, Fixed y, Posture target)
+    {
+        var dx = x - observer.X;
+        var dy = y - observer.Y;
+        return observer.CanLead && _move.IsOnMap(observer.X, observer.Y) && _move.IsOnMap(x, y)
+            && (dx * dx) + (dy * dy) <= Rules.MaxRange * Rules.MaxRange
+            && _los.Check(new Viewpoint(observer.X, observer.Y, observer.Posture), new Viewpoint(x, y, target)).Visible;
+    }
 
     public void Tick(World world)
     {
