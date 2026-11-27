@@ -52,6 +52,31 @@ public class ViewFollowUpTests
     [Theory]
     [InlineData("fix-assault")]
     [InlineData("view-sandbox")]
+    public void In_the_opening_view_no_two_mens_symbols_touch_in_any_posture(string scenario)
+    {
+        var c = Start(scenario);
+        c.FrameOwnForces();
+        var men = c.Battle.View.Squads.SelectMany(q => q.Soldiers).ToArray();
+        foreach (var posture in Enum.GetValues<global::PointBlank.Sim.Sight.Posture>())
+        {
+            var boxes = men.Select(m => FrameBuilder.Man(m with { Posture = posture }, c.Camera)[0])
+                .Select(p => p is RectPrim r ? new Area(r.X, r.Y, r.W, r.H)
+                    : p is CirclePrim k ? new Area(k.Centre.X - k.Radius, k.Centre.Y - k.Radius, 2 * k.Radius, 2 * k.Radius)
+                    : throw new InvalidOperationException()).ToArray();
+            for (var i = 0; i < boxes.Length; i++)
+            {
+                for (var j = i + 1; j < boxes.Length; j++)
+                {
+                    var (a, b) = (boxes[i], boxes[j]);
+                    Assert.False(a.X < b.Right && b.X < a.Right && a.Y < b.Bottom && b.Y < a.Bottom, $"{posture}: men {i} and {j} touch");
+                }
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("fix-assault")]
+    [InlineData("view-sandbox")]
     public void Units_are_named_in_words_not_by_data_ids(string scenario)
     {
         var c = Start(scenario);

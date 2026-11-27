@@ -111,7 +111,8 @@ public static class FrameBuilder
         {
             Posture.Standing => new CirclePrim(at, r, Palette.Own),
             Posture.Kneeling => new RectPrim(at.X - r, at.Y - r, 2 * r, 2 * r, Palette.Own),
-            _ => new RectPrim(at.X - (1.6f * r), at.Y - (0.6f * r), 3.2f * r, 1.2f * r, Palette.Own),
+            // Short enough that men lying two metres apart show a gap between them (item 2.5a).
+            _ => new RectPrim(at.X - (1.2f * r), at.Y - (0.5f * r), 2.4f * r, r, Palette.Own),
         };
         return man.Health == HealthState.Wounded ? [shape, new CirclePrim(at, MathF.Max(1, r / 3), Palette.Wounded)] : [shape];
     }

@@ -326,6 +326,83 @@ public class ScreenshotTests
         }
     }
 
+    private static bool Shows(Png frame, TextPrim t) =>
+        frame.Count(TextBox.Of(t), p => p == t.Colour) >= 8;
+
+    [ScreenshotFact]
+    public void The_opening_view_shows_men_apart_every_selected_squads_orders_and_incoming_fire()
+    {
+        var c = Twin("fix-assault", true);
+        c.FrameOwnForces();
+        c.Select(c.Battle.View.Squads.Select(q => q.Id));
+        c.Press(Command.CycleRoe);
+        StepTo(c, 5);
+        var early = c.Frame();
+        var incomingAt = 5;
+        while (incomingAt < 1800 && !c.Frame().Any(p => p.Colour == Palette.Incoming))
+        {
+            c.Step();
+            incomingAt = (int)c.Battle.View.Tick;
+        }
+
+        var late = c.Frame();
+        var out_ = Path.Combine(Root(), "TestResults", "screens", "followups", "opening");
+        var ids = string.Join(",", c.Battle.View.Squads.Select(q => q.Id));
+        Capture(Opening, "--scenario", "fix-assault", "--seed", "1", "--scripted", "--select", ids, "--press", "R",
+            "--ticks", $"5,{incomingAt}", "--out", out_);
+        var first = Png.Load(Path.Combine(out_, "fix-assault-seed1-tick5.png"));
+        var fired = Png.Load(Path.Combine(out_, $"fix-assault-seed1-tick{incomingAt}.png"));
+        var map = c.Layout.Map;
+
+        // Every squad's heading, order and pending rules change are in the panel.
+        var panel = early.OfType<TextPrim>().Where(t => t.At.X >= c.Layout.Panel.X && t.At.Y > c.Layout.Panel.Y).ToArray();
+        var wanted = panel.Where(t => t.Text.StartsWith('#') || t.Text.StartsWith("Order:", StringComparison.Ordinal)
+            || t.Text.StartsWith("RoE change:", StringComparison.Ordinal)).ToArray();
+        Assert.True(wanted.Length >= 3 * c.Battle.View.Squads.Count, $"{wanted.Length} lines");
+        Assert.All(wanted, t => Assert.True(Shows(first, t), t.Text));
+
+        // Men are drawn at the opening scale, each at his own place.
+        var men = late.OfType<RectPrim>().Where(r => r.Colour == Palette.Own && map.Contains(new Pt(r.X, r.Y))).ToArray();
+        Assert.True(men.Length >= 8, $"{men.Length} kneeling or prone men on screen");
+        Assert.All(men, r => Assert.True(fired.Near(new Pt(r.X + (r.W / 2), r.Y + (r.H / 2)), 5, p => p == Palette.Own), $"man at {r.X},{r.Y}"));
+
+        var arrows = late.OfType<LinePrim>().Where(l => l.Colour == Palette.Incoming && map.Contains(l.A) && map.Contains(l.B)).ToArray();
+        Assert.NotEmpty(arrows);
+        Assert.All(arrows, l => Assert.True(
+            fired.Near(new Pt((l.A.X + l.B.X) / 2, (l.A.Y + l.B.Y) / 2), 2, p => p == Palette.Incoming), $"arrow {l.A} {l.B}"));
+        Assert.Equal(0, first.Count(map, p => p == Palette.Incoming));
+    }
+
+    [ScreenshotFact]
+    public void A_refused_order_is_marked_on_the_screen()
+    {
+        var (scenario, seed) = ("fix-assault", 1UL);
+        GameController? c = null;
+        var tick = 0;
+        for (; seed <= 30 && c == null; seed++)
+        {
+            var twin = new GameController(PlayerBattle.Create(scenario, seed, true));
+            twin.FrameOwnForces();
+            for (tick = 1; tick <= 1800; tick++)
+            {
+                twin.Step();
+                if (tick % 10 == 0 && twin.Frame().Any(p => p.Colour == Palette.Rejected && p is LinePrim))
+                {
+                    c = twin;
+                    break;
+                }
+            }
+        }
+
+        Assert.NotNull(c);
+        seed--;
+        var out_ = Path.Combine(Root(), "TestResults", "screens", "followups", "refused");
+        Capture(Opening, "--scenario", scenario, "--seed", $"{seed}", "--scripted", "--ticks", $"{tick}", "--out", out_);
+        var png = Png.Load(Path.Combine(out_, $"{scenario}-seed{seed}-tick{tick}.png"));
+        var pixels = png.Count(c.Layout.Map, p => p == Palette.Rejected);
+        Assert.True(pixels >= 20, $"{pixels} pixels of the refused order, seed {seed} tick {tick}");
+    }
+
     /// <summary>A reader for the 8-bit RGB or RGBA, non-interlaced PNG files Godot writes.</summary>
     private sealed class Png(int width, int height, int channels, byte[] pixels)
     {
