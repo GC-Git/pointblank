@@ -1,6 +1,7 @@
 using PointBlank.Sim.Orders;
 using PointBlank.Sim.Fire;
 using PointBlank.Sim.Map;
+using PointBlank.Sim.Morale;
 using PointBlank.Sim.Movement;
 using PointBlank.Sim.Org;
 using PointBlank.Sim.Sight;
@@ -99,7 +100,7 @@ public enum IntentKind : byte
     /// <summary>On his squad's move but held where he is.</summary>
     Held,
 
-    /// <summary>He has fired within the last few seconds.</summary>
+    /// <summary>On a fire task with nothing stopping him, and he has fired within the last few seconds.</summary>
     Firing,
 
     /// <summary>On a fire task with a friendly in the way, so holding fire.</summary>
@@ -321,7 +322,9 @@ public sealed class SpottingSystem : ISimSystem
                         };
                     }
 
-                    man = man with { Task = ai?.TaskOf(q, s, done) ?? IntentKind.None };
+                    var shoots = man.Fire is IntentKind.Firing or IntentKind.Aiming;
+                    var cowering = ((world.FindSystem<MoraleSystem>()?.ReasonsOf(q.Id) ?? MoraleReason.None) & MoraleReason.Cowering) != 0;
+                    man = man with { Task = ai?.TaskOf(q, s, done, shoots, world.Tick, cowering) ?? IntentKind.None };
                 }
 
                 soldiers.Add(man);

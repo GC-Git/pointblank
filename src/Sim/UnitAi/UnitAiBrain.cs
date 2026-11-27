@@ -74,34 +74,40 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
 
     /// <summary>
     /// The drill a man is on, read from the squad's memory, for the debug overlay (item 2.6): it changes nothing.
-    /// <paramref name="done"/> is the kind of the squad's finished order, if any.
+    /// <paramref name="done"/> is the kind of the squad's finished order, if any. Cowering, fleeing, rushing, flanking and the
+    /// firing line are named only for a man actually doing them (item 2.5a): flat after his own reaction, on the squad's
+    /// run, walking, or with fire he can bring (<paramref name="shooting"/>).
     /// </summary>
-    public IntentKind TaskOf(int squadId, int teamIndex, bool moving, bool routing, OrderKind? done, int heldTeams)
+    public IntentKind TaskOf(
+        int squadId, int soldierId, int teamIndex, bool prone, bool walking, bool shooting, long tick, bool moving, bool routing,
+        OrderKind? done, int heldTeams, bool cowering)
     {
         _minds.TryGetValue(squadId, out var m);
-        if (m is { CowerStart: >= 0 })
+        if (cowering)
         {
-            return IntentKind.Cowering;
+            return m is { CowerStart: >= 0 } && prone && tick >= m.CowerStart + Draw(soldierId, m.CowerStart, 6, rules.RushJitterTicks)
+                ? IntentKind.Cowering
+                : IntentKind.None;
         }
 
         if (routing)
         {
-            return IntentKind.Fleeing;
+            return moving ? IntentKind.Fleeing : IntentKind.None;
         }
 
         if (moving)
         {
             return m?.Phase == 2 ? IntentKind.DownBetweenRushes
                 : heldTeams != 0 ? ((heldTeams & (1 << teamIndex)) != 0 ? IntentKind.Covering : IntentKind.Bounding)
-                : m?.Phase == 1 ? IntentKind.Rushing
+                : m?.Phase == 1 && walking ? IntentKind.Rushing
                 : IntentKind.None;
         }
 
         var inLine = m is { Firing: true, LineSector: >= 0 };
-        return inLine && m!.TaskTeam == teamIndex ? IntentKind.Flanking
+        return inLine && m!.TaskTeam == teamIndex && (walking || shooting) ? IntentKind.Flanking
             : done == OrderKind.Defend ? IntentKind.Defending
             : done == OrderKind.Ambush ? IntentKind.Ambushing
-            : inLine ? IntentKind.FiringLine
+            : inLine && shooting ? IntentKind.FiringLine
             : IntentKind.None;
     }
 

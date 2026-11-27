@@ -366,7 +366,13 @@ public class OverlayTests
                     continue;
                 }
 
-                Assert.True((man.Fire == IntentKind.Firing) == FiredLately(lastShot, s.Id, now), $"tick {tick}, man {s.Id}: {man.Fire}");
+                // Item 2.5a: present state comes before "recently fired". A recent shooter reads firing unless something
+                // stops him now.
+                var recent = FiredLately(lastShot, s.Id, now);
+                Assert.True(man.Fire != IntentKind.Firing || (recent && IntentFollowUpTests.Free(fire, own, s)), $"tick {tick}, man {s.Id}: {man.Fire}");
+                Assert.True(
+                    !recent || !IntentFollowUpTests.Free(fire, own, s) || man.Fire is IntentKind.Firing or IntentKind.Blocked,
+                    $"tick {tick}, man {s.Id} fired, nothing stops him, yet reads {man.Fire}");
                 if (man.Fire == IntentKind.Blocked)
                 {
                     Assert.True(
@@ -429,7 +435,10 @@ public class OverlayTests
                         Assert.Equal(able.Count(s => move.GoalOf(s.Id) is { Local: false, Held: false }), tally.GetValueOrDefault("moving"));
                         Assert.Equal(able.Count(s => move.GoalOf(s.Id) is { Local: true }), tally.GetValueOrDefault("own move"));
                         Assert.Equal(able.Count(s => move.GoalOf(s.Id) is { Held: true }), tally.GetValueOrDefault("held"));
-                        Assert.Equal(able.Count(s => FiredLately(lastShot, s.Id, now)), tally.GetValueOrDefault("firing"));
+                        Assert.Equal(
+                            able.Count(s => FiredLately(lastShot, s.Id, now) && IntentFollowUpTests.Free(fire, q, s)
+                                && fire.ActivityOf(q, s, now).Activity != IntentKind.Blocked),
+                            tally.GetValueOrDefault("firing"));
 
                         // A bounding team is free to walk; a covering one is held.
                         var held = move.HeldTeamsOf(q.Id);
@@ -461,7 +470,8 @@ public class OverlayTests
                             Assert.Contains(to, rings);
                         }
 
-                        if (fire.ActivityOf(q, s, now).Target is { } aim)
+                        // The aim point from the sim's fire task itself, not from the labelling code.
+                        if (fire.FireTaskOf(q.Id) is { } aim && IntentFollowUpTests.TakesPart(fire, q, s) && fire.RoundsOf(s.Id) > 0)
                         {
                             Assert.Contains((from, c.Camera.ToScreen(F(aim.X), F(aim.Y))), lines);
                             both += goal != null && FiredLately(lastShot, s.Id, now) ? 1 : 0;
