@@ -87,6 +87,11 @@ Left-click or drag selects squads (Shift adds), right-click gives the chosen ord
 engagement, Space pause, 1/2/4 speed, arrows or middle-drag pan, wheel zoom, Esc
 deselect.
 
+Debug overlays, each toggled by its own key: F1 sight (ground the selected squads can
+see), F2 suppression and morale values, F3 true against known positions, F4 intent
+(movement, fire and unit-AI drill). F2 to F4 work only in development builds. In
+screenshot mode `--press F3,F4` presses the named keys before the first frame.
+
 Screenshot mode (needs a real renderer, so no `--headless`) saves one PNG per tick and
 quits. `--scripted` also gives the US side's scripted orders; `--select 0,2`,
 `--zoom <pixels per metre>` and `--center x,y` are optional:
@@ -140,8 +145,11 @@ $env:PB_SCREENSHOT=1; dotnet test PointBlank.sln --filter Category=Screenshot; $
     `SpottingSystem.KnownEnemies`, `MovementSystem.Execute`) is `internal` to `Sim`, visible
     only to `Sim.Tests` and the headless runner through `InternalsVisibleTo`. Never widen that
     list for `game/` or AI code, and never make those members public.
-    `SpottingSystem.DebugTruth()` is the one public truth accessor, and it is for debug
-    overlays only. `game/` and `src/Presentation/` get a battle from `PlayerBattle`, which
+    `SpottingSystem.DebugTruth()` is the public truth accessor, for debug overlays only.
+    `PlayerBattle.DebugTruth()` is the only other (owner's approval, item 2.6): a
+    debug-overlay-only bridge to it, called by the truth overlays alone, that works only
+    in development builds (configurations `Debug` and `ExportDebug`). In any other build,
+    including a release export, it returns null and those overlays are inert. `game/` and `src/Presentation/` get a battle from `PlayerBattle`, which
    hands out only the US `SideView`. Tests in `tests/Sim.Tests/Boundary/` enforce this by
    reflection, including an allow list of the Sim types those two assemblies may name.
 12. **Realism first**: realistic unit behaviour beats hitting a scripted moment or test bar. Never

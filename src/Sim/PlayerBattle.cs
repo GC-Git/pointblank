@@ -66,9 +66,17 @@ public sealed class PlayerBattle
 
     /// <summary>
     /// DEBUG OVERLAYS ONLY (item 2.6, CLAUDE.md rule 11): <see cref="SpottingSystem.DebugTruth()"/> as copies of both
-    /// sides. Nothing else may call it; a boundary test enforces this.
+    /// sides. Nothing else may call it; a boundary test enforces this. Development builds only (configurations Debug and
+    /// ExportDebug, see Sim.csproj); in any other build it is always null.
     /// </summary>
-    public SpottingDebug DebugTruth() => World.GetSystem<SpottingSystem>().DebugTruth(World);
+    public SpottingDebug? DebugTruth()
+    {
+#if PB_DEV_BUILD
+        return World.GetSystem<SpottingSystem>().DebugTruth(World);
+#else
+        return null;
+#endif
+    }
 
     /// <summary>Advances the battle one tick (a tenth of a second of battle time).</summary>
     public void Step() => World.Step();

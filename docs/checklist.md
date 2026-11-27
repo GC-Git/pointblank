@@ -177,8 +177,18 @@ Status: draft, awaiting owner sign-off
   selected the panel shows only the first, e.g. 'Order: none' while another has a pending order;
   Smoke and Ambush aren't offered; incoming-fire bearings and order rejections aren't drawn. Unit labels and the panel title
   show raw ids such as `us_rifle_squad`; pressing the rules-of-engagement key again before
-  the first change applies repeats the same setting instead of cycling further.
+  the first change applies repeats the same setting instead of cycling further. From the 2.6
+  review: overlay text overlaps when zoomed in, and the orange values look like stale-contact
+  labels; sight dots clear on every pan or zoom frame, so they stay mostly blank while moving;
+  a sight pass costs 9-21 ms per frame (Debug, two squads; first run 48 ms).
   *Done when:* each is fixed or explicitly deferred by the owner, with tests.
+
+- [ ] **2.4c Squad masked by friendlies** (S)
+  Do before 2.7. From the 2.6 review: in `fix-assault` seed 1 the second squad was mostly
+  masked by friendlies and never fired (not yet verified).
+  *Done when:* the cause is measured over seeds 1-50, and a squad that cannot fire because
+  friendlies are in the way realistically shifts for a clear line or the reason it stays is
+  documented; no scenario reshaping and no retuning.
 
 - [ ] **2.7 First playable scenarios** (S) ⛳
   Two scenarios: *fix and assault* (US platoon + tank vs German MG position) and

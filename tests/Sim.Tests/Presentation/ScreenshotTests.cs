@@ -31,6 +31,7 @@ public sealed class ScreenshotTheoryAttribute : TheoryAttribute
 /// Item 2.5 screenshot-mode tests. The game saves frames; the same battle is run here (it is deterministic), where the
 /// truth is visible, and the frames' pixels are checked against it. The frames stay in <c>TestResults/screens</c>.
 /// </summary>
+[Collection("dotnet-build")]
 [Trait("Category", "Screenshot")]
 public class ScreenshotTests
 {

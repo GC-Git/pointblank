@@ -4,6 +4,8 @@ using PointBlank.Sim.Movement;
 using PointBlank.Sim.Orders;
 using PointBlank.Sim.Org;
 using PointBlank.Sim.Sight;
+using PointBlank.Sim.Spotting;
+using PointBlank.Sim.Morale;
 
 namespace PointBlank.Sim.UnitAi;
 
@@ -61,6 +63,10 @@ public sealed class UnitAiSystem : ISimSystem
     }
 
     public void AppendState(StateHasher hasher) => _brain.AppendState(hasher);
+
+    /// <summary>The drill the unit AI has the man on (<see cref="UnitAiBrain.TaskOf"/>). Read only (debug overlay, item 2.6).</summary>
+    internal IntentKind TaskOf(Squad squad, Soldier s, OrderKind? done) => _brain.TaskOf(
+        squad.Id, s.TeamIndex, _move.ModeOf(squad.Id) != null, squad.Morale == MoraleState.Routing, done, _move.HeldTeamsOf(squad.Id));
 
     /// <summary>The brain's hands, for one side only.</summary>
     private sealed class Effects(World world, UnitAiSystem ai, string side) : IAiEffects

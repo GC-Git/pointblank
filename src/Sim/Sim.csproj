@@ -14,7 +14,10 @@
     <InternalsVisibleTo Include="runner" />
   </ItemGroup>
 
-  <PropertyGroup>
+  <!-- The debug-overlay truth bridge (PlayerBattle.DebugTruth, CLAUDE.md rule 11) exists only in development builds.
+       Listed by name, so any other configuration (Release, ExportRelease, a new one) is closed. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug' Or '$(Configuration)' == 'ExportDebug'">
+    <DefineConstants>$(DefineConstants);PB_DEV_BUILD</DefineConstants>
   </PropertyGroup>
 
 </Project>

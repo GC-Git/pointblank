@@ -109,6 +109,9 @@ public sealed class MovementSystem : ISimSystem
         }
     }
 
+    /// <summary>The teams of a moving squad held now (bit per team index). Read only (debug overlay, item 2.6).</summary>
+    internal int HeldTeamsOf(int squadId) => _held.GetValueOrDefault(squadId) & ~RushFlag;
+
     internal void SetHeldTeams(int squadId, int teamMask, bool rush = false)
     {
         var value = (teamMask & ~RushFlag) | (rush ? RushFlag : 0);

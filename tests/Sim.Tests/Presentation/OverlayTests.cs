@@ -1,4 +1,9 @@
+using System.Globalization;
 using PointBlank.Presentation;
+using PointBlank.Sim.Fire;
+using PointBlank.Sim.Movement;
+using PointBlank.Sim.Orders;
+using PointBlank.Sim.Suppression;
 using PointBlank.Sim.Map;
 using PointBlank.Sim.Org;
 using PointBlank.Sim.Sight;
@@ -122,6 +127,8 @@ public class OverlayTests
             shown.Toggle(o);
         }
 
+        shown.Frame(); // before the first tick too: asking must not set anything up in the sim
+        Assert.Equal(plain.Battle.World.ComputeStateHash(), shown.Battle.World.ComputeStateHash());
         for (var tick = 0; tick < 600; tick++)
         {
             plain.Step();
@@ -161,7 +168,7 @@ public class OverlayTests
     }
 
     [Fact]
-    public void The_sight_overlay_dots_only_ground_a_selected_man_sees_and_is_built_a_slice_at_a_time()
+    public void The_sight_overlay_is_built_a_slice_at_a_time_and_goes_with_the_selection()
     {
         var c = Start();
         c.Toggle(Overlay.Sight);
@@ -170,50 +177,340 @@ public class OverlayTests
         c.Select([2]);
         c.Frame();
         Assert.False(c.SightComplete, "one frame must not do the whole job");
-        c.FinishOverlays();
+        Assert.True(Drawn(c, Overlay.Sight) > 0);
         Assert.True(c.SightComplete);
-        var dots = c.Frame().OfType<RectPrim>().Where(r => r.Colour == Palette.Sight).ToArray();
-        Assert.NotEmpty(dots);
-        var men = c.Battle.View.Squad(2)!.Value.Soldiers;
-        Assert.All(dots, d =>
-        {
-            var (x, y) = c.Camera.ToWorld(new Pt(d.X + (d.W / 2), d.Y + (d.H / 2)));
-            var half = Fixed.FromRatio(1, 2);
-            var (fx, fy) = (Fixed.FromInt((int)MathF.Floor(x)) + half, Fixed.FromInt((int)MathF.Floor(y)) + half);
-            Assert.Contains(men, m => c.Battle.View.CanSee(m.Id, fx, fy, Posture.Standing));
-        });
 
         c.Select([]);
         Assert.Equal(0, Drawn(c, Overlay.Sight));
     }
 
+    /// <summary>
+    /// Every US squad of every scenario, hedges, woods and buildings included: a sampled tile is dotted exactly when it is
+    /// seen.
+    /// </summary>
     [Fact]
-    public void The_truth_overlay_marks_every_enemy_where_he_really_is_and_ties_contacts_to_him()
+    public void The_sight_overlay_dots_exactly_the_ground_the_selected_men_see_among_real_blockers()
     {
-        var c = Start();
-        StepTo(c, 600);
-        c.Toggle(Overlay.Truth);
-        var frame = c.Frame().Where(p => p.Colour == Palette.Truth && InMap(c, p)).ToArray();
-        var enemies = Squads(c).Where(q => q.Side == "de").SelectMany(q => q.Soldiers).ToArray();
-        Assert.Equal(enemies.Length, frame.OfType<RectPrim>().Count());
-        Assert.All(enemies, e => Assert.Contains(frame.OfType<RectPrim>(), r => r.Touches(c.Camera.ToScreen(F(e.X), F(e.Y)), 0.5f)));
-        Assert.NotEmpty(c.Battle.View.KnownEnemies);
-        Assert.Equal(c.Battle.View.KnownEnemies.Count, frame.OfType<LinePrim>().Count());
+        int seen = 0, hidden = 0;
+        foreach (var scenario in PlayerBattle.ScenarioIds)
+        {
+            var squads = Squads(new GameController(PlayerBattle.Create(scenario, 1))).Where(q => q.Side == "us").Select(q => q.Id);
+            foreach (var id in squads.ToArray())
+            {
+                CheckSight(scenario, id, ref seen, ref hidden);
+            }
+        }
+
+        Assert.True(seen > 200 && hidden > 200, $"in range: seen {seen}, hidden by blockers {hidden}");
+    }
+
+    private static void CheckSight(string scenario, int id, ref int seen, ref int hidden)
+    {
+        var c = new GameController(PlayerBattle.Create(scenario, 1));
+        var map = c.Battle.World.GetSystem<MapSystem>().Map;
+        var los = new LineOfSight(map, SightRules.FromData(PathFinderTests.Data));
+        var range = SpottingRules.FromData(PathFinderTests.Data).MaxRange;
+        var squad = Squads(c).First(q => q.Id == id);
+        var tile = F(map.TileSize);
+        const float zoom = 5;
+        c.Camera.Set(F(squad.Soldiers[0].X), F(squad.Soldiers[0].Y), zoom);
+        c.Select([squad.Id]);
+        c.Toggle(Overlay.Sight);
+        c.FinishOverlays();
+        var dots = c.Frame().OfType<RectPrim>().Where(r => r.Colour == Palette.Sight)
+            .Select(r => c.Camera.ToWorld(new Pt(r.X + (r.W / 2), r.Y + (r.H / 2))))
+            .Select(p => ((int)(p.X / tile), (int)(p.Y / tile))).ToHashSet();
+
+        // The overlay looks from one man per tile and posture.
+        var observers = squad.Soldiers.Where(s => s.CanLead)
+            .GroupBy(s => ((int)(F(s.X) / tile), (int)(F(s.Y) / tile), s.Posture)).Select(g => g.First()).ToArray();
+        var step = Math.Max(1, (int)MathF.Ceiling(12 / (tile * zoom)));
+        for (var y = 0; y < map.Height; y += step)
+        {
+            for (var x = 0; x < map.Width; x += step)
+            {
+                if (!c.Layout.Map.Contains(c.Camera.ToScreen((x + 0.5f) * tile, (y + 0.5f) * tile)))
+                {
+                    continue;
+                }
+
+                var half = Fixed.FromRatio(1, 2);
+                var (fx, fy) = ((Fixed.FromInt(x) + half) * map.TileSize, (Fixed.FromInt(y) + half) * map.TileSize);
+                var inRange = observers.Where(m => ((fx - m.X) * (fx - m.X)) + ((fy - m.Y) * (fy - m.Y)) <= range * range).ToArray();
+                var expected = inRange.Any(m => los.Check(new Viewpoint(m.X, m.Y, m.Posture), new Viewpoint(fx, fy, Posture.Standing)).Visible);
+                Assert.True(expected == dots.Contains((x, y)), $"{scenario}, squad {id}, tile {x},{y}: seen {expected}, dotted {!expected}");
+                if (inRange.Length > 0)
+                {
+                    _ = expected ? seen++ : hidden++;
+                }
+            }
+        }
+    }
+
+    private static bool HasAContactApartFromItsMan(string scenario)
+    {
+        var c = new GameController(PlayerBattle.Create(scenario, 1, true));
+        var enemies = Squads(c).Where(q => q.Side == "de").SelectMany(q => q.Soldiers).ToDictionary(s => s.Id);
+        while (c.Battle.View.Tick < 6000)
+        {
+            c.Step();
+            if (c.Battle.View.KnownEnemies.Any(k => Math.Abs(F(k.X - enemies[k.EnemyId].X)) + Math.Abs(F(k.Y - enemies[k.EnemyId].Y)) > 1))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     [Fact]
-    public void The_values_and_intent_overlays_cover_both_sides()
+    public void The_truth_overlay_marks_every_enemy_where_he_really_is_and_ties_each_contact_to_him()
+    {
+        var c = new GameController(PlayerBattle.Create(
+            new[] { "fix-assault", "bombard-creep" }.First(HasAContactApartFromItsMan), 1, true));
+        var enemies = Squads(c).Where(q => q.Side == "de").SelectMany(q => q.Soldiers).ToDictionary(s => s.Id);
+        bool Apart() => c.Battle.View.KnownEnemies.Any(k => Math.Abs(F(k.X - enemies[k.EnemyId].X)) + Math.Abs(F(k.Y - enemies[k.EnemyId].Y)) > 1);
+        while (!Apart() && c.Battle.View.Tick < 6000)
+        {
+            c.Step();
+        }
+
+        Assert.True(Apart(), "no contact ever stood apart from the man it is of");
+        c.Toggle(Overlay.Truth);
+        var frame = c.Frame().Where(p => p.Colour == Palette.Truth && InMap(c, p)).ToArray();
+        Assert.Equal(enemies.Count, frame.OfType<RectPrim>().Count());
+        Assert.All(enemies.Values, e => Assert.Contains(frame.OfType<RectPrim>(), r => r.Touches(c.Camera.ToScreen(F(e.X), F(e.Y)), 0.5f)));
+        var expected = c.Battle.View.KnownEnemies
+            .Select(k => (A: c.Camera.ToScreen(F(k.X), F(k.Y)), B: c.Camera.ToScreen(F(enemies[k.EnemyId].X), F(enemies[k.EnemyId].Y))))
+            .OrderBy(l => l.A.X).ThenBy(l => l.A.Y).ThenBy(l => l.B.X).ThenBy(l => l.B.Y);
+        var lines = frame.OfType<LinePrim>().Select(l => (l.A, l.B))
+            .OrderBy(l => l.A.X).ThenBy(l => l.A.Y).ThenBy(l => l.B.X).ThenBy(l => l.B.Y);
+        Assert.Equal(expected, lines);
+    }
+
+    [Fact]
+    public void The_values_overlay_shows_the_sims_suppression_and_morale_for_both_sides()
     {
         var c = Start();
         StepTo(c, 600);
+        var suppression = c.Battle.World.GetSystem<SuppressionSystem>();
+        static string N(Fixed v) => (v.Raw / 4294967296f).ToString("0", CultureInfo.InvariantCulture);
         c.Toggle(Overlay.Values);
-        var values = c.Frame().OfType<TextPrim>().Where(t => t.Colour == Palette.Values && InMap(c, t)).Select(t => t.Text).ToArray();
-        Assert.All(Squads(c), q => Assert.Contains(values, v => v.StartsWith($"#{q.Id} sup ", StringComparison.Ordinal) && v.Contains(" mor ")));
+        var shown = c.Frame().OfType<TextPrim>().Where(t => t.Colour == Palette.Values && InMap(c, t)).Select(t => t.Text);
+        var expected = Squads(c).Select(q => $"#{q.Id} sup {N(suppression.SquadLevelOf(q.Id))} mor {N(q.MoraleLevel)}");
+        Assert.Equal(expected.Order(), shown.Order());
+        Assert.Contains(Squads(c), q => N(suppression.SquadLevelOf(q.Id)) != "0");
+        Assert.Contains(Squads(c), q => N(q.MoraleLevel) != "0");
 
-        c.Toggle(Overlay.Values);
+        // Close in on the most suppressed squad: each man's own number stands beside him.
+        var worst = Squads(c).MaxBy(q => suppression.SquadLevelOf(q.Id))!;
+        c.Camera.Set(worst.Soldiers.Average(s => F(s.X)), worst.Soldiers.Average(s => F(s.Y)), 14);
+        var texts = c.Frame().OfType<TextPrim>().Where(t => t.Colour == Palette.Values).ToArray();
+        var close = Squads(c).SelectMany(q => q.Soldiers)
+            .Select(s => (Man: s, At: c.Camera.ToScreen(F(s.X), F(s.Y))))
+            .Select(m => (m.Man, At: new Pt(m.At.X + 12, m.At.Y + 4)))
+            .Where(m => c.Layout.Map.Contains(m.At)).ToArray();
+        Assert.All(close, m => Assert.Contains(texts, t => t.At == m.At && t.Text == N(suppression.LevelOf(m.Man.Id))));
+        Assert.Contains(close, m => N(suppression.LevelOf(m.Man.Id)) != "0");
+    }
+
+    /// <summary>Steps once, recording from the sim's shots the tick each man last fired.</summary>
+    private static void StepRecording(GameController c, Dictionary<int, long> lastShot)
+    {
+        c.Step();
+        foreach (var shot in c.Battle.World.GetSystem<FireSystem>().Shots)
+        {
+            lastShot[shot.FirerId] = shot.Tick;
+        }
+    }
+
+    private static bool FiredLately(Dictionary<int, long> lastShot, int man, long now) =>
+        lastShot.TryGetValue(man, out var at) && now - at <= FireSystem.FiredRecentlyTicks;
+
+    /// <summary>Whether an able friendly stands within <paramref name="clearance"/> of the man's line to the point, short of it.</summary>
+    private static bool FriendInTheWay(Squad[] squads, Squad own, Soldier s, float x, float y, float clearance)
+    {
+        var (dx, dy) = (x - F(s.X), y - F(s.Y));
+        var d = MathF.Sqrt((dx * dx) + (dy * dy));
+        return squads.Where(q => q.Side == own.Side).SelectMany(q => q.Soldiers).Where(f => f != s && f.CanLead).Any(f =>
+        {
+            var (rx, ry) = (F(f.X) - F(s.X), F(f.Y) - F(s.Y));
+            var along = ((rx * dx) + (ry * dy)) / d;
+            return along > 0 && along < d && MathF.Abs((rx * dy) - (ry * dx)) / d <= clearance;
+        });
+    }
+
+    [Theory]
+    [InlineData("fix-assault")]
+    [InlineData("bombard-creep")]
+    public void A_man_reads_as_firing_only_after_a_shot_and_as_blocked_only_with_a_friend_in_the_way(string scenario)
+    {
+        var c = new GameController(PlayerBattle.Create(scenario, 1, true));
+        var fire = c.Battle.World.GetSystem<FireSystem>();
+        var squads = Squads(c).ToArray();
+        var mask = F(fire.Rules.MaskClearance);
+        var widest = MathF.Max(mask, F(fire.Rules.NearMissRadius));
+        var lastShot = new Dictionary<int, long>();
+        int firing = 0, blocked = 0, shootingOnTheMove = 0, secondSquadBlocked = 0;
+        for (var tick = 0; tick < 1800; tick++)
+        {
+            StepRecording(c, lastShot);
+            var now = c.Battle.World.Tick;
+            foreach (var man in c.Battle.DebugTruth()!.Soldiers)
+            {
+                var own = squads.First(q => q.Id == man.SquadId);
+                var s = own.Soldiers.First(m => m.Id == man.Id);
+                if (!s.CanLead)
+                {
+                    Assert.Equal((IntentKind.None, IntentKind.None, IntentKind.None), (man.Task, man.Move, man.Fire));
+                    continue;
+                }
+
+                Assert.True((man.Fire == IntentKind.Firing) == FiredLately(lastShot, s.Id, now), $"tick {tick}, man {s.Id}: {man.Fire}");
+                if (man.Fire == IntentKind.Blocked)
+                {
+                    Assert.True(
+                        man.Aims && FriendInTheWay(squads, own, s, F(man.FireX), F(man.FireY), widest + 0.01f),
+                        $"tick {tick}, man {s.Id} reads blocked with nobody in the way");
+                    blocked++;
+                    secondSquadBlocked += man.SquadId == 2 ? 1 : 0;
+                }
+                else if (man.Fire == IntentKind.Aiming)
+                {
+                    Assert.False(FriendInTheWay(squads, own, s, F(man.FireX), F(man.FireY), mask - 0.01f), $"tick {tick}, man {s.Id} aims through a friend");
+                }
+
+                firing += man.Fire == IntentKind.Firing ? 1 : 0;
+                shootingOnTheMove += man.Fire == IntentKind.Firing && man.Move != IntentKind.None ? 1 : 0;
+            }
+        }
+
+        Assert.True(firing > 0 && shootingOnTheMove > 0, $"firing {firing}, of them with a move {shootingOnTheMove}, blocked {blocked}");
+        if (scenario == "fix-assault")
+        {
+            Assert.True(secondSquadBlocked > 0, "squad 2, masked by friendlies in this battle, never reads as blocked");
+        }
+    }
+
+    [Fact]
+    public void The_intent_overlay_shows_each_mans_move_fire_and_drill_as_the_sim_has_them()
+    {
+        var seen = new SortedSet<string>(StringComparer.Ordinal);
+        var both = 0;
+        foreach (var scenario in new[] { "fix-assault", "bombard-creep" })
+        {
+            var c = new GameController(PlayerBattle.Create(scenario, 1, true));
+            c.Toggle(Overlay.Intent);
+            var move = c.Battle.World.GetSystem<MovementSystem>();
+            var fire = c.Battle.World.GetSystem<FireSystem>();
+            var lastShot = new Dictionary<int, long>();
+            for (var tick = 1; tick <= 1800; tick++)
+            {
+                StepRecording(c, lastShot);
+                if (tick % 10 != 0)
+                {
+                    continue;
+                }
+
+                var frame = c.Frame().Where(p => p.Colour == Palette.Intent && InMap(c, p)).ToArray();
+                var lines = frame.OfType<LinePrim>().Select(l => (l.A, l.B)).ToHashSet();
+                var rings = frame.OfType<CirclePrim>().Select(r => r.Centre).ToHashSet();
+                var now = c.Battle.World.Tick;
+                foreach (var q in Squads(c))
+                {
+                    var able = q.Soldiers.Where(s => s.CanLead).ToArray();
+                    var label = frame.OfType<TextPrim>().FirstOrDefault(t => t.Text.StartsWith($"#{q.Id}: ", StringComparison.Ordinal));
+                    if (label != null)
+                    {
+                        var tally = label.Text[(label.Text.IndexOf("; ", StringComparison.Ordinal) + 2)..].Split(", ")
+                            .Where(w => w != "none able")
+                            .ToDictionary(w => w[..w.LastIndexOf(' ')], w => int.Parse(w[(w.LastIndexOf(' ') + 1)..], CultureInfo.InvariantCulture));
+                        seen.UnionWith(tally.Keys);
+                        Assert.Equal(able.Count(s => move.GoalOf(s.Id) is { Local: false, Held: false }), tally.GetValueOrDefault("moving"));
+                        Assert.Equal(able.Count(s => move.GoalOf(s.Id) is { Local: true }), tally.GetValueOrDefault("own move"));
+                        Assert.Equal(able.Count(s => move.GoalOf(s.Id) is { Held: true }), tally.GetValueOrDefault("held"));
+                        Assert.Equal(able.Count(s => FiredLately(lastShot, s.Id, now)), tally.GetValueOrDefault("firing"));
+
+                        // A bounding team is free to walk; a covering one is held.
+                        var held = move.HeldTeamsOf(q.Id);
+                        if (tally.ContainsKey("bounding") || tally.ContainsKey("covering"))
+                        {
+                            Assert.Equal(able.Count(s => (held & (1 << s.TeamIndex)) == 0), tally.GetValueOrDefault("bounding"));
+                            Assert.Equal(able.Count(s => (held & (1 << s.TeamIndex)) != 0), tally.GetValueOrDefault("covering"));
+                        }
+
+                        if (tally.ContainsKey("defending"))
+                        {
+                            Assert.Equal(OrderKind.Defend, c.Battle.World.GetSystem<CommandSystem>().StatusOf(q.Id)!.Order!.Kind);
+                        }
+                    }
+
+                    foreach (var s in able)
+                    {
+                        var from = c.Camera.ToScreen(F(s.X), F(s.Y));
+                        if (!c.Layout.Map.Contains(from))
+                        {
+                            continue;
+                        }
+
+                        var goal = move.GoalOf(s.Id);
+                        if (goal is { } g)
+                        {
+                            var to = c.Camera.ToScreen(F(g.X), F(g.Y));
+                            Assert.Contains((from, to), lines);
+                            Assert.Contains(to, rings);
+                        }
+
+                        if (fire.ActivityOf(q, s, now).Target is { } aim)
+                        {
+                            Assert.Contains((from, c.Camera.ToScreen(F(aim.X), F(aim.Y))), lines);
+                            both += goal != null && FiredLately(lastShot, s.Id, now) ? 1 : 0;
+                        }
+                    }
+
+                    // The fire line points where the rounds go.
+                    foreach (var shot in fire.Shots.Where(x => able.Any(s => s.Id == x.FirerId)))
+                    {
+                        var s = able.First(m => m.Id == shot.FirerId);
+                        if (fire.ActivityOf(q, s, now).Target is not { } aim)
+                        {
+                            continue;
+                        }
+
+                        var (ax, ay) = (F(aim.X - shot.OriginX), F(aim.Y - shot.OriginY));
+                        var (bx, by) = (F(shot.EndX - shot.OriginX), F(shot.EndY - shot.OriginY));
+                        var cos = ((ax * bx) + (ay * by)) / MathF.Sqrt(((ax * ax) + (ay * ay)) * ((bx * bx) + (by * by)));
+                        Assert.True(cos > 0.8f, $"tick {tick}: man {s.Id} fires away from his line ({cos})");
+                    }
+                }
+            }
+        }
+
+        Assert.True(both > 0, "nobody was shown both moving and firing");
+        Assert.All(
+            new[] { "moving", "held", "own move", "firing", "blocked", "bounding", "covering", "defending" },
+            w => Assert.Contains(w, seen));
+    }
+
+    [Fact]
+    public void Close_in_a_man_who_moves_and_fires_is_labelled_with_both()
+    {
+        var c = Start();
         c.Toggle(Overlay.Intent);
-        var intent = c.Frame().Where(p => p.Colour == Palette.Intent && InMap(c, p)).ToArray();
-        Assert.All(Squads(c), q => Assert.Contains(intent.OfType<TextPrim>(), t => t.Text.StartsWith($"#{q.Id}: ", StringComparison.Ordinal)));
-        Assert.NotEmpty(intent.OfType<LinePrim>());
+        TruthSoldier? found = null;
+        while (found == null && c.Battle.View.Tick < 1800)
+        {
+            c.Step();
+            found = c.Battle.DebugTruth()!.Soldiers.Cast<TruthSoldier?>()
+                .FirstOrDefault(s => s!.Value.Move == IntentKind.Move && s.Value.Fire == IntentKind.Firing);
+        }
+
+        Assert.NotNull(found);
+        var man = found.Value;
+        c.Camera.Set(F(man.X), F(man.Y), 14);
+        var at = c.Camera.ToScreen(F(man.X), F(man.Y));
+        var label = Assert.Single(c.Frame().OfType<TextPrim>(), t => t.Colour == Palette.Intent && t.At == new Pt(at.X + 12, at.Y + 15)).Text;
+        Assert.Contains("moving", label);
+        Assert.Contains("firing", label);
     }
 }
