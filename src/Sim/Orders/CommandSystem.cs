@@ -24,7 +24,8 @@ namespace PointBlank.Sim.Orders;
 /// Executing until fire ends, then Done with the end note; any other delivered order stops the squad's fire;
 /// kinds without behaviour (and Fire without a FireSystem) are Done with <see cref="OrderNote.NotImplemented"/>. SetRoe (item 2.3)
 /// sets the squad's <see cref="RoeMode"/> (<see cref="RoeOf"/>, hashed) and touches nothing else; a bad mode is Rejected
-/// (<see cref="OrderNote.InvalidRoe"/>). A delivered order stops only the player's fire order, never the unit AI's fire.</item>
+/// (<see cref="OrderNote.InvalidRoe"/>). It travels on a ticket of its own (<see cref="RoeStatusOf"/>, item 2.5a), with
+/// the same delay and morale rules, so it never replaces a pending or running order, and no order replaces it. A delivered order stops only the player's fire order, never the unit AI's fire.</item>
 /// <item>Suppression (item 2.1, optional <see cref="SuppressionSystem"/>): an advance-type move (Move, MoveFast,
 /// Sneak) delivered to a pinned squad, or under way when it becomes pinned, is <see cref="OrderStatus.Held"/>: the
 /// move stops, and starts again to the same point once the squad is no longer pinned. Fall-back, Hold and Fire
@@ -43,6 +44,7 @@ public sealed class CommandSystem(
 {
     private readonly Dictionary<int, Ticket> _tickets = [];
     private readonly List<IssueRejection> _rejections = [];
+    private readonly SortedDictionary<int, Ticket> _roeTickets = [];
     private readonly SortedDictionary<int, RoeMode> _roe = [];
 
     public CommandRules Rules { get; } = rules;
@@ -51,11 +53,16 @@ public sealed class CommandSystem(
     internal global::PointBlank.Sim.Artillery.ArtillerySystem? Artillery { get; set; }
 
     /// <summary>The unit's latest order and its state, for the UI. Status None when it has had none.</summary>
-    internal OrderView StatusOf(int unitId) =>
-        _tickets.TryGetValue(unitId, out var t)
-            ? new OrderView(unitId, t.Order, t.Status, t.Remaining, t.Total, t.Reasons, t.Note, t.Issued)
-            : new OrderView(unitId, null, OrderStatus.None, 0, 0, DelayReason.None, OrderNote.None, -1);
+    internal OrderView StatusOf(int unitId) => View(_tickets, unitId);
 
+    /// <summary>The unit's latest rules-of-engagement change and its state (item 2.5a). Status None when it has had none.</summary>
+    internal OrderView RoeStatusOf(int unitId) => View(_roeTickets, unitId);
+
+    private static OrderView View(IReadOnlyDictionary<int, Ticket> bySquad, int unitId) => Find(bySquad, unitId) is { } t
+        ? new OrderView(unitId, t.Order, t.Status, t.Remaining, t.Total, t.Reasons, t.Note, t.Issued)
+        : new OrderView(unitId, null, OrderStatus.None, 0, 0, DelayReason.None, OrderNote.None, -1);
+
+    private static Ticket? Find(IReadOnlyDictionary<int, Ticket> bySquad, int unitId) => bySquad.GetValueOrDefault(unitId);
     /// <summary>A squad's rules of engagement (item 2.3); <see cref="RoeMode.FireAtWill"/> until a SetRoe order says otherwise.</summary>
     internal RoeMode RoeOf(int unitId) => _roe.TryGetValue(unitId, out var r) ? r : RoeMode.FireAtWill;
 
@@ -64,7 +71,7 @@ public sealed class CommandSystem(
 
     /// <summary>The reasons an order issued now would be delayed (a UI preview).</summary>
     /// <exception cref="InvalidOperationException">There is no such unit.</exception>
-    internal DelayReason ReasonsFor(int unitId) => Reasons(Find(unitId));
+    internal DelayReason ReasonsFor(int unitId) => Reasons(FindSquad(unitId));
 
     /// <summary>
     /// An HQ is always in contact. A squad is in contact when an HQ of its side that has an able man
@@ -132,7 +139,15 @@ public sealed class CommandSystem(
         }
 
         var t = new Ticket(order, world.Tick);
-        _tickets[unitId] = t;
+        if (order.Kind == OrderKind.SetRoe)
+        {
+            _roeTickets[unitId] = t;
+        }
+        else
+        {
+            _tickets[unitId] = t;
+        }
+
         if ((OrderKinds.IsMove(order.Kind) || order.Kind == OrderKind.CallFire || (order.Kind == OrderKind.Fire && order.TargetId < 0)) && !move.IsOnMap(order.X, order.Y))
         {
             t.Status = OrderStatus.Rejected;
@@ -157,6 +172,7 @@ public sealed class CommandSystem(
     {
         foreach (var squad in org.Squads)
         {
+            TickRoe(world, squad);
             if (!_tickets.TryGetValue(squad.Id, out var t))
             {
                 continue;
@@ -206,6 +222,32 @@ public sealed class CommandSystem(
         }
     }
 
+    /// <summary>Counts down a rules-of-engagement change; a routing squad drops one it hesitates over, as any order.</summary>
+    private void TickRoe(World world, Squad squad)
+    {
+        if (Find(_roeTickets, squad.Id) is not { Status: OrderStatus.Pending or OrderStatus.Hesitating } t)
+        {
+            return;
+        }
+
+        if (squad.Morale == MoraleState.Routing && t.Status == OrderStatus.Hesitating)
+        {
+            (t.Status, t.Note, t.Remaining) = (OrderStatus.Refused, OrderNote.Routing, 0);
+        }
+        else if (--t.Remaining <= 0)
+        {
+            t.Remaining = 0;
+            if (t.Status == OrderStatus.Pending)
+            {
+                Deliver(world, squad, t);
+            }
+            else
+            {
+                Execute(world, squad, t);
+            }
+        }
+    }
+
     public void AppendState(StateHasher hasher)
     {
         hasher.Add(org.Squads.Count);
@@ -218,16 +260,14 @@ public sealed class CommandSystem(
                 continue;
             }
 
-            hasher.Add((byte)t!.Order.Kind);
-            hasher.Add(t.Order.X);
-            hasher.Add(t.Order.Y);
-            hasher.Add(t.Order.TargetId);
-            hasher.Add(t.Issued);
-            hasher.Add((byte)t.Status);
-            hasher.Add(t.Remaining);
-            hasher.Add(t.Total);
-            hasher.Add((byte)t.Reasons);
-            hasher.Add((byte)t.Note);
+            Append(hasher, t!);
+        }
+
+        hasher.Add(_roeTickets.Count);
+        foreach (var (id, t) in _roeTickets)
+        {
+            hasher.Add(id);
+            Append(hasher, t);
         }
 
         hasher.Add(_roe.Count);
@@ -245,6 +285,20 @@ public sealed class CommandSystem(
             hasher.Add(r.UnitId);
             hasher.Add((byte)r.Reason);
         }
+    }
+
+    private static void Append(StateHasher hasher, Ticket t)
+    {
+        hasher.Add((byte)t.Order.Kind);
+        hasher.Add(t.Order.X);
+        hasher.Add(t.Order.Y);
+        hasher.Add(t.Order.TargetId);
+        hasher.Add(t.Issued);
+        hasher.Add((byte)t.Status);
+        hasher.Add(t.Remaining);
+        hasher.Add(t.Total);
+        hasher.Add((byte)t.Reasons);
+        hasher.Add((byte)t.Note);
     }
 
     private static bool Roll(SimRng rng, Fixed chance) => rng.NextFixed() < chance;
@@ -272,7 +326,7 @@ public sealed class CommandSystem(
         return n == 0 ? null : (x / Fixed.FromInt(n), y / Fixed.FromInt(n));
     }
 
-    private Squad Find(int unitId) =>
+    private Squad FindSquad(int unitId) =>
         org.Squads.FirstOrDefault(s => s.Id == unitId) ?? throw new InvalidOperationException($"No unit {unitId}.");
 
     private DelayReason Reasons(Squad squad)

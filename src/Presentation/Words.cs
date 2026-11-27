@@ -15,6 +15,21 @@ public static class Words
         return char.ToUpperInvariant(text[0]) + text[1..];
     }
 
+    /// <summary>A unit's data id as a name: "us_platoon_hq" becomes "US platoon HQ".</summary>
+    public static string Unit(string id)
+    {
+        var german = id.StartsWith("de_", StringComparison.Ordinal);
+        var words = id.Split('_').Select((w, i) => w switch
+        {
+            "us" => "US",
+            "de" => "German",
+            "hq" => "HQ",
+            _ when german && i == 1 => char.ToUpperInvariant(w[0]) + w[1..], // German unit words are nouns
+            _ => w,
+        });
+        return string.Join(' ', words);
+    }
+
     private static string Phrase(string name) => name switch
     {
         "Ok" => "OK",

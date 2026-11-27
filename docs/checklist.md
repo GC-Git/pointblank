@@ -157,7 +157,7 @@ Status: draft, awaiting owner sign-off
   intent.
   *Done when:* each overlay toggles and appears in a screenshot test.
 
-- [ ] **2.4b Realistic posture under pin and orders** (S)
+- [x] **2.4b Realistic posture under pin and orders** (S)
   Do before 2.7. Follow-ups from the 2.4a review: men get up while their squad is pinned
   (seeds 1-50: `fix-assault` 227 such rises, `equal-fire` 271; before 2.4a 183 and 216; one
   routing man rises every 4 s); quick stand/drop reversals remain; by code reading, not yet
@@ -193,8 +193,15 @@ Status: draft, awaiting owner sign-off
   under test; "cowering" covers a whole squad before each man reacts and "firing line" includes
   non-firing men; release builds still highlight F2-F4 although inert.
   During review the headless `--build-solutions` Godot command once reached build DONE then did
-  not exit for over 8 minutes (not yet checked on main).
+  not exit for over 8 minutes (not yet checked on main). Fixed in 2.5a: the console wrapper
+  waits for every process the build starts, and MSBuild left a reusable worker node running;
+  `Directory.Build.rsp` and `Directory.Build.props` stop persistent build processes.
   *Done when:* each is fixed or explicitly deferred by the owner, with tests.
+  Owner decisions: changing the rules of engagement keeps a pending move order, and the
+  change travels beside it with its own delay; the Smoke order is deferred until item 5.5
+  (smoke is not built). Ambush is to be offered only if real ambush behaviour exists: the
+  sim currently treats Ambush exactly like Defend, so it is not offered; the owner deferred
+  the Ambush order to item 2.8.
 
 - [ ] **2.4c Squad masked by friendlies** (S)
   Do before 2.7. From the 2.6 review: in `fix-assault` seed 1 the second squad was mostly
@@ -219,6 +226,15 @@ Status: draft, awaiting owner sign-off
   scripted defender.
   *Done when:* both run start to finish from the runner and in Godot with no errors.
   **Owner plays both and signs off on the feel (Milestone 3 in the spec).**
+
+- [ ] **2.8 Ambush order** (S)
+  After the 2.7 play-through. Proposed behaviour, to be confirmed by the owner before
+  building: men stay hidden and hold fire until the enemy is close or their leader opens
+  fire, then each man joins after his own reaction; it differs from Defend and is offered
+  in the view. Also from the 2.5a build: selection rings and nearby squad names can
+  overlap (the Defend order's 'not available yet' reading was fixed in 2.5a).
+  *Done when:* the owner has confirmed the behaviour, tests show it differs from Defend with
+  no all-at-once opening, the view offers it, and the display follow-up is fixed.
 
 ## Milestone 3 — Art style
 
@@ -292,6 +308,8 @@ Status: draft, awaiting owner sign-off
   Smoke from artillery, mortars, tanks and grenades blocks LOS, drifts and fades.
   *Done when:* a smoke screen blocks LOS for its duration and then clears, and a squad
   ordered to smoke then cross takes fewer casualties across seeds.
+  Includes offering the Smoke order in the game's order bar (deferred from item 2.5a by
+  owner decision).
 
 - [ ] **5.6 Air strikes** (S)
   Request, delay, approach, inaccuracy, possible friendly fire, limited sorties.

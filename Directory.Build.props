@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- Item 2.5a: no persistent compiler server (VBCSCompiler), for the same reason as Directory.Build.rsp. -->
+    <UseSharedCompilation>false</UseSharedCompilation>
+  </PropertyGroup>
+</Project>

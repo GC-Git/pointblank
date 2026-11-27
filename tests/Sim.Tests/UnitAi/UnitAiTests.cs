@@ -69,11 +69,12 @@ public class UnitAiTests
         Assert.Equal(IssueResult.Accepted, view.Issue(us.Id, new Order(OrderKind.SetRoe, Fixed.Zero, Fixed.Zero, (int)RoeMode.HoldFire)));
         rig.World.Run(100);
         Assert.Equal(RoeMode.HoldFire, view.RoeOf(us.Id));
-        Assert.Equal(OrderStatus.Done, view.StatusOf(us.Id)!.Status);
+        Assert.Equal(OrderStatus.Done, view.RoeStatusOf(us.Id)!.Status);
+        Assert.Equal(OrderStatus.None, view.StatusOf(us.Id)!.Status); // item 2.5a: the change has its own ticket
         view.Issue(us.Id, new Order(OrderKind.SetRoe, Fixed.Zero, Fixed.Zero, 99));
         rig.World.Run(300);
-        Assert.Equal(OrderStatus.Rejected, view.StatusOf(us.Id)!.Status);
-        Assert.Equal(OrderNote.InvalidRoe, view.StatusOf(us.Id)!.Note);
+        Assert.Equal(OrderStatus.Rejected, view.RoeStatusOf(us.Id)!.Status);
+        Assert.Equal(OrderNote.InvalidRoe, view.RoeStatusOf(us.Id)!.Note);
         Assert.Equal(RoeMode.HoldFire, view.RoeOf(us.Id));
     }
 

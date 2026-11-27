@@ -66,6 +66,10 @@ Build the C# project through Godot (headless):
 & "C:\Godot_v4.7-stable_mono_win64\Godot_v4.7-stable_mono_win64_console.exe" --headless --path game --build-solutions --quit
 ```
 
+`Directory.Build.rsp` (`-nodeReuse:false`) and `Directory.Build.props`
+(`UseSharedCompilation=false`) keep builds from leaving processes running; without them
+the command above reaches `DONE` and does not exit. Keep both.
+
 Run the game headless (loads the main scene and quits):
 
 ```powershell

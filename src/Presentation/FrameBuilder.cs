@@ -35,6 +35,8 @@ public static class FrameBuilder
             OrderLine(list, c, q);
         }
 
+        Incoming(list, c, squads);
+
         // Selection rings go under every man, so a ring never hides a neighbour.
         foreach (var man in squads.Where(q => c.Selected.Contains(q.Id)).SelectMany(q => q.Soldiers).Where(Able))
         {
@@ -68,6 +70,11 @@ public static class FrameBuilder
         foreach (var q in squads)
         {
             SquadLabel(list, c, q);
+        }
+
+        foreach (var q in squads)
+        {
+            RejectedOrder(list, c, q);
         }
 
         TruthOverlays.Draw(list, c);
@@ -104,7 +111,8 @@ public static class FrameBuilder
         {
             Posture.Standing => new CirclePrim(at, r, Palette.Own),
             Posture.Kneeling => new RectPrim(at.X - r, at.Y - r, 2 * r, 2 * r, Palette.Own),
-            _ => new RectPrim(at.X - (1.6f * r), at.Y - (0.6f * r), 3.2f * r, 1.2f * r, Palette.Own),
+            // Short enough that men lying two metres apart show a gap between them (item 2.5a).
+            _ => new RectPrim(at.X - (1.2f * r), at.Y - (0.5f * r), 2.4f * r, r, Palette.Own),
         };
         return man.Health == HealthState.Wounded ? [shape, new CirclePrim(at, MathF.Max(1, r / 3), Palette.Wounded)] : [shape];
     }
@@ -173,10 +181,142 @@ public static class FrameBuilder
         _ => null,
     };
 
+    /// <summary>
+    /// For each recent bearing of enemy fire on a squad, an arrow outside the squad pointing in from that side; shell bursts
+    /// have a ring on the tail. The bearing is the side's own fuzzed knowledge, never the shooter's place.
+    /// </summary>
+    private static void Incoming(List<Prim> list, GameController c, IReadOnlyList<SquadView> squads)
+    {
+        foreach (var (id, dx, dy, explosion) in c.Incoming)
+        {
+            if (squads.FirstOrDefault(q => q.Id == id) is not { Soldiers.Count: > 0 } q)
+            {
+                continue;
+            }
+
+            var (x, y) = GameController.Centre(q);
+            var centre = c.Camera.ToScreen(x, y);
+            var reach = q.Soldiers.Where(Able).Select(s => c.Camera.ToScreen(s.X.F(), s.Y.F()))
+                .Select(p => ((p.X - centre.X) * dx) + ((p.Y - centre.Y) * dy)).DefaultIfEmpty(0).Max();
+            var near = MathF.Max(reach, 0) + Size(c.Camera) + 8;
+            Pt At(float along, float across) => new(centre.X + (dx * along) - (dy * across), centre.Y + (dy * along) + (dx * across));
+            var (tail, head) = (At(near + 26, 0), At(near, 0));
+            list.Add(new LinePrim(tail, head, Palette.Incoming, 3));
+            list.Add(new LinePrim(At(near + 9, 7), head, Palette.Incoming, 2));
+            list.Add(new LinePrim(At(near + 9, -7), head, Palette.Incoming, 2));
+            if (explosion)
+            {
+                list.Add(new CirclePrim(tail, 5, Palette.Incoming, false, 2));
+            }
+        }
+    }
+
+    /// <summary>
+    /// A refused or impossible order, marked for a while: a cross at its point and why. A point outside the picture gets a
+    /// line toward it that ends at the picture's edge, with no cross; an order with no point on the map (a rules-of-engagement
+    /// change, or a target off the map) gets its cross beside the squad.
+    /// </summary>
+    private static void RejectedOrder(List<Prim> list, GameController c, SquadView q)
+    {
+        foreach (var (order, roe) in new[] { (c.Battle.View.StatusOf(q.Id), false), (c.Battle.View.RoeStatusOf(q.Id), true) })
+        {
+            if (order is not { Status: OrderStatus.Refused or OrderStatus.Rejected, Order: { } o } || c.Queued(q.Id) != null
+                || c.RefusalExpired(q.Id, roe, order.IssuedTick))
+            {
+                continue;
+            }
+
+            var (x, y) = GameController.Centre(q);
+            var from = c.Camera.ToScreen(x, y);
+            var at = c.Camera.ToScreen(o.X.F(), o.Y.F());
+            var tile = c.Map.TileSize.F();
+            var pointed = o.Kind != OrderKind.SetRoe && o.X.F() >= 0 && o.Y.F() >= 0
+                && o.X.F() < c.Map.Width * tile && o.Y.F() < c.Map.Height * tile;
+            at = pointed ? at : new Pt(from.X + 40, from.Y);
+            var cross = c.Layout.Map.Contains(at);
+            if (Clip(c.Layout.Map, from, at) is not var (a, b))
+            {
+                continue;
+            }
+
+            list.Add(new LinePrim(a, b, Palette.Rejected, 1));
+            if (cross)
+            {
+                list.Add(new LinePrim(new Pt(at.X - 7, at.Y - 7), new Pt(at.X + 7, at.Y + 7), Palette.Rejected, 3));
+                list.Add(new LinePrim(new Pt(at.X - 7, at.Y + 7), new Pt(at.X + 7, at.Y - 7), Palette.Rejected, 3));
+            }
+
+            var text = $"#{q.Id} {OrderText(order)}";
+            var label = new Pt(b.X + 10, b.Y + 4);
+            if (!cross)
+            {
+                // Keep the words inside the picture, by the end of the line.
+                var width = TextBox.Of(new TextPrim(label, text, Palette.Rejected, 11)).W;
+                label = new Pt(
+                    Math.Clamp(label.X, c.Layout.Map.X + 2, c.Layout.Map.Right - width - 2),
+                    Math.Clamp(label.Y, c.Layout.Map.Y + 14, c.Layout.Map.Bottom - 6));
+            }
+
+            Label(list, label, text, Palette.Rejected);
+        }
+    }
+
+    /// <summary>The part of the segment inside the area, or null if none of it is.</summary>
+    private static (Pt A, Pt B)? Clip(Area area, Pt a, Pt b)
+    {
+        var (dx, dy) = (b.X - a.X, b.Y - a.Y);
+        var (enter, leave) = (0f, 1f);
+        foreach (var (p, q) in new[] { (-dx, a.X - area.X), (dx, area.Right - a.X), (-dy, a.Y - area.Y), (dy, area.Bottom - a.Y) })
+        {
+            if (p == 0)
+            {
+                if (q < 0)
+                {
+                    return null;
+                }
+            }
+            else if (p < 0)
+            {
+                enter = MathF.Max(enter, q / p);
+            }
+            else
+            {
+                leave = MathF.Min(leave, q / p);
+            }
+        }
+
+        return enter <= leave
+            ? (new Pt(a.X + (enter * dx), a.Y + (enter * dy)), new Pt(a.X + (leave * dx), a.Y + (leave * dy)))
+            : null;
+    }
+
+    /// <summary>A rules-of-engagement change on its way, or refused; null when there is none to tell of.</summary>
+    private static string? RoeText(GameController c, int squad)
+    {
+        if (c.QueuedRoe(squad) is { } queued)
+        {
+            return $"RoE change: {Words.Of(queued)} queued";
+        }
+
+        if (c.Battle.View.RoeStatusOf(squad) is not { Order: { } o } change)
+        {
+            return null;
+        }
+
+        var to = $"RoE change: {Words.Of((RoeMode)o.TargetId)}";
+        return change.Status switch
+        {
+            OrderStatus.Pending => $"{to}, pending {Seconds(change.TicksRemaining)}",
+            OrderStatus.Hesitating => $"{to}, hesitating {Seconds(change.TicksRemaining)}",
+            OrderStatus.Refused or OrderStatus.Rejected => $"{to}, refused ({Words.Of(change.Note)})",
+            _ => null,
+        };
+    }
+
     private static void OrderLine(List<Prim> list, GameController c, SquadView q)
     {
         var order = c.Battle.View.StatusOf(q.Id);
-        if (order?.Order is not { } o || o.Kind is OrderKind.Hold or OrderKind.SetRoe
+        if (order?.Order is not { } o || o.Kind is OrderKind.Hold
             || order.Status is not (OrderStatus.Pending or OrderStatus.Hesitating or OrderStatus.Executing or OrderStatus.Held))
         {
             return;
@@ -198,7 +338,7 @@ public static class FrameBuilder
         var at = new Pt(centre.X - 30, top - 30);
         var order = c.Battle.View.StatusOf(q.Id);
 
-        var name = $"#{q.Id} {q.OrgId}";
+        var name = $"#{q.Id} {Words.Unit(q.OrgId)}";
         if (q.Morale != MoraleState.Steady)
         {
             name += $" {Words.Of(q.Morale)}";
@@ -245,7 +385,8 @@ public static class FrameBuilder
             (Overlay.Truth, "F3 truth", Palette.Truth), (Overlay.Intent, "F4 intent", Palette.Intent),
         })
         {
-            list.Add(new TextPrim(new Pt(x, 20), label, c.Overlays.HasFlag(overlay) ? colour : Palette.DimText, 13));
+            var lit = c.Overlays.HasFlag(overlay) && (overlay == Overlay.Sight || !c.TruthOverlaysInert);
+            list.Add(new TextPrim(new Pt(x, 20), label, lit ? colour : Palette.DimText, 13));
             x += 90;
         }
 
@@ -269,7 +410,17 @@ public static class FrameBuilder
         }
 
         var chosen = squads.Where(q => c.Selected.Contains(q.Id)).ToArray();
-        if (chosen.Length == 0)
+        if (chosen.Length > 1)
+        {
+            // Several squads: every one with its state and orders, in a few lines each.
+            foreach (var q in chosen)
+            {
+                Line($"#{q.Id} {Words.Unit(q.OrgId)}", Palette.Selected, 14);
+                Line($"  Morale {Words.Of(q.Morale)} {Number(q.MoraleLevel)}, sup {Number(q.SuppressionLevel)}, ammo {Words.Of(q.Ammo)}", Palette.DimText, 12);
+                OrderLines(Line, c, q.Id);
+            }
+        }
+        else if (chosen.Length == 0)
         {
             Line("No squad selected", Palette.Selected, 15);
             Line("Left-click or drag: select (Shift adds)", Palette.DimText);
@@ -280,7 +431,7 @@ public static class FrameBuilder
         else
         {
             var q = chosen[0];
-            Line($"#{q.Id} {q.OrgId}{(chosen.Length > 1 ? $"  (+{chosen.Length - 1} more)" : "")}", Palette.Selected, 15);
+            Line($"#{q.Id} {Words.Unit(q.OrgId)}", Palette.Selected, 15);
             Line($"Morale: {Words.Of(q.Morale)} {Number(q.MoraleLevel)}");
             Bar(list, x, y - 11, 200, 5, q.MoraleLevel.F() / 100, Palette.MoraleBar);
             y += 8;
@@ -296,28 +447,7 @@ public static class FrameBuilder
             Line(q.LeaderId < 0 ? $"No leader (successor in {Seconds(q.TicksToSuccession)})" : $"Leader: {Words.Of(leader.Role)}");
             Line($"Ammo: {Words.Of(q.Ammo)}   RoE: {(c.Battle.View.RoeOf(q.Id) is { } roe ? Words.Of(roe) : "-")}");
 
-            var order = c.Battle.View.StatusOf(q.Id);
-            if (c.Queued(q.Id) is { } queued)
-            {
-                Line($"Order: {Words.Of(queued)} queued", Palette.DelayBar);
-            }
-            else if (order?.Order is { } o)
-            {
-                Line($"Order: {Words.Of(o.Kind)}: {Words.Of(order.Status)}", Palette.DelayBar);
-                if (order.Note != OrderNote.None)
-                {
-                    Line($"  {Words.Of(order.Note)}", Palette.DimText, 12);
-                }
-            }
-            else
-            {
-                Line("Order: none", Palette.DimText);
-            }
-
-            if (order is { Status: OrderStatus.Pending or OrderStatus.Hesitating })
-            {
-                Line($"Delay: {Seconds(order.TicksRemaining)} left of {Seconds(order.TotalDelayTicks)}", Palette.DelayBar);
-            }
+            OrderLines(Line, c, q.Id);
 
             var why = c.Battle.View.ReasonsFor(q.Id) ?? DelayReason.None;
             Line(why == DelayReason.None ? "Delay factors: none" : $"Delay factors: {Words.Of(why)}", Palette.DimText, 12);
@@ -335,11 +465,49 @@ public static class FrameBuilder
             }
         }
 
+        foreach (var refused in c.Battle.View.Rejections.TakeLast(1))
+        {
+            Line($"Order to #{refused.UnitId} refused: {Words.Of(refused.Reason)}", Palette.Rejected, 12);
+        }
+
         y += 6;
         Line($"Fire missions left: {c.Battle.View.MissionsLeft}", Palette.DimText, 12);
         foreach (var m in c.Battle.View.FireMissions.TakeLast(2))
         {
             Line($"  mission {m.Id}: {Words.Of(m.Status)}, eta {Seconds(m.EtaTicks)}, {m.RoundsLeft}/{m.RoundsTotal}", Palette.DimText, 12);
+        }
+    }
+
+    /// <summary>A squad's orders: a rules change on its way, the order and its state, and the delay left.</summary>
+    private static void OrderLines(Action<string, Rgb?, int> line, GameController c, int squad)
+    {
+        if (RoeText(c, squad) is { } change)
+        {
+            line(change, Palette.DelayBar, 12);
+        }
+
+        var order = c.Battle.View.StatusOf(squad);
+        if (c.Queued(squad) is { } queued)
+        {
+            line($"Order: {Words.Of(queued)} queued", Palette.DelayBar, 13);
+        }
+        else if (order?.Order is { } o)
+        {
+            line($"Order: {Words.Of(o.Kind)}: {Words.Of(order.Status)}", Palette.DelayBar, 13);
+            // A delivered Defend order carries the sim's "no behaviour of its own" note, but the men do defend.
+                if (order.Note != OrderNote.None && !(o.Kind == OrderKind.Defend && order.Note == OrderNote.NotImplemented))
+            {
+                line($"  {Words.Of(order.Note)}", Palette.DimText, 12);
+            }
+        }
+        else
+        {
+            line("Order: none", Palette.DimText, 13);
+        }
+
+        if (order is { Status: OrderStatus.Pending or OrderStatus.Hesitating })
+        {
+            line($"Delay: {Seconds(order.TicksRemaining)} left of {Seconds(order.TotalDelayTicks)}", Palette.DelayBar, 13);
         }
     }
 

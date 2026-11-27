@@ -55,8 +55,27 @@ public sealed record UiButton(Command Command, string Label, Area Area);
 public sealed class GameController
 {
     private const float PickPixels = 9;
+
+    /// <summary>The least pixels per metre of the opening view: below it men and postures cannot be told apart.</summary>
+    public const float ReadableScale = 6;
+
+    /// <summary>The sight overlay's line-of-sight checks per frame.</summary>
+    public const int SightChecksPerFrame = 150;
+
+    private const float OpeningScale = 10;
+    private const float OpeningMargin = 15;
+
+    /// <summary>How long an incoming-fire mark stays after the last round of its bearing (display only).</summary>
+    public const int IncomingTicks = 20;
+
+    /// <summary>How long a refused or impossible order stays marked on the map (display only).</summary>
+    public const int RejectedTicks = 100;
+
+    private readonly Dictionary<(int Squad, int Sector), (long Tick, float DirX, float DirY, bool Explosion)> _incoming = [];
+    private readonly Dictionary<(int Squad, bool Roe), (long Issued, long Seen)> _refusals = [];
     private readonly SortedSet<int> _selected = [];
     private readonly Dictionary<int, (long Tick, OrderKind Kind)> _queued = [];
+    private readonly Dictionary<int, (long Tick, RoeMode Roe)> _queuedRoe = [];
     private readonly MapView _map;
     private readonly SightOverlay _sight = new();
 
@@ -90,6 +109,12 @@ public sealed class GameController
 
     public void Toggle(Overlay overlay) => Overlays ^= overlay;
 
+    /// <summary>
+    /// Set once the truth overlays find no truth to show (outside development builds): they are inert, so their keys are
+    /// not highlighted (item 2.5a).
+    /// </summary>
+    internal bool TruthOverlaysInert { get; set; }
+
     /// <summary>Whether the sight overlay has finished its pass (it works a slice per frame).</summary>
     public bool SightComplete => _sight.Complete;
 
@@ -102,9 +127,87 @@ public sealed class GameController
         }
     }
 
+    /// <summary>Line-of-sight checks the sight overlay asked on its last frame.</summary>
+    public int SightChecksLastFrame => _sight.ChecksLastUpdate;
+
     internal SightOverlay Sight => _sight;
 
-    public void Step() => Battle.Step();
+    /// <summary>
+    /// The opening view (item 2.5a): close enough to tell men and postures apart, on the player's own forces; if they are
+    /// too far apart to show together, on the first squad.
+    /// </summary>
+    public void FrameOwnForces()
+    {
+        var squads = Battle.View.Squads;
+        if (squads.Count == 0)
+        {
+            return;
+        }
+
+        var men = squads.SelectMany(q => q.Soldiers).ToArray();
+        var (left, right) = (men.Min(s => s.X.F()), men.Max(s => s.X.F()));
+        var (top, bottom) = (men.Min(s => s.Y.F()), men.Max(s => s.Y.F()));
+        var fit = MathF.Min(Layout.Map.W / (right - left + (2 * OpeningMargin)), Layout.Map.H / (bottom - top + (2 * OpeningMargin)));
+        var (x, y) = fit >= ReadableScale ? ((left + right) / 2, (top + bottom) / 2) : Centre(squads[0]);
+        Camera.Set(x, y, Math.Clamp(fit, ReadableScale, OpeningScale));
+    }
+
+    public void Step()
+    {
+        Battle.Step();
+        RememberIncoming();
+        RememberRefusals();
+    }
+
+    /// <summary>Notes when each own squad's refused or impossible order was first seen to be so.</summary>
+    private void RememberRefusals()
+    {
+        var view = Battle.View;
+        foreach (var q in view.Squads)
+        {
+            foreach (var (order, roe) in new[] { (view.StatusOf(q.Id), false), (view.RoeStatusOf(q.Id), true) })
+            {
+                if (order is { Status: OrderStatus.Refused or OrderStatus.Rejected }
+                    && !(_refusals.TryGetValue((q.Id, roe), out var had) && had.Issued == order.IssuedTick))
+                {
+                    _refusals[(q.Id, roe)] = (order.IssuedTick, view.Tick);
+                }
+            }
+        }
+    }
+
+    /// <summary>Whether the map mark for this refused order has had its time.</summary>
+    internal bool RefusalExpired(int squad, bool roe, long issued) =>
+        _refusals.TryGetValue((squad, roe), out var r) && r.Issued == issued && Battle.View.Tick - r.Seen > RejectedTicks;
+
+    /// <summary>The bearings of recent enemy fire on the player's own squads, as the side knows them.</summary>
+    internal IEnumerable<(int Squad, float DirX, float DirY, bool Explosion)> Incoming =>
+        _incoming.OrderBy(e => e.Key).Select(e => (e.Key.Squad, e.Value.DirX, e.Value.DirY, e.Value.Explosion));
+
+    /// <summary>Drops the marks that are old at <paramref name="tick"/>.</summary>
+    public void ForgetIncoming(long tick)
+    {
+        foreach (var key in _incoming.Where(e => tick - e.Value.Tick > IncomingTicks).Select(e => e.Key).ToArray())
+        {
+            _incoming.Remove(key);
+        }
+    }
+
+    private void RememberIncoming()
+    {
+        var tick = Battle.View.Tick;
+        var fire = Battle.View.IncomingFire;
+        if (fire.Count > 0)
+        {
+            var squadOf = Battle.View.Squads.SelectMany(q => q.Soldiers.Select(s => (s.Id, Squad: q.Id))).ToDictionary(p => p.Id, p => p.Squad);
+            foreach (var f in fire.Where(f => !f.Friendly))
+            {
+                _incoming[(squadOf[f.SoldierId], f.Sector)] = (tick, f.DirX.F(), f.DirY.F(), f.Explosion);
+            }
+        }
+
+        ForgetIncoming(tick);
+    }
 
     /// <summary>Runs the ticks that a frame of this length earns. Returns how many.</summary>
     public int Advance(double seconds)
@@ -172,13 +275,17 @@ public sealed class GameController
 
                 break;
             case Command.CycleRoe:
-                // The whole selection follows the first squad's next setting.
+                // The whole selection follows the first squad's next setting, counting from a change still on its way
+                // (queued or in the chain of command), so quick presses cycle onward.
                 if (_selected.Count > 0 && Battle.View.RoeOf(_selected.Min) is { } roe)
                 {
-                    var next = (RoeMode)(((int)roe + 1) % 3);
+                    var next = (RoeMode)(((int)(RoeOnTheWay(_selected.Min) ?? roe) + 1) % 3);
                     foreach (var id in _selected)
                     {
-                        Issue(id, new Order(OrderKind.SetRoe, Fixed.Zero, Fixed.Zero, (int)next));
+                        if (Battle.View.Issue(id, new Order(OrderKind.SetRoe, Fixed.Zero, Fixed.Zero, (int)next)) == IssueResult.Accepted)
+                        {
+                            _queuedRoe[id] = (Battle.View.Tick, next);
+                        }
                     }
                 }
 
@@ -317,6 +424,15 @@ public sealed class GameController
     /// <summary>An order given but not yet taken up by the sim (it is, on the next tick).</summary>
     internal OrderKind? Queued(int squad) =>
         _queued.TryGetValue(squad, out var q) && q.Tick == Battle.View.Tick ? q.Kind : null;
+
+    /// <summary>A rules-of-engagement change given but not yet taken up by the sim.</summary>
+    internal RoeMode? QueuedRoe(int squad) =>
+        _queuedRoe.TryGetValue(squad, out var q) && q.Tick == Battle.View.Tick ? q.Roe : null;
+
+    /// <summary>The setting a squad is about to have: queued, or still in the chain of command; null if none is.</summary>
+    internal RoeMode? RoeOnTheWay(int squad) => QueuedRoe(squad)
+        ?? (Battle.View.RoeStatusOf(squad) is { Order: { } o, Status: OrderStatus.Pending or OrderStatus.Hesitating }
+            ? (RoeMode)o.TargetId : null);
 
     /// <summary>The middle of a squad's able men (of all its men if none is able), in metres.</summary>
     internal static (float X, float Y) Centre(SquadView q)

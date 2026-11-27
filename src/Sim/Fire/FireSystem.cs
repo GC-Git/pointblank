@@ -145,8 +145,9 @@ public sealed class FireSystem : ISimSystem
     /// <summary>
     /// What the man is doing about fire, for the debug overlay (item 2.6), and the point his squad's task aims at if he
     /// takes part (the ordered task, else the unit AI's: his team in its mask and he not kept silent).
-    /// <see cref="IntentKind.Firing"/> means a shot within <see cref="FiredRecentlyTicks"/>; a man with a task and no recent
-    /// shot reads why, by the tests fire control applies. Read only: it must not <see cref="Sync"/>, which adds hashed state.
+    /// His present state comes first (item 2.5a): out of ammunition (no aim then), reloading, no part in a task (none, or
+    /// keeping silent), out of range, a friend in the way. Only then <see cref="IntentKind.Firing"/>, a shot within
+    /// <see cref="FiredRecentlyTicks"/>, else aiming. Read only: it must not <see cref="Sync"/>, which adds hashed state.
     /// </summary>
     internal (IntentKind Activity, (Fixed X, Fixed Y)? Target) ActivityOf(Squad squad, Soldier s, long tick)
     {
@@ -159,23 +160,43 @@ public sealed class FireSystem : ISimSystem
         var takesPart = fo != null && (fo.Mask & (1 << s.TeamIndex)) != 0 && !(ai && _aiSilent.Contains(s.Id));
         (Fixed X, Fixed Y)? target = takesPart ? (fo!.X, fo.Y) : null;
         var st = _indexOf.TryGetValue(s.Id, out var i) ? _states[i] : null;
-        if (st != null && tick - st.LastFired <= FiredRecentlyTicks)
-        {
-            return (IntentKind.Firing, target);
-        }
-
-        if (!takesPart || st?.Weapon is not { } w)
+        if (st?.Weapon is not { } w)
         {
             return (IntentKind.None, null);
         }
 
-        var activity = st.Rounds == 0 ? IntentKind.NoAmmo
-            : st.Reload > 0 ? IntentKind.Reloading
-            : !InRange(s, w, fo!.X, fo.Y) ? IntentKind.OutOfRange
+        if (st.Rounds == 0)
+        {
+            return (IntentKind.NoAmmo, null);
+        }
+
+        if (st.Reload > 0)
+        {
+            return (IntentKind.Reloading, target);
+        }
+
+        if (!takesPart)
+        {
+            return (IntentKind.None, null);
+        }
+
+        var activity = !InRange(s, w, fo!.X, fo.Y) ? IntentKind.OutOfRange
             : Masked(s, squad.Side, fo.X, fo.Y, ai ? AiClearance : Rules.MaskClearance) ? IntentKind.Blocked
+            : tick - st.LastFired <= FiredRecentlyTicks ? IntentKind.Firing
             : IntentKind.Aiming;
         return (activity, target);
     }
+
+    /// <summary>The ticks left of a man's reload, 0 when he is not reloading (read only, for tests).</summary>
+    internal int ReloadTicksOf(int soldierId) => _indexOf.TryGetValue(soldierId, out var i) ? _states[i].Reload : 0;
+
+    /// <summary>The squad's fire task (the ordered one, else the unit AI's), or null (read only, for tests).</summary>
+    internal (Fixed X, Fixed Y, int TeamMask, bool Ai)? FireTaskOf(int squadId) =>
+        _orders.TryGetValue(squadId, out var o) ? (o.X, o.Y, o.Mask, false)
+        : _ai.TryGetValue(squadId, out var a) ? (a.X, a.Y, a.Mask, true) : null;
+
+    /// <summary>Whether the man is keeping silent on his squad's AI fire task (read only, for tests).</summary>
+    internal bool IsAiSilent(int soldierId) => _aiSilent.Contains(soldierId);
 
     /// <summary>Ends the squad's AI fire task, if any.</summary>
     internal void StopAiFire(int squadId) => _ai.Remove(squadId);
