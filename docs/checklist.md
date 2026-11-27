@@ -152,7 +152,7 @@ Status: draft, awaiting owner sign-off
   *Done when:* screenshot-mode tests capture the expected frames. The UI reads only
   player-side knowledge (test).
 
-- [ ] **2.6 Debug overlays and screenshot mode** (S)
+- [x] **2.6 Debug overlays and screenshot mode** (S)
   Toggleable LOS cones, suppression and morale values, true vs known positions, AI
   intent.
   *Done when:* each overlay toggles and appears in a screenshot test.
@@ -169,6 +169,10 @@ Status: draft, awaiting owner sign-off
   than the pre-change baseline in every scenario; a test shows `Hold` just after `Sneak`
   leaves men low, and an AI get-down is not cancelled by a pending order. Existing criteria
   stay green with no retuning.
+  Owner decision: in a routing squad that is pinned, men who are not personally pinned may get
+  up and run in rushes. This is an accepted realistic reason under the "no rises while pinned"
+  criterion: each man is judged by his own state, consistent with pinned men dropping
+  individually.
 
 - [ ] **2.5a View and control follow-ups** (S)
   Do before 2.7. From the 2.5 review: the rules-of-engagement key pressed just after a move
@@ -181,6 +185,15 @@ Status: draft, awaiting owner sign-off
   review: overlay text overlaps when zoomed in, and the orange values look like stale-contact
   labels; sight dots clear on every pan or zoom frame, so they stay mostly blank while moving;
   a sight pass costs 9-21 ms per frame (Debug, two squads; first run 48 ms).
+  Also from the 2.6 review: the F4 intent label "firing" takes precedence over reload, ammo and
+  task state (`fix-assault` seed 1: 13% of "firing" man-ticks were reloading, 9% had no fire task
+  or were silenced; "reloading" never appears), so current state must be checked first; several
+  intent states have no test (reloading, aiming, out of range, no ammo, rushing, down, firing
+  line, flanking, ambushing, fleeing, cowering) and target lines are compared against the code
+  under test; "cowering" covers a whole squad before each man reacts and "firing line" includes
+  non-firing men; release builds still highlight F2-F4 although inert.
+  During review the headless `--build-solutions` Godot command once reached build DONE then did
+  not exit for over 8 minutes (not yet checked on main).
   *Done when:* each is fixed or explicitly deferred by the owner, with tests.
 
 - [ ] **2.4c Squad masked by friendlies** (S)
@@ -189,6 +202,16 @@ Status: draft, awaiting owner sign-off
   *Done when:* the cause is measured over seeds 1-50, and a squad that cannot fire because
   friendlies are in the way realistically shifts for a clear line or the reason it stays is
   documented; no scenario reshaping and no retuning.
+
+- [ ] **2.4d Posture follow-ups** (S)
+  Do before 2.7 unless the owner defers it. From the 2.4b review (seeds 1-50): the posture
+  metric excuses every routing rise, including a few personally pinned men (4 cases in
+  equal-fire and fix-assault); a new movement order replaces a pending AI get-down with a
+  higher posture (34 of 1054 man-orders in fix-assault); calm men in unpinned moving squads
+  lie prone over 5 s (240 cases in fix-assault, same before 2.4b); a few men rise while
+  morale says Pinned but suppression does not.
+  *Done when:* each is measured, then fixed or documented as realistic, with tests; no
+  retuning or scenario reshaping.
 
 - [ ] **2.7 First playable scenarios** (S) ⛳
   Two scenarios: *fix and assault* (US platoon + tank vs German MG position) and

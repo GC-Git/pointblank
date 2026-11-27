@@ -236,11 +236,21 @@ public sealed class MovementSystem : ISimSystem
         }
     }
 
+    /// <summary>
+    /// Whether fire keeps a man from getting up (items 2.4a and 2.4b): he is pinned himself, or his squad is pinned. The
+    /// one exception is a routing squad: its men who are not pinned themselves still get up to run, rushing and dropping
+    /// (UnitAiBrain.Flee). Owner decision, item 2.4b: this is an accepted realistic reason for a rise in a pinned squad,
+    /// because each man is judged by his own state, as when pinned men drop one by one.
+    /// </summary>
+    private bool HeldDown(Squad q, Soldier s) =>
+        _suppression != null
+        && (_suppression.StateOf(s.Id) == Suppression.SuppressionState.Pinned
+            || (q.Morale != MoraleState.Routing && _suppression.IsPinned(q.Id)));
+
     public void Tick(World world)
     {
         // Before anyone steps.
-        PostureChange.Apply(_org.Squads, world.Tick, Rules.OrderPostureDelayTicks,
-            s => _suppression?.StateOf(s.Id) == Suppression.SuppressionState.Pinned);
+        PostureChange.Apply(_org.Squads, world.Tick, Rules.OrderPostureDelayTicks, HeldDown);
 
         if (_local.Count > 0)
         {

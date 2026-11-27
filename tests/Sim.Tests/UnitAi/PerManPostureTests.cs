@@ -3,6 +3,7 @@ using PointBlank.Sim.Morale;
 using PointBlank.Sim.Movement;
 using PointBlank.Sim.Org;
 using PointBlank.Sim.Sight;
+using PointBlank.Sim.Suppression;
 using static PointBlank.Sim.Tests.UnitAi.AiRig;
 
 namespace PointBlank.Sim.Tests.UnitAi;
@@ -53,6 +54,62 @@ public class PerManPostureTests
         rig.Move.Stop(q.Id); // a Hold before anyone has stood
         rig.World.Run(rig.Move.Rules.OrderPostureDelayTicks + 1);
         Assert.All(q.Soldiers, s => Assert.Equal(rig.Move.Rules.PostureOf(MoveMode.Sneak), s.Posture));
+    }
+
+    /// <summary>Item 2.4b: a Hold is no reason to stay up. Men who were about to get lower still do.</summary>
+    [Fact]
+    public void A_hold_just_after_sneak_leaves_the_men_low()
+    {
+        var (rig, q) = Prone();
+        foreach (var s in q.Soldiers)
+        {
+            s.Posture = Posture.Standing;
+        }
+
+        rig.Move.Execute(new MoveOrder(q.Id, M(120), M(20), MoveMode.Sneak));
+        rig.Move.Stop(q.Id); // before anyone has crouched
+        rig.World.Run(rig.Move.Rules.OrderPostureDelayTicks + 1);
+        Assert.All(q.Soldiers, s => Assert.Equal(rig.Move.Rules.PostureOf(MoveMode.Sneak), s.Posture));
+        Assert.All(q.Soldiers, s => Assert.False(s.AwaitingPosture));
+    }
+
+    /// <summary>Item 2.4b: the AI's get-down made while a man still awaits an order's posture survives a Hold.</summary>
+    [Fact]
+    public void An_ai_get_down_is_not_cancelled_by_a_pending_order()
+    {
+        var (rig, q) = Prone();
+        var man = q.Soldiers[0];
+        man.Posture = Posture.Standing;
+        rig.Move.Execute(new MoveOrder(q.Id, M(120), M(20), MoveMode.Sneak)); // he awaits: crouch
+        PostureChange.Request(man, Posture.Prone, rig.World.Tick, rig.Move.Rules.OrderPostureDelayTicks);
+        rig.Move.Stop(q.Id);
+        rig.World.Run(rig.Move.Rules.OrderPostureDelayTicks + 1);
+        Assert.Equal(Posture.Prone, man.Posture);
+    }
+
+    /// <summary>Item 2.4b: while the squad is pinned even a man who is not pinned himself stays down.</summary>
+    [Fact]
+    public void A_man_does_not_get_up_while_his_squad_is_pinned()
+    {
+        var (rig, q) = Prone();
+        var man = q.Soldiers[0];
+        for (var i = 0; i <= rig.Move.Rules.OrderPostureDelayTicks + 1; i++)
+        {
+            foreach (var s in q.Soldiers.Skip(1))
+            {
+                rig.Suppression.SetLevel(s.Id, Fixed.FromInt(100));
+            }
+
+            rig.World.Step();
+            if (i == 0)
+            {
+                Assert.True(rig.Suppression.IsPinned(q.Id));
+                Assert.NotEqual(SuppressionState.Pinned, rig.Suppression.StateOf(man.Id));
+                PostureChange.Request(man, Posture.Kneeling, rig.World.Tick, rig.Move.Rules.OrderPostureDelayTicks);
+            }
+
+            Assert.Equal(Posture.Prone, man.Posture);
+        }
     }
 
     [Fact]

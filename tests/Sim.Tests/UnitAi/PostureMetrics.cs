@@ -1,3 +1,4 @@
+using PointBlank.Sim.Morale;
 using PointBlank.Sim.Org;
 using PointBlank.Sim.Sight;
 using PointBlank.Sim.Suppression;
@@ -14,10 +15,23 @@ internal sealed class PostureMetrics
 {
     public int All, Most, AllButOne, PinnedStandUps, QuickReversals, Changes;
 
+    /// <summary>Rises (item 2.4b): a man took a higher posture while his squad was pinned by fire. Seen: it was pinned
+    /// when the tick began (what the decision could know). After: it was pinned when the tick ended.</summary>
+    public int RisesSeenPinned, RisesAfterPinned, RisesMoralePinned;
+
+    /// <summary>Of <see cref="RisesSeenPinned"/>, those of squads that are not routing: the ones nothing excuses.</summary>
+    public int UnexcusedRises;
+
+    public SortedDictionary<string, int> RiseKinds { get; } = [];
+
+    public SortedDictionary<string, int> ReversalKinds { get; } = [];
+
     public List<string> Samples { get; } = [];
 
     public override string ToString() =>
-        $"all {All}, >=75% {Most}, all-but-one {AllButOne}, stand-ups while pinned {PinnedStandUps}, quick reversals {QuickReversals}, changes {Changes}";
+        $"all {All}, >=75% {Most}, all-but-one {AllButOne}, stand-ups while pinned {PinnedStandUps}, quick reversals {QuickReversals}, changes {Changes}, rises in pinned squad {RisesSeenPinned} (at tick end {RisesAfterPinned}, morale Pinned {RisesMoralePinned})"
+        + " [" + string.Join(", ", RiseKinds.Select(k => $"{k.Key}={k.Value}")) + "] reversals ["
+        + string.Join(", ", ReversalKinds.Select(k => $"{k.Key}={k.Value}")) + "]";
 
     public static PostureMetrics Measure(string id, int seeds)
     {
@@ -30,10 +44,12 @@ internal sealed class PostureMetrics
             var suppression = world.GetSystem<SuppressionSystem>();
             var last = new Dictionary<int, Posture>();
             var left = new Dictionary<int, (Posture From, long Tick)>();
+            var pinnedBefore = new HashSet<int>();
             for (var i = 0; i <= ticks; i++)
             {
                 if (i > 0)
                 {
+                    pinnedBefore = org.Squads.Where(q => suppression.IsPinned(q.Id)).Select(q => q.Id).ToHashSet();
                     world.Step();
                 }
 
@@ -58,6 +74,21 @@ internal sealed class PostureMetrics
 
                         changed++;
                         r.Changes++;
+                        if (s.Posture < was) // a rise (Standing is lowest in the enum)
+                        {
+                            var seen = pinnedBefore.Contains(q.Id);
+                            var after = suppression.IsPinned(q.Id);
+                            r.RisesSeenPinned += seen ? 1 : 0;
+                            r.RisesAfterPinned += after ? 1 : 0;
+                            r.RisesMoralePinned += q.Morale == MoraleState.Pinned ? 1 : 0;
+                            if (seen)
+                            {
+                                r.UnexcusedRises += q.Morale != MoraleState.Routing ? 1 : 0;
+                                var key = $"{q.Morale}{(suppression.StateOf(s.Id) == SuppressionState.Pinned ? "/manPinned" : "")}/{was}>{s.Posture}";
+                                r.RiseKinds[key] = r.RiseKinds.GetValueOrDefault(key) + 1;
+                            }
+                        }
+
                         if (s.Posture == Posture.Standing && suppression.StateOf(s.Id) == SuppressionState.Pinned)
                         {
                             r.PinnedStandUps++;
@@ -66,6 +97,8 @@ internal sealed class PostureMetrics
                         if (left.TryGetValue(s.Id, out var l) && l.From == s.Posture && world.Tick - l.Tick <= World.TicksPerSecond)
                         {
                             r.QuickReversals++;
+                            var key = $"{q.Morale}/{s.Posture}>{was}>{s.Posture}";
+                            r.ReversalKinds[key] = r.ReversalKinds.GetValueOrDefault(key) + 1;
                         }
 
                         left[s.Id] = (was, world.Tick);
