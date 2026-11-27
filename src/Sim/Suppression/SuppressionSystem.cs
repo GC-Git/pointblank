@@ -199,7 +199,7 @@ public sealed class SuppressionSystem(OrgSystem org, SuppressionRules rules) : I
                 st.DropAt = -1;
                 if (s.CanLead && (st.State == SuppressionState.Pinned || q.State == SuppressionState.Pinned))
                 {
-                    s.Posture = Posture.Prone; // still pinned (himself or his squad) when his reaction comes: down
+                    PostureChange.Drop(s); // still pinned (himself or his squad) when his reaction comes: down
                 }
             }
         }
@@ -221,11 +221,11 @@ public sealed class SuppressionSystem(OrgSystem org, SuppressionRules rules) : I
         z = unchecked((z ^ (z >> 27)) * 0x94D049BB133111EBUL);
         z ^= z >> 31;
         var range = Math.Max(0, Rules.PinDropDelayTicks);
-        st.DropAt = world.Tick + (long)(z % (ulong)(range + 1));
+        st.DropAt = world.Tick + (long)(z % (ulong)Math.Max(1, range)); // the posture is taken on the next tick: within the delay
         if (st.DropAt == world.Tick)
         {
             st.DropAt = -1;
-            st.Soldier.Posture = Posture.Prone;
+            PostureChange.Drop(st.Soldier);
         }
     }
 

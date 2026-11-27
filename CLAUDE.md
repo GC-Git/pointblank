@@ -97,7 +97,9 @@ lines.
    "Done when" list are written first. Tick the item only when its PR is merged.
 8. **Never push to `main`**, never force push, never merge your own PR. The owner's
    merge is the sign-off, except where the merge rule below applies.
-9. **Delete only inside the repo**, using relative paths.
+9. **Don't run delete commands** (`rm`, `rmdir`, `Remove-Item`; see rule 14). If a delete is
+   ever genuinely needed, raise it with the owner; it uses a relative path and stays inside
+   the repo.
 10. **Run `git push` and `gh pr create` as separate commands.** Combined in one line,
     `--base main` trips the push-to-main deny rule.
 11. **Fog of war: UI and AI code may only use `SideView`** (`world.ViewFor(side)`). It shows
@@ -111,13 +113,24 @@ lines.
     overlays only. Tests in `tests/Sim.Tests/Boundary/` enforce this by reflection.
 12. **Realism first**: realistic unit behaviour beats hitting a scripted moment or test bar. Never
     tune or reshape a scenario only to make a test pass; report the conflict instead.
+13. **Split scope creep into new checklist items**: when a new realism or scope problem
+    appears mid-item, add it as a new item instead of growing the current one.
+14. **Never run a plain `git push`** (always `git push origin <branch>`) and don't run delete
+    commands (rule 9); both trigger approval prompts that block the owner.
 
 ## Merge rule (owner's standing instruction, 2026-11-25)
 
 The coordinating session may merge a checklist item's PR when the independent evaluator's
-verdict is MERGE and all tests pass, then start the next item. It stops and waits for the
-owner at every ⛳ sign-off item, on any evaluator FAIL or DON'T MERGE, or if a build
-session is blocked. Build sessions never merge their own PR.
+verdict is MERGE and all tests pass, then start the next item. It always stops and waits
+for the owner at every ⛳ sign-off item. On an evaluator FAIL or DON'T MERGE, or a blocked
+build session, it first gives one automatic fix round if the fix is clear (below);
+otherwise it stops and waits for the owner. Build sessions never merge their own PR.
+
+**One automatic fix round (owner's rule):** on a FAIL or DON'T MERGE, or a blocked build,
+with a clear fix, the coordinator sends it back for one fix round without asking. If there
+is no clear fix, the second attempt also fails, or a design or realism decision is needed,
+it stops and waits for the owner. Nothing is ever merged on a DON'T MERGE without the
+owner's explicit OK.
 
 ## Permissions
 

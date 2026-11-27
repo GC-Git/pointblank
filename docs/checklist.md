@@ -129,11 +129,21 @@ Status: draft, awaiting owner sign-off
   in 100% of seeds. No unit under fire stays standing in the open for more than 3 s
   unless ordered `MoveFast`.
 
-- [ ] **2.4 Off-map artillery** (O)
+- [x] **2.4 Off-map artillery** (O)
   Call-for-fire with delay and dispersion, HE blast and fragmentation, limited missions.
   *Done when:* after a 2-minute barrage on a defended position, defender morale and
   suppression are measurably degraded. In ≥30% of seeds the attacker has not spotted
   every surviving defender.
+
+- [ ] **2.4a Per-man reactions everywhere** (S)
+  Every order-driven or AI-driven posture change is made man by man, each after his own
+  deterministic reaction delay. A man waits for a move order's posture before he walks,
+  and a later order is never overridden by an older pending change.
+  *Done when:* across the `bombard-creep`, `pin-open`, `fix-assault`, `equal-fire` and
+  idle-reaction scenarios (seeds 1 to 50) no squad with 3 or more able men ever has every
+  able man change posture on the same tick (permanent test; any exception justified in
+  it). The delays are tagged data values and the pending state is in the state hash. All
+  earlier "Done when" tests stay green with no retuned values.
 
 - [ ] **2.5 Godot view and controls** (S)
   Draw the map, units as placeholder shapes, and visible enemies only. Selection,
@@ -146,6 +156,19 @@ Status: draft, awaiting owner sign-off
   Toggleable LOS cones, suppression and morale values, true vs known positions, AI
   intent.
   *Done when:* each overlay toggles and appears in a screenshot test.
+
+- [ ] **2.4b Realistic posture under pin and orders** (S)
+  Do before 2.7. Follow-ups from the 2.4a review: men get up while their squad is pinned
+  (seeds 1-50: `fix-assault` 227 such rises, `equal-fire` 271; before 2.4a 183 and 216; one
+  routing man rises every 4 s); quick stand/drop reversals remain; by code reading, not yet
+  tested, `Halt` cancels any awaited posture change including going lower, so `Hold` just
+  after `Sneak` may leave men standing, and an AI get-down made while a man awaits an order
+  is also cancellable.
+  *Done when:* over seeds 1-50, men don't get up while their squad is pinned unless a
+  documented realistic reason applies; quick stand/drop reversals within 1 s are no higher
+  than the pre-change baseline in every scenario; a test shows `Hold` just after `Sneak`
+  leaves men low, and an AI get-down is not cancelled by a pending order. Existing criteria
+  stay green with no retuning.
 
 - [ ] **2.7 First playable scenarios** (S) ⛳
   Two scenarios: *fix and assault* (US platoon + tank vs German MG position) and

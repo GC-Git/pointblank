@@ -125,6 +125,9 @@ public sealed class UnitAiRules
     /// <summary>Each man's rush and drop cycle is offset by up to this many ticks (his own draw).</summary>
     public int RushJitterTicks { get; init; }
 
+    /// <summary>The longest a man takes to change posture on a unit-AI decision (<c>ai_posture_delay</c>).</summary>
+    public int AiPostureDelayTicks { get; init; }
+
     public Fixed LineSpacing { get; init; }
 
     public int LineReformSectors { get; init; }
@@ -203,6 +206,7 @@ public sealed class UnitAiRules
             BoltSuppressionTicks = (N("bolt_suppression_delay") * Fixed.FromInt(World.TicksPerSecond)).ToInt(),
             BoltBurstTicks = (N("bolt_burst_delay") * Fixed.FromInt(World.TicksPerSecond)).ToInt(),
             BoltBurstRadius = N("bolt_burst_radius"),
+            AiPostureDelayTicks = (N("ai_posture_delay") * Fixed.FromInt(World.TicksPerSecond)).ToInt(),
             RushJitterTicks = (N("rush_jitter") * Fixed.FromInt(World.TicksPerSecond)).ToInt(),
             LineSpacing = Pos("line_spacing"),
             LineReformSectors = Math.Max(1, N("line_reform_sectors").ToInt()),

@@ -103,7 +103,7 @@ public class StandingScanTests(ITestOutputHelper output)
         }
     }
 
-    private static World Runner(string id, ulong seed, out int ticks)
+    internal static World Runner(string id, ulong seed, out int ticks)
     {
         var scenario = ScenarioCatalog.Find(id)!;
         var world = scenario.CreateWorld(seed);
@@ -117,7 +117,7 @@ public class StandingScanTests(ITestOutputHelper output)
     }
 
     /// <summary>The idle-reaction and advance scenarios of <see cref="UnitAiScenarioTests"/>, and equal fire, all with real rounds.</summary>
-    private static World Rig(string id, ulong seed, out int ticks)
+    internal static World Rig(string id, ulong seed, out int ticks)
     {
         var map = new GameMap(id, 200, 60);
         if (id == "idle-hidden")

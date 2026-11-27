@@ -388,17 +388,15 @@ public sealed class MoraleSystem(
         candidates.Sort((a, b) => a.D2 != b.D2 ? a.D2.CompareTo(b.D2) : a.Order.CompareTo(b.Order));
         foreach (var c in candidates)
         {
-            var before = squad.Soldiers.Select(s => s.Posture).ToArray();
             if (move.Execute(new MoveOrder(squad.Id, c.X, c.Y, MoveMode.MoveFast)) == MoveResult.Started)
             {
                 if (HoldForAi)
                 {
                     // Item 2.4 review: no one gets up on the same tick. Every man stays as he was, held, and the unit AI
                     // lets each go after his own delay (UnitAiBrain.BoltDelay).
-                    for (var i = 0; i < squad.Soldiers.Count; i++)
+                    foreach (var s in squad.Soldiers)
                     {
-                        var s = squad.Soldiers[i];
-                        s.Posture = before[i];
+                        PostureChange.Cancel(s);
                         move.SetHeldSoldier(s.Id, s.CanLead);
                     }
                 }

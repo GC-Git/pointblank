@@ -143,7 +143,8 @@ public sealed class MovementSystem : ISimSystem
         && x < _map.TileSize * Fixed.FromInt(_map.Width) && y < _map.TileSize * Fixed.FromInt(_map.Height);
 
     /// <summary>
-    /// Starts the order: plans the squad's path and sets every able man's posture to the mode's.
+    /// Starts the order: plans the squad's path; every able man takes the mode's posture on his own reaction
+    /// (<c>Org.PostureChange</c>) and walks once he has.
     /// Orders reach this through the chain of command (<c>Orders.CommandSystem</c>); tests may call it
     /// directly. Changes nothing unless the result is <see cref="MoveResult.Started"/>: a target off
     /// the map is rejected, never clamped to the edge.
@@ -193,7 +194,7 @@ public sealed class MovementSystem : ISimSystem
         foreach (var s in active)
         {
             _members[s.Id] = new Member { SinceReplan = int.MaxValue / 2 };
-            s.Posture = Rules.PostureOf(order.Mode);
+            PostureChange.Order(s, Rules.PostureOf(order.Mode)); // each man gets up or down on his own reaction
         }
 
         return MoveResult.Started;
@@ -211,17 +212,22 @@ public sealed class MovementSystem : ISimSystem
         {
             _members.Remove(s.Id);
             _local.Remove(s.Id);
+            PostureChange.Halt(s); // a later Hold is not overridden by the posture of the move it ends
         }
     }
 
     public void Tick(World world)
     {
+        // Before anyone steps.
+        PostureChange.Apply(_org.Squads, world.Tick, Rules.OrderPostureDelayTicks,
+            s => _suppression?.StateOf(s.Id) == Suppression.SuppressionState.Pinned);
+
         if (_local.Count > 0)
         {
             foreach (var id in _local.Keys.ToArray())
             {
                 var l = _local[id];
-                if (IsAble(l.Soldier))
+                if (IsAble(l.Soldier) && !l.Soldier.AwaitingPosture)
                 {
                     MoveMember(l.Member, l.Soldier, l.Mode);
                 }
@@ -384,7 +390,7 @@ public sealed class MovementSystem : ISimSystem
         var anyFree = false;
         foreach (var s in active)
         {
-            anyFree |= (heldMask & (1 << s.TeamIndex)) == 0 && !_heldMen.Contains(s.Id);
+            anyFree |= (heldMask & (1 << s.TeamIndex)) == 0 && !_heldMen.Contains(s.Id) && !s.AwaitingPosture;
         }
 
         // While some teams are held (fire and movement), the others bound: they rush at MoveFast speed on the same path.
@@ -404,7 +410,7 @@ public sealed class MovementSystem : ISimSystem
             }
 
             m.SinceReplan = Math.Min(m.SinceReplan + 1, int.MaxValue / 2);
-            m.Held = (heldMask & (1 << soldier.TeamIndex)) != 0 || _heldMen.Contains(soldier.Id);
+            m.Held = (heldMask & (1 << soldier.TeamIndex)) != 0 || _heldMen.Contains(soldier.Id) || soldier.AwaitingPosture;
             if (m.Held)
             {
                 finished = false;
