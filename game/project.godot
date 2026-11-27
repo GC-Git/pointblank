@@ -12,3 +12,9 @@ config/features=PackedStringArray("4.7", "C#", "Forward Plus")
 
 project/assembly_name="PointBlank"
 project/solution_directory=".."
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"

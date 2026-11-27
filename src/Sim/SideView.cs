@@ -1,5 +1,6 @@
 using PointBlank.Sim.Artillery;
 using PointBlank.Sim.Fire;
+using PointBlank.Sim.Map;
 using PointBlank.Sim.Morale;
 using PointBlank.Sim.Movement;
 using PointBlank.Sim.Orders;
@@ -96,6 +97,12 @@ public sealed class SideView
     public string Side { get; }
 
     public long Tick => _world.Tick;
+
+    /// <summary>
+    /// A fresh copy of the ground (item 2.5), or null for a world without a map. Both sides know the map. It copies every
+    /// tile, so a caller keeps it rather than asking every frame.
+    /// </summary>
+    public MapView? Map => _world.FindSystem<MapSystem>() is { } m ? MapView.Of(m.Map) : null;
 
     /// <summary>The side's own squads, in spawn order.</summary>
     public IReadOnlyList<SquadView> Squads => _org.Squads.Where(q => q.Side == Side).Select(ViewOf).ToArray();

@@ -24,6 +24,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Sim\Sim.csproj" />
     <ProjectReference Include="..\..\tools\Runner\Runner.csproj" />
+    <ProjectReference Include="..\..\src\Presentation\Presentation.csproj" />
+    <!-- Build order only: the UI boundary test reads the game's assembly, so testing must never see a stale one. -->
+    <ProjectReference Include="..\..\game\PointBlank.csproj" ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
 
 </Project>

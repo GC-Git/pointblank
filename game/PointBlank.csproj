@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\src\Sim\Sim.csproj" />
+    <ProjectReference Include="..\src\Presentation\Presentation.csproj" />
   </ItemGroup>
 
 </Project>
