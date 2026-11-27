@@ -59,6 +59,12 @@ public sealed record TextPrim(Pt At, string Text, Rgb Colour, int Size = 13) : P
     public override bool Touches(Pt p, float slack) => MathF.Abs(p.X - At.X) <= slack && MathF.Abs(p.Y - At.Y) <= slack;
 }
 
+/// <summary>The screen area a text takes, estimated for the engine's default font, to keep texts apart.</summary>
+public static class TextBox
+{
+    public static Area Of(TextPrim t) => new(t.At.X, t.At.Y - t.Size + 1, t.Text.Length * t.Size * 0.56f, t.Size + 1);
+}
+
 /// <summary>Flat placeholder colours (the art style is a later milestone). The three enemy colours are used for nothing else.</summary>
 public static class Palette
 {
@@ -91,10 +97,12 @@ public static class Palette
     public static readonly Rgb OrderLine = new(224, 240, 255);
     public static readonly Rgb Impact = new(255, 250, 210);
     public static readonly Rgb Mission = new(196, 90, 220);
+    public static readonly Rgb Incoming = new(255, 204, 180);
+    public static readonly Rgb Rejected = new(120, 80, 255);
 
     // Debug overlays (item 2.6): each colour is used for its overlay only.
     public static readonly Rgb Sight = new(150, 250, 236);
-    public static readonly Rgb Values = new(255, 160, 72);
+    public static readonly Rgb Values = new(178, 160, 255);
     public static readonly Rgb Truth = new(255, 0, 255);
     public static readonly Rgb Intent = new(190, 255, 60);
 

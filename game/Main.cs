@@ -31,6 +31,12 @@ public partial class Main : Node2D
             _screenshot = options.Screenshot;
             _game = new GameController(PlayerBattle.Create(options.Scenario, options.Seed, options.Scripted));
             _game.Select(options.Select);
+            // The opening view is on the player's forces, unless the command line asks for something else.
+            if (!options.WholeMap && options.Zoom == null && options.Center == null)
+            {
+                _game.FrameOwnForces();
+            }
+
             if (options.Zoom != null || options.Center != null)
             {
                 var (x, y) = options.Center ?? (_game.Camera.CentreX, _game.Camera.CentreY);

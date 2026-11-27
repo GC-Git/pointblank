@@ -105,6 +105,9 @@ public sealed record LaunchOptions(
     /// <summary>Screenshot mode: keys pressed before the first frame, by Godot's key names (e.g. F1).</summary>
     public IReadOnlyList<string> Press { get; init; } = [];
 
+    /// <summary>Start on the whole map instead of the player's forces.</summary>
+    public bool WholeMap { get; init; }
+
     /// <exception cref="ArgumentException">An unknown or incomplete option.</exception>
     public static LaunchOptions Parse(IReadOnlyList<string> args)
     {
@@ -124,6 +127,7 @@ public sealed record LaunchOptions(
                 "--out" => o with { Out = Value() },
                 "--press" => o with { Press = Value().Split(',') },
                 "--scripted" => o with { Scripted = true },
+                "--whole-map" => o with { WholeMap = true },
                 "--select" => o with { Select = Numbers() },
                 "--zoom" => o with { Zoom = Real(Value()) },
                 "--center" => o with { Center = Value().Split(',') is [var x, var y] ? (Real(x), Real(y)) : throw new ArgumentException("--center needs x,y.") },

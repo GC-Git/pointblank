@@ -48,13 +48,19 @@ public class ScreenshotTests
         return true;
     });
 
+    /// <summary>A marker for <see cref="Capture"/>: keep the game's own opening view.</summary>
+    private const string Opening = "(opening view)";
+
     private static void Capture(params string[] options)
     {
         Assert.True(Built.Value);
         var godot = Environment.GetEnvironmentVariable("PB_GODOT")
             ?? @"C:\Godot_v4.7-stable_mono_win64\Godot_v4.7-stable_mono_win64_console.exe";
         string[] launch = ["--path", "game", "--audio-driver", "Dummy", "--windowed", "--resolution", "320x180", "--", "--screenshot"];
-        Start(godot, [.. launch, .. options], "ERROR");
+
+        // The twins here look at the whole map, unless a test asks for the game's own opening view.
+        string[] view = options.Contains(Opening) ? [] : ["--whole-map"];
+        Start(godot, [.. launch, .. options.Where(o => o != Opening), .. view], "ERROR");
     }
 
     private static void Start(string program, IEnumerable<string> arguments, string? forbidden)

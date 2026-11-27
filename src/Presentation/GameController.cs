@@ -55,6 +55,17 @@ public sealed record UiButton(Command Command, string Label, Area Area);
 public sealed class GameController
 {
     private const float PickPixels = 9;
+
+    /// <summary>The least pixels per metre of the opening view: below it men and postures cannot be told apart.</summary>
+    public const float ReadableScale = 6;
+
+    private const float OpeningScale = 10;
+    private const float OpeningMargin = 15;
+
+    /// <summary>How long an incoming-fire mark stays after the last round of its bearing (display only).</summary>
+    public const int IncomingTicks = 20;
+
+    private readonly Dictionary<(int Squad, int Sector), (long Tick, float DirX, float DirY, bool Explosion)> _incoming = [];
     private readonly SortedSet<int> _selected = [];
     private readonly Dictionary<int, (long Tick, OrderKind Kind)> _queued = [];
     private readonly Dictionary<int, (long Tick, RoeMode Roe)> _queuedRoe = [];
@@ -105,7 +116,60 @@ public sealed class GameController
 
     internal SightOverlay Sight => _sight;
 
-    public void Step() => Battle.Step();
+    /// <summary>
+    /// The opening view (item 2.5a): close enough to tell men and postures apart, on the player's own forces; if they are
+    /// too far apart to show together, on the first squad.
+    /// </summary>
+    public void FrameOwnForces()
+    {
+        var squads = Battle.View.Squads;
+        if (squads.Count == 0)
+        {
+            return;
+        }
+
+        var men = squads.SelectMany(q => q.Soldiers).ToArray();
+        var (left, right) = (men.Min(s => s.X.F()), men.Max(s => s.X.F()));
+        var (top, bottom) = (men.Min(s => s.Y.F()), men.Max(s => s.Y.F()));
+        var fit = MathF.Min(Layout.Map.W / (right - left + (2 * OpeningMargin)), Layout.Map.H / (bottom - top + (2 * OpeningMargin)));
+        var (x, y) = fit >= ReadableScale ? ((left + right) / 2, (top + bottom) / 2) : Centre(squads[0]);
+        Camera.Set(x, y, Math.Clamp(fit, ReadableScale, OpeningScale));
+    }
+
+    public void Step()
+    {
+        Battle.Step();
+        RememberIncoming();
+    }
+
+    /// <summary>The bearings of recent enemy fire on the player's own squads, as the side knows them.</summary>
+    internal IEnumerable<(int Squad, float DirX, float DirY, bool Explosion)> Incoming =>
+        _incoming.OrderBy(e => e.Key).Select(e => (e.Key.Squad, e.Value.DirX, e.Value.DirY, e.Value.Explosion));
+
+    /// <summary>Drops the marks that are old at <paramref name="tick"/>.</summary>
+    public void ForgetIncoming(long tick)
+    {
+        foreach (var key in _incoming.Where(e => tick - e.Value.Tick > IncomingTicks).Select(e => e.Key).ToArray())
+        {
+            _incoming.Remove(key);
+        }
+    }
+
+    private void RememberIncoming()
+    {
+        var tick = Battle.View.Tick;
+        var fire = Battle.View.IncomingFire;
+        if (fire.Count > 0)
+        {
+            var squadOf = Battle.View.Squads.SelectMany(q => q.Soldiers.Select(s => (s.Id, Squad: q.Id))).ToDictionary(p => p.Id, p => p.Squad);
+            foreach (var f in fire.Where(f => !f.Friendly))
+            {
+                _incoming[(squadOf[f.SoldierId], f.Sector)] = (tick, f.DirX.F(), f.DirY.F(), f.Explosion);
+            }
+        }
+
+        ForgetIncoming(tick);
+    }
 
     /// <summary>Runs the ticks that a frame of this length earns. Returns how many.</summary>
     public int Advance(double seconds)
