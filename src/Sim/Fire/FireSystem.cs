@@ -139,6 +139,22 @@ public sealed class FireSystem : ISimSystem
         _ai[squad.Id] = new FireOrder(targetId, x, y) { Mask = teamMask };
     }
 
+    /// <summary>
+    /// What the man's squad's fire task aims at, if he takes part: the ordered task, else the unit AI's (his team in its
+    /// mask and he not kept silent). Read only (debug overlay, item 2.6).
+    /// </summary>
+    internal (Fixed X, Fixed Y)? TargetOf(int squadId, Soldier s)
+    {
+        if (_orders.TryGetValue(squadId, out var ordered))
+        {
+            return (ordered.X, ordered.Y);
+        }
+
+        return _ai.TryGetValue(squadId, out var ai) && (ai.Mask & (1 << s.TeamIndex)) != 0 && !_aiSilent.Contains(s.Id)
+            ? (ai.X, ai.Y)
+            : null;
+    }
+
     /// <summary>Ends the squad's AI fire task, if any.</summary>
     internal void StopAiFire(int squadId) => _ai.Remove(squadId);
 

@@ -71,6 +71,23 @@ public sealed class MovementSystem : ISimSystem
     /// <summary>The mode of the squad's unfinished move order, or null when it is not moving.</summary>
     internal MoveMode? ModeOf(int squadId) => _guides.TryGetValue(squadId, out var g) ? g.Mode : null;
 
+    /// <summary>
+    /// Where the soldier is walking to (the centre of his goal tile), or null when he has no path. <c>Local</c>: on a move
+    /// of his own; <c>Held</c>: on his squad's move but waiting. Read only (debug overlay, item 2.6).
+    /// </summary>
+    internal (Fixed X, Fixed Y, bool Local, bool Held)? GoalOf(int soldierId)
+    {
+        var local = _local.TryGetValue(soldierId, out var l);
+        var member = local ? l!.Member : _members.GetValueOrDefault(soldierId);
+        if (member?.Path == null)
+        {
+            return null;
+        }
+
+        var (x, y) = Centre(member.Goal);
+        return (x, y, local, !local && member.Held);
+    }
+
     /// <summary>Whether the soldier is walking now: on his squad's move and not held, or on a local move.</summary>
     internal bool IsSoldierMoving(int soldierId) =>
         _local.ContainsKey(soldierId) || (_members.TryGetValue(soldierId, out var m) && m.Path != null && !m.Held);

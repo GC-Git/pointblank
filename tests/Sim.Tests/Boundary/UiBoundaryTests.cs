@@ -51,6 +51,12 @@ public class UiBoundaryTests
         "PointBlank.Sim.Artillery.FireMissionView",
         "PointBlank.Sim.Artillery.MissionStatus",
         "PointBlank.Sim.Artillery.ShellImpactView",
+
+        // Debug overlays only (item 2.6): Only_the_truth_overlays_call_for_debug_truth holds the truth to one method.
+        "PointBlank.Sim.Spotting.SpottingDebug",
+        "PointBlank.Sim.Spotting.TruthSoldier",
+        "PointBlank.Sim.Spotting.TruthSquad",
+        "PointBlank.Sim.Spotting.IntentKind",
     ];
 
     /// <summary>Namespaces (by prefix) whose types look members up by name at run time.</summary>
@@ -147,6 +153,54 @@ public class UiBoundaryTests
         Assert.Empty(offenders);
     }
 
+    [Theory]
+    [MemberData(nameof(UiAssemblies))]
+    public void Only_the_truth_overlays_call_for_debug_truth(string which)
+    {
+        using var pe = new PEReader(File.OpenRead(PathOf(which)));
+        var md = pe.GetMetadataReader();
+        var truth = md.MemberReferences
+            .Where(h => md.GetString(md.GetMemberReference(h).Name) == "DebugTruth")
+            .Select(h => System.Reflection.Metadata.Ecma335.MetadataTokens.GetToken(h))
+            .ToHashSet();
+        var callers = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (var handle in md.MethodDefinitions)
+        {
+            var method = md.GetMethodDefinition(handle);
+            if (method.RelativeVirtualAddress == 0)
+            {
+                continue;
+            }
+
+            var il = pe.GetMethodBody(method.RelativeVirtualAddress).GetILBytes()!;
+            for (var i = 0; i + 4 < il.Length; i++)
+            {
+                // call, callvirt and ldtoken; ldftn and ldvirtftn (0x06 and 0x07 after the 0xFE prefix).
+                var calls = il[i] is 0x28 or 0x6F or 0xD0 || (i > 0 && il[i - 1] == 0xFE && il[i] is 0x06 or 0x07);
+                if (calls && truth.Contains(BitConverter.ToInt32(il, i + 1)))
+                {
+                    var type = md.GetTypeDefinition(method.GetDeclaringType());
+                    callers.Add($"{md.GetString(type.Namespace)}.{md.GetString(type.Name)}.{md.GetString(method.Name)}");
+                }
+            }
+        }
+
+        // The game only paints; in Presentation one method of one class asks for the truth.
+        string[] allowed = which == "game" ? [] : ["PointBlank.Presentation.TruthOverlays.Draw"];
+        Assert.Equal(allowed, callers.ToArray());
+    }
+
+    [Fact]
+    public void The_truth_overlays_hand_no_truth_to_other_code()
+    {
+        var type = typeof(PointBlank.Presentation.GameController).Assembly.GetType("PointBlank.Presentation.TruthOverlays", true)!;
+        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+
+        Assert.Empty(type.GetFields(all));
+        Assert.Empty(type.GetProperties(all));
+        Assert.All(type.GetMethods(all).Where(m => !m.IsPrivate && !m.Name.Contains('<')), m => Assert.Equal(("Draw", typeof(void)), (m.Name, m.ReturnType)));
+    }
+
     [Fact]
     public void Only_the_tests_and_the_headless_runner_see_sim_internals()
     {
@@ -156,12 +210,12 @@ public class UiBoundaryTests
     }
 
     [Fact]
-    public void The_player_battle_hands_out_nothing_but_the_players_view()
+    public void The_player_battle_hands_out_nothing_but_the_players_view_and_the_debug_overlays_truth()
     {
         var members = typeof(PlayerBattle).GetMembers(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
             .Select(m => m.Name).Where(n => !n.StartsWith("get_", StringComparison.Ordinal)).Order(StringComparer.Ordinal);
 
-        Assert.Equal(["Create", "PlayerSide", "ScenarioId", "ScenarioIds", "Seed", "Step", "View"], members);
+        Assert.Equal(["Create", "DebugTruth", "PlayerSide", "ScenarioId", "ScenarioIds", "Seed", "Step", "View"], members);
         Assert.Equal("us", PlayerBattle.Create("fix-assault", 1).View.Side);
     }
 }

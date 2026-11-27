@@ -145,7 +145,7 @@ Status: draft, awaiting owner sign-off
   it). The delays are tagged data values and the pending state is in the state hash. All
   earlier "Done when" tests stay green with no retuned values.
 
-- [ ] **2.5 Godot view and controls** (S)
+- [x] **2.5 Godot view and controls** (S)
   Draw the map, units as placeholder shapes, and visible enemies only. Selection,
   right-click orders, pause, 1×/2×/4× speed. Show morale, suppression and order-delay
   state on the unit and in a panel.
@@ -175,7 +175,9 @@ Status: draft, awaiting owner sign-off
   silently cancels the pending move (needs an owner decision on whether it should); at default
   zoom squads are tiny blobs and men and postures can't be told apart; with several squads
   selected the panel shows only the first, e.g. 'Order: none' while another has a pending order;
-  Smoke and Ambush aren't offered; incoming-fire bearings and order rejections aren't drawn.
+  Smoke and Ambush aren't offered; incoming-fire bearings and order rejections aren't drawn. Unit labels and the panel title
+  show raw ids such as `us_rifle_squad`; pressing the rules-of-engagement key again before
+  the first change applies repeats the same setting instead of cycling further.
   *Done when:* each is fixed or explicitly deferred by the owner, with tests.
 
 - [ ] **2.7 First playable scenarios** (S) ⛳

@@ -1,13 +1,15 @@
 using PointBlank.Sim.Orders;
 using PointBlank.Sim.Replays;
 using PointBlank.Sim.Scenarios;
+using PointBlank.Sim.Spotting;
 
 namespace PointBlank.Sim;
 
 /// <summary>
 /// A battle as the player's program holds it (item 2.5): it can be stepped one tick at a time and seen only through the
 /// player's <see cref="SideView"/>. It never hands out the <see cref="PointBlank.Sim.World"/>, a scenario or its metrics,
-/// so UI code cannot reach the truth through it. The player is always <see cref="PlayerSide"/>.
+/// so UI code cannot reach the truth through it, except as read-only copies for debug overlays
+/// (<see cref="DebugTruth"/>). The player is always <see cref="PlayerSide"/>.
 /// </summary>
 public sealed class PlayerBattle
 {
@@ -61,6 +63,12 @@ public sealed class PlayerBattle
 
         return new PlayerBattle(scenarioId, seed, world);
     }
+
+    /// <summary>
+    /// DEBUG OVERLAYS ONLY (item 2.6, CLAUDE.md rule 11): <see cref="SpottingSystem.DebugTruth()"/> as copies of both
+    /// sides. Nothing else may call it; a boundary test enforces this.
+    /// </summary>
+    public SpottingDebug DebugTruth() => World.GetSystem<SpottingSystem>().DebugTruth(World);
 
     /// <summary>Advances the battle one tick (a tenth of a second of battle time).</summary>
     public void Step() => World.Step();

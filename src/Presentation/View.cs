@@ -102,6 +102,9 @@ public sealed record LaunchOptions(
     string Scenario, ulong Seed, bool Screenshot, IReadOnlyList<int> Ticks, string Out, bool Scripted, IReadOnlyList<int> Select,
     float? Zoom, (float X, float Y)? Center)
 {
+    /// <summary>Screenshot mode: keys pressed before the first frame, by Godot's key names (e.g. F1).</summary>
+    public IReadOnlyList<string> Press { get; init; } = [];
+
     /// <exception cref="ArgumentException">An unknown or incomplete option.</exception>
     public static LaunchOptions Parse(IReadOnlyList<string> args)
     {
@@ -119,6 +122,7 @@ public sealed record LaunchOptions(
                 "--screenshot" => o with { Screenshot = true },
                 "--ticks" => o with { Ticks = Numbers() },
                 "--out" => o with { Out = Value() },
+                "--press" => o with { Press = Value().Split(',') },
                 "--scripted" => o with { Scripted = true },
                 "--select" => o with { Select = Numbers() },
                 "--zoom" => o with { Zoom = Real(Value()) },

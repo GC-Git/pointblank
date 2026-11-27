@@ -24,6 +24,12 @@ public static class FrameBuilder
         var squads = view.Squads;
         var list = new List<Prim>();
 
+        // Seen ground lies under everything else.
+        if (c.Overlays.HasFlag(Overlay.Sight))
+        {
+            c.Sight.Draw(list, c);
+        }
+
         foreach (var q in squads)
         {
             OrderLine(list, c, q);
@@ -63,6 +69,8 @@ public static class FrameBuilder
         {
             SquadLabel(list, c, q);
         }
+
+        TruthOverlays.Draw(list, c);
 
         if (c.DragBox is { } box)
         {
@@ -229,6 +237,18 @@ public static class FrameBuilder
             new Pt(10, 20),
             $"{c.Battle.ScenarioId}  seed {c.Battle.Seed}   time {seconds / 60:00}:{seconds % 60:00}   {clock}   right-click: {Words.Of(c.Mode)}",
             Palette.Text, 14));
+        // The overlay keys; one that is on shows in its overlay's colour.
+        var x = 560f;
+        foreach (var (overlay, label, colour) in new[]
+        {
+            (Overlay.Sight, "F1 sight", Palette.Sight), (Overlay.Values, "F2 values", Palette.Values),
+            (Overlay.Truth, "F3 truth", Palette.Truth), (Overlay.Intent, "F4 intent", Palette.Intent),
+        })
+        {
+            list.Add(new TextPrim(new Pt(x, 20), label, c.Overlays.HasFlag(overlay) ? colour : Palette.DimText, 13));
+            x += 90;
+        }
+
         list.Add(new TextPrim(new Pt(c.Layout.Panel.X + 10, 20), $"contacts {c.Battle.View.KnownEnemies.Count}", Palette.DimText, 13));
     }
 

@@ -21,6 +21,12 @@ public sealed class ScreenshotFactAttribute : FactAttribute
     }
 }
 
+/// <summary><see cref="ScreenshotFactAttribute"/>, for a theory.</summary>
+public sealed class ScreenshotTheoryAttribute : TheoryAttribute
+{
+    public ScreenshotTheoryAttribute() => Skip = new ScreenshotFactAttribute().Skip;
+}
+
 /// <summary>
 /// Item 2.5 screenshot-mode tests. The game saves frames; the same battle is run here (it is deterministic), where the
 /// truth is visible, and the frames' pixels are checked against it. The frames stay in <c>TestResults/screens</c>.
@@ -279,6 +285,38 @@ public class ScreenshotTests
         Assert.NotEmpty(hedges);
         Assert.All(hedges, t => Assert.True(frame.Is(At(t.X, t.Y, 1), Palette.Hedge), $"hedge at {t}"));
         Assert.Equal(0, frame.Count(new Area(0, 0, 1280, 720), Palette.IsEnemy));
+    }
+
+    [ScreenshotTheory]
+    [InlineData("F1", "sight", 500)]
+    [InlineData("F2", "values", 40)]
+    [InlineData("F3", "truth", 100)]
+    [InlineData("F4", "intent", 60)]
+    public void Each_overlay_key_puts_its_overlay_on_the_screen_and_no_other(string key, string name, int least)
+    {
+        var colours = new Dictionary<string, Rgb>
+        {
+            ["sight"] = Palette.Sight, ["values"] = Palette.Values, ["truth"] = Palette.Truth, ["intent"] = Palette.Intent,
+        };
+        var map = Twin("fix-assault", true).Layout.Map;
+        Png Frame(string folder, params string[] keys)
+        {
+            var out_ = Path.Combine(Root(), "TestResults", "screens", "overlays", folder);
+            string[] options = ["--scenario", "fix-assault", "--seed", "1", "--ticks", "600", "--scripted", "--select", "2", "--out", out_];
+            Capture(keys.Length == 0 ? options : [.. options, "--press", string.Join(",", keys)]);
+            return Png.Load(Path.Combine(out_, "fix-assault-seed1-tick600.png"));
+        }
+
+        var on = Frame(name, key);
+        var pixels = on.Count(map, p => p == colours[name]);
+        Assert.True(pixels >= least, $"{name}: {pixels} pixels on, at least {least} expected");
+        Assert.All(colours.Where(c => c.Key != name), c => Assert.Equal(0, on.Count(map, p => p == c.Value)));
+
+        // Off, both never pressed and pressed twice.
+        foreach (var off in new[] { Frame($"{name}-never"), Frame($"{name}-twice", key, key) })
+        {
+            Assert.All(colours.Values, c => Assert.Equal(0, off.Count(new Area(0, 0, 1280, 720), p => p == c)));
+        }
     }
 
     /// <summary>A reader for the 8-bit RGB or RGBA, non-interlaced PNG files Godot writes.</summary>
