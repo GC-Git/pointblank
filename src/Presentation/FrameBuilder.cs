@@ -327,7 +327,8 @@ public static class FrameBuilder
             (Overlay.Truth, "F3 truth", Palette.Truth), (Overlay.Intent, "F4 intent", Palette.Intent),
         })
         {
-            list.Add(new TextPrim(new Pt(x, 20), label, c.Overlays.HasFlag(overlay) ? colour : Palette.DimText, 13));
+            var lit = c.Overlays.HasFlag(overlay) && (overlay == Overlay.Sight || !c.TruthOverlaysInert);
+            list.Add(new TextPrim(new Pt(x, 20), label, lit ? colour : Palette.DimText, 13));
             x += 90;
         }
 

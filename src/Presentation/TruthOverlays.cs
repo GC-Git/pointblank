@@ -11,6 +11,7 @@ namespace PointBlank.Presentation;
 /// </summary>
 internal static class TruthOverlays
 {
+
     // Men get their own text from 8 pixels per metre; further out only squads do.
     public static void Draw(List<Prim> list, GameController c)
     {
@@ -22,6 +23,7 @@ internal static class TruthOverlays
         // Null outside development builds: the truth overlays are then inert.
         if (c.Battle.DebugTruth() is not { } truth)
         {
+            c.TruthOverlaysInert = true;
             return;
         }
 

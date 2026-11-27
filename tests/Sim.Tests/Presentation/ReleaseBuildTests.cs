@@ -68,12 +68,12 @@ public class ReleaseBuildTests
                     .Count(p => Equals(prim.GetValue(p), colour));
             }
 
-            // The top strip's key help takes a colour while its overlay is on: that is the one thing drawn in a release.
+            // In development the key help and the map take the overlay's colour; a release highlights nothing (item 2.5a).
             foreach (var name in new[] { "Values", "Truth", "Intent" })
             {
                 controller.GetMethod("Toggle")!.Invoke((object)game, [Enum.Parse(overlayType, name)]);
                 var drawn = Drawn(name);
-                Assert.True(development ? drawn > 1 : drawn == 1, $"{configuration}, {name}: {drawn} shapes");
+                Assert.True(development ? drawn > 1 : drawn == 0, $"{configuration}, {name}: {drawn} shapes");
             }
         }
         finally

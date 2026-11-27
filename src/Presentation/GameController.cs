@@ -59,6 +59,9 @@ public sealed class GameController
     /// <summary>The least pixels per metre of the opening view: below it men and postures cannot be told apart.</summary>
     public const float ReadableScale = 6;
 
+    /// <summary>The sight overlay's line-of-sight checks per frame.</summary>
+    public const int SightChecksPerFrame = 150;
+
     private const float OpeningScale = 10;
     private const float OpeningMargin = 15;
 
@@ -102,6 +105,12 @@ public sealed class GameController
 
     public void Toggle(Overlay overlay) => Overlays ^= overlay;
 
+    /// <summary>
+    /// Set once the truth overlays find no truth to show (outside development builds): they are inert, so their keys are
+    /// not highlighted (item 2.5a).
+    /// </summary>
+    internal bool TruthOverlaysInert { get; set; }
+
     /// <summary>Whether the sight overlay has finished its pass (it works a slice per frame).</summary>
     public bool SightComplete => _sight.Complete;
 
@@ -113,6 +122,9 @@ public sealed class GameController
             _sight.Update(this, int.MaxValue);
         }
     }
+
+    /// <summary>Line-of-sight checks the sight overlay asked on its last frame.</summary>
+    public int SightChecksLastFrame => _sight.ChecksLastUpdate;
 
     internal SightOverlay Sight => _sight;
 

@@ -64,6 +64,7 @@ public sealed class PlayerBattle
         return new PlayerBattle(scenarioId, seed, world);
     }
 
+
     /// <summary>
     /// DEBUG OVERLAYS ONLY (item 2.6, CLAUDE.md rule 11): <see cref="SpottingSystem.DebugTruth()"/> as copies of both
     /// sides. Nothing else may call it; a boundary test enforces this. Development builds only (configurations Debug and
