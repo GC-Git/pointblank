@@ -58,6 +58,28 @@ public sealed record SightRules
     /// <summary>Obscurement added each time a ray crosses a hedge below its top.</summary>
     public Fixed HedgeObscurement { get; init; }
 
+    /// <summary>Rays at least this long (m) take the hedge's full obscurement (item 2.4 follow-up). Default 0: always full.</summary>
+    public Fixed HedgeFarRange { get; init; }
+
+    /// <summary>Rays at most this long (m) take only <see cref="HedgeNearObscurement"/>; linear up to <see cref="HedgeFarRange"/>.</summary>
+    public Fixed HedgeNearRange { get; init; }
+
+    /// <summary>A hedge's obscurement on a short ray (capped at <see cref="HedgeObscurement"/>).</summary>
+    public Fixed HedgeNearObscurement { get; init; } = Fixed.FromInt(1000);
+
+    /// <summary>A crossing closer than this (m) to either end of the ray is a man at the hedge, looking through it.</summary>
+    public Fixed HedgeAdjacentRange { get; init; }
+
+    /// <summary>The most a hedge obscures at a crossing next to one end of the ray.</summary>
+    public Fixed HedgeAdjacentObscurement { get; init; } = Fixed.FromInt(1000);
+
+    /// <summary>A copy in which every hedge is its full obscurement at any range: the physical hedge, for blast (item 2.4).</summary>
+    public SightRules SolidHedges() => this with
+    {
+        HedgeFarRange = Fixed.Zero, HedgeNearRange = Fixed.Zero, HedgeNearObscurement = Fixed.FromInt(1000),
+        HedgeAdjacentRange = Fixed.Zero, HedgeAdjacentObscurement = Fixed.FromInt(1000),
+    };
+
     public Fixed EyeHeight(Posture posture) => _eye[(int)posture];
 
     public Fixed CanopyHeight(TerrainType type) => _canopy[(int)type];
@@ -79,7 +101,14 @@ public sealed record SightRules
             Number(sight, "default", "floor_height"),
             Number(sight, "default", "block_threshold"),
             terrain.Hedge.BlockHeight,
-            terrain.Hedge.LosObscurement);
+            terrain.Hedge.LosObscurement)
+        {
+            HedgeFarRange = Number(sight, "default", "hedge_far_range"),
+            HedgeNearRange = Number(sight, "default", "hedge_near_range"),
+            HedgeNearObscurement = Number(sight, "default", "hedge_near_obscurement"),
+            HedgeAdjacentRange = Number(sight, "default", "hedge_adjacent_range"),
+            HedgeAdjacentObscurement = Number(sight, "default", "hedge_adjacent_obscurement"),
+        };
     }
 
     private static Fixed Number(DataTable table, string id, string name)

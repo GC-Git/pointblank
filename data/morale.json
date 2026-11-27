@@ -33,7 +33,9 @@
         "rout_below": { "value": "15", "unit": "points", "source": { "kind": "placeholder", "note": "Placeholder: a broken squad below this routs." } },
         "steady_above": { "value": "70", "unit": "points", "source": { "kind": "placeholder", "note": "Placeholder: a rallying squad at or above this (or at its ceiling, if lower) has rallied." } },
         "rout_distance": { "value": "100", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: how far a routing squad runs from the nearest known enemy." } },
-        "rout_threat_radius": { "value": "300", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: a routing squad runs from the mean bearing of the known enemies within this distance." } }
+        "rout_threat_radius": { "value": "300", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: a routing squad runs from the mean bearing of the known enemies within this distance." } },
+        "cower_radius": { "value": "50", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: a broken or routing squad with a man this close to a shell burst cowers flat where it is (owner decision: cower first)." } },
+        "cower_lift": { "value": "15", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: it bolts only after this long with no burst within cower_radius (the shelling lifts or slackens)." } }
       }
     }
   ]

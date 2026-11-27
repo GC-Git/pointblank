@@ -9,6 +9,7 @@ using PointBlank.Sim.Replays;
 using PointBlank.Sim.Sight;
 using PointBlank.Sim.Spotting;
 using PointBlank.Sim.Suppression;
+using PointBlank.Sim.UnitAi;
 
 namespace PointBlank.Runner;
 
@@ -73,7 +74,8 @@ public sealed class PinScenario : IScenario
         var fire = new FireSystem(map, org, sight, fireRules, spot, suppression);
         var command = new CommandSystem(org, move, CommandRules.FromData(data), fire, suppression);
         var watch = new PinWatch(org, fire, suppression);
-        var world = new World(seed, new MapSystem(map), org, command, move, spot, fire, suppression, new MgFireControl(2), watch);
+        var ai = new UnitAiSystem(map, org, move, fire, command, UnitAiRules.FromData(data));
+        var world = new World(seed, new MapSystem(map), org, command, move, spot, ai, fire, suppression, new MgFireControl(2), watch);
 
         var rng = new SimRng((seed * 7919UL) + 17UL);
         Fixed Jitter(int metres) => Fixed.FromRatio(rng.NextInt(-metres * 1000, (metres * 1000) + 1), 1000);

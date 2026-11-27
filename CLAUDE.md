@@ -109,6 +109,8 @@ lines.
     list for `game/` or AI code, and never make those members public.
     `SpottingSystem.DebugTruth()` is the one public truth accessor, and it is for debug
     overlays only. Tests in `tests/Sim.Tests/Boundary/` enforce this by reflection.
+12. **Realism first**: realistic unit behaviour beats hitting a scripted moment or test bar. Never
+    tune or reshape a scenario only to make a test pass; report the conflict instead.
 
 ## Merge rule (owner's standing instruction, 2026-11-25)
 
@@ -132,7 +134,7 @@ The authoritative list is the report: `dotnet run --project tools/Runner -- --da
 (it lists every placeholder as `table/entry/value`). Currently every value in `data/` is a
 sample placeholder, added by item 0.4 to exercise the loader; none is historical.
 
-Data file format: `data/<table>.json` (tables: units, weapons, ammo, materials, organisation, terrain, postures, sight, movement, formation, command, spotting, fire, suppression, morale, unit_ai, unit_ai_tasks) = `{"table": "...", "entries": [{"id": "...", "values":
+Data file format: `data/<table>.json` (tables: units, weapons, ammo, materials, organisation, terrain, postures, sight, movement, formation, command, spotting, fire, suppression, morale, unit_ai, unit_ai_tasks, artillery) = `{"table": "...", "entries": [{"id": "...", "values":
 {"<name>": {"value": "853", "unit": "m/s", "source": {...}}}}]}`. `source` is
 `{"kind":"reference","ref":"title, author/publisher, page or URL"}`,
 `{"kind":"estimated","reasoning":"..."}` or `{"kind":"placeholder","note":"..."}`. The loader

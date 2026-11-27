@@ -175,6 +175,7 @@ public class SuppressionTests(ITestOutputHelper output)
         rig.Sup.SetLevel(s.Id, Rules.PinnedThreshold + M(1));
         rig.World.Step();
         Assert.Equal(SuppressionState.Pinned, rig.Sup.StateOf(s.Id));
+        rig.World.Run(Rules.PinDropDelayTicks); // he goes down on his own reaction, within pin_drop_delay
         Assert.Equal(Posture.Prone, s.Posture);
         rig.Sup.SetLevel(s.Id, Rules.PinnedRelease + M(1)); // below pinned, above release: still pinned
         rig.World.Step();
@@ -194,7 +195,41 @@ public class SuppressionTests(ITestOutputHelper output)
         rig.World.Step();
         Assert.Equal(SuppressionState.Pinned, rig.Sup.SquadStateOf(q.Id));
         Assert.True(rig.Sup.SquadLevelOf(q.Id) > M(85));
+        rig.World.Run(Rules.PinDropDelayTicks);
         Assert.All(q.Soldiers.Where(m => m.CanLead), m => Assert.Equal(Posture.Prone, m.Posture));
+    }
+
+    [Fact]
+    public void When_a_squad_is_pinned_each_man_drops_on_his_own_reaction_not_all_on_one_tick()
+    {
+        var spreads = new List<int>();
+        for (ulong seed = 1; seed <= 10; seed++)
+        {
+            var rig = Setup(seed);
+            var q = rig.Org.SpawnSquad("us_rifle_squad", M(20), M(20 + (int)seed)); // spawned standing
+            rig.World.Step();
+            foreach (var m in q.Soldiers)
+            {
+                rig.Sup.SetLevel(m.Id, M(90)); // every man crosses the pin threshold on the same tick
+            }
+
+            var down = new Dictionary<int, long>();
+            for (var t = 0; t <= Rules.PinDropDelayTicks; t++)
+            {
+                rig.World.Step();
+                foreach (var m in q.Soldiers.Where(m => m.Posture == Posture.Prone && !down.ContainsKey(m.Id)))
+                {
+                    down[m.Id] = rig.World.Tick;
+                }
+            }
+
+            Assert.Equal(SuppressionState.Pinned, rig.Sup.SquadStateOf(q.Id));
+            Assert.All(q.Soldiers.Where(m => m.CanLead), m => Assert.Equal(Posture.Prone, m.Posture)); // all down within the delay
+            spreads.Add((int)(down.Values.Max() - down.Values.Min()));
+        }
+
+        output.WriteLine($"drop spread first to last man (ticks): {string.Join(", ", spreads)}; pin_drop_delay {Rules.PinDropDelayTicks} ticks");
+        Assert.All(spreads, s => Assert.True(s > 0, "the whole squad dropped on one tick"));
     }
 
     private static int ShotsIn30s(ulong seed, Fixed level)

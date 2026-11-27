@@ -50,6 +50,7 @@ public sealed class MovementSystem : ISimSystem
     private readonly Dictionary<int, Member> _members = [];
     private readonly SortedDictionary<int, Local> _local = [];
     private readonly SortedDictionary<int, int> _held = [];
+    private readonly SortedSet<int> _heldMen = []; // single men the unit AI holds (item 2.4: each man bolts and drops on his own)
 
     public MovementSystem(GameMap map, OrgSystem org, MovementRules rules, Suppression.SuppressionSystem? suppression = null)
     {
@@ -78,6 +79,19 @@ public sealed class MovementSystem : ISimSystem
     /// Holds the teams in <paramref name="teamMask"/> (bit per team index) of a moving squad: they wait where they
     /// stand until released (mask 0). Ignored when the squad is not moving; cleared when its move ends or is replaced.
     /// </summary>
+    /// <summary>Holds one man of a moving squad where he is (or frees him): the unit AI's per-man rush and drop (item 2.4).</summary>
+    internal void SetHeldSoldier(int soldierId, bool held)
+    {
+        if (held)
+        {
+            _heldMen.Add(soldierId);
+        }
+        else
+        {
+            _heldMen.Remove(soldierId);
+        }
+    }
+
     internal void SetHeldTeams(int squadId, int teamMask, bool rush = false)
     {
         var value = (teamMask & ~RushFlag) | (rush ? RushFlag : 0);
@@ -236,6 +250,12 @@ public sealed class MovementSystem : ISimSystem
 
     public void AppendState(StateHasher hasher)
     {
+        hasher.Add(_heldMen.Count);
+        foreach (var id in _heldMen)
+        {
+            hasher.Add(id);
+        }
+
         hasher.Add(_org.Squads.Count);
         foreach (var squad in _org.Squads)
         {
@@ -364,7 +384,7 @@ public sealed class MovementSystem : ISimSystem
         var anyFree = false;
         foreach (var s in active)
         {
-            anyFree |= (heldMask & (1 << s.TeamIndex)) == 0;
+            anyFree |= (heldMask & (1 << s.TeamIndex)) == 0 && !_heldMen.Contains(s.Id);
         }
 
         // While some teams are held (fire and movement), the others bound: they rush at MoveFast speed on the same path.
@@ -384,7 +404,7 @@ public sealed class MovementSystem : ISimSystem
             }
 
             m.SinceReplan = Math.Min(m.SinceReplan + 1, int.MaxValue / 2);
-            m.Held = (heldMask & (1 << soldier.TeamIndex)) != 0;
+            m.Held = (heldMask & (1 << soldier.TeamIndex)) != 0 || _heldMen.Contains(soldier.Id);
             if (m.Held)
             {
                 finished = false;

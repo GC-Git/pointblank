@@ -40,6 +40,9 @@ public enum MoraleReason : ushort
 
     /// <summary>An HQ of the side is within <c>hq_rally_radius</c> (faster recovery).</summary>
     NearHq = 512,
+
+    /// <summary>Broken or routing under shellfire (item 2.4): the men cower flat where they are until the shelling lifts.</summary>
+    Cowering = 1024,
 }
 
 /// <summary>Helpers for <see cref="MoraleReason"/>.</summary>
@@ -48,7 +51,7 @@ public static class MoraleReasons
     /// <summary>Most important first: the order in which the UI should list reasons.</summary>
     public static readonly MoraleReason[] Priority =
     [
-        MoraleReason.LeaderKilled, MoraleReason.HeavyCasualties, MoraleReason.Pinned, MoraleReason.UnderFire,
+        MoraleReason.Cowering, MoraleReason.LeaderKilled, MoraleReason.HeavyCasualties, MoraleReason.Pinned, MoraleReason.UnderFire,
         MoraleReason.Leaderless, MoraleReason.Isolated, MoraleReason.OutOfContact, MoraleReason.Casualties,
         MoraleReason.NearHq, MoraleReason.Supported,
     ];
@@ -132,6 +135,12 @@ public sealed record MoraleRules
     /// <summary>A routing squad runs from the mean bearing of the known enemies within this distance (item 2.3).</summary>
     public Fixed RoutThreatRadius { get; init; }
 
+    /// <summary>A broken or routing squad with an able man within this distance (m) of a shell burst cowers (item 2.4).</summary>
+    public Fixed CowerRadius { get; init; }
+
+    /// <summary>It bolts (or recovers its feet) only after this many ticks with no burst within <see cref="CowerRadius"/>.</summary>
+    public int CowerLiftTicks { get; init; }
+
     /// <exception cref="DataException">The entry is missing or a value is out of range.</exception>
     public static MoraleRules FromData(DataSet data)
     {
@@ -178,6 +187,8 @@ public sealed record MoraleRules
             SteadyAbove = Level("steady_above"),
             RoutDistance = F("rout_distance", big),
             RoutThreatRadius = F("rout_threat_radius", big),
+            CowerRadius = F("cower_radius", big),
+            CowerLiftTicks = (F("cower_lift", big) * Fixed.FromInt(World.TicksPerSecond)).ToInt(),
         };
         if (r.ShockSpreadMin > r.ShockSpreadMax || !(r.RoutBelow <= r.BrokenBelow && r.BrokenBelow < r.BrokenRelease
             && r.BrokenRelease <= r.ShakenBelow && r.ShakenBelow <= r.ShakenRelease && r.BrokenRelease <= r.SteadyAbove))

@@ -83,10 +83,27 @@ public sealed class UnitAiSystem : ISimSystem
 
         public void SetHeldTeams(int squadId, int teamMask, bool rush) => ai._move.SetHeldTeams(Own(squadId).Id, teamMask, rush);
 
+        public void SetHeldSoldier(int squadId, int soldierId, bool held)
+        {
+            if (Own(squadId).Soldiers.Any(s => s.Id == soldierId))
+            {
+                ai._move.SetHeldSoldier(soldierId, held);
+            }
+        }
+
         public void SetFire(int squadId, int targetId, Fixed x, Fixed y, int teamMask) =>
             ai._fire.SetAiFire(world, Own(squadId), targetId, x, y, teamMask);
 
         public void StopFire(int squadId) => ai._fire.StopAiFire(Own(squadId).Id);
+
+        public void SetSilent(int squadId, int soldierId, bool silent)
+        {
+            var q = Own(squadId);
+            if (q.Soldiers.Any(s => s.Id == soldierId))
+            {
+                ai._fire.SetAiSilent(soldierId, silent);
+            }
+        }
 
         private Squad Own(int squadId) =>
             ai._org.Squads.FirstOrDefault(q => q.Id == squadId && q.Side == side)

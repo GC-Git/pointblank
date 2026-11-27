@@ -35,6 +35,7 @@ namespace PointBlank.Sim.Morale;
 /// side knows (<see cref="SpottingSystem.KnownEnemies"/>, so fog is respected), or to its nearest HQ if it knows none,
 /// pulled in until the point is on the map. <see cref="CommandSystem"/> refuses it every order but FallBack.</item>
 /// </list>
+/// Shell bursts (item 2.4) also shock morale directly through <see cref="AddShock"/>.
 /// Register after <see cref="SuppressionSystem"/>.
 /// </summary>
 public sealed class MoraleSystem(
@@ -52,6 +53,20 @@ public sealed class MoraleSystem(
     {
         var e = Get(squadId);
         e.Level = Clamp(level);
+        e.Squad.SetMoraleLevel(e.Level);
+    }
+
+    /// <summary>A shell burst fell within <c>cower_radius</c> of one of the squad's able men (item 2.4).</summary>
+    internal void NoteShelled(int squadId, long tick) => Get(squadId).LastShelled = tick;
+
+    /// <summary>Set when a unit AI runs (item 2.4): a flee starts with every man held, and the AI releases them one by one.</summary>
+    private bool HoldForAi { get; set; }
+
+    /// <summary>A morale shock that is not a casualty (item 2.4: a shell burst nearby): the level drops by <paramref name="amount"/>.</summary>
+    internal void AddShock(int squadId, Fixed amount)
+    {
+        var e = Get(squadId);
+        e.Level = Clamp(e.Level - amount);
         e.Squad.SetMoraleLevel(e.Level);
     }
 
@@ -79,6 +94,12 @@ public sealed class MoraleSystem(
     }
 
     public void Tick(World world)
+    {
+        HoldForAi = world.FindSystem<UnitAi.UnitAiSystem>() != null;
+        TickInner(world);
+    }
+
+    private void TickInner(World world)
     {
         Sync();
         var dt = World.TickDuration;
@@ -147,10 +168,33 @@ public sealed class MoraleSystem(
             // State.
             var before = e.Core;
             e.Core = Next(e.Core, e.Level, ceiling, recovering);
+            // Cower first (item 2.4, owner decision): a broken or routing squad under shellfire lies flat where it is, not
+            // moving (and, through the unit AI, not firing), until no burst has fallen within cower_radius for cower_lift.
+            // A squad that routs under shellfire bolts only then.
             if (e.Core == MoraleState.Routing && before != MoraleState.Routing)
             {
+                e.FleePending = true;
+            }
+
+            e.FleePending &= e.Core == MoraleState.Routing;
+            var cowering = e.Core is MoraleState.Broken or MoraleState.Routing && world.Tick - e.LastShelled <= Rules.CowerLiftTicks;
+            if (cowering)
+            {
+                if (move?.IsMoving(squad.Id) == true)
+                {
+                    move.Stop(squad.Id);
+                    e.FleePending |= e.Core == MoraleState.Routing; // caught by shellfire on the run: down, then run again
+                }
+
+                // The men go flat through the unit AI, each on his own reaction (no squad-wide posture flip).
+            }
+            else if (e.FleePending)
+            {
+                e.FleePending = false;
                 Flee(squad, centre);
             }
+
+            e.Cowering = cowering;
 
             var pinned = supState == SuppressionState.Pinned;
             squad.SetMorale(pinned && e.Core is MoraleState.Steady or MoraleState.Shaken or MoraleState.Rallying ? MoraleState.Pinned : e.Core);
@@ -166,6 +210,7 @@ public sealed class MoraleSystem(
             r |= supported ? MoraleReason.Supported : MoraleReason.Isolated;
             r |= inContact ? MoraleReason.None : MoraleReason.OutOfContact;
             r |= nearHq ? MoraleReason.NearHq : MoraleReason.None;
+            r |= e.Cowering ? MoraleReason.Cowering : MoraleReason.None;
             e.Reasons = r;
         }
     }
@@ -184,6 +229,9 @@ public sealed class MoraleSystem(
             hasher.Add(e.Initial);
             hasher.Add(e.LastLoss);
             hasher.Add(e.LeaderKilled);
+            hasher.Add(e.LastShelled);
+            hasher.Add(e.FleePending);
+            hasher.Add(e.Cowering);
             hasher.Add((ushort)e.Reasons);
         }
     }
@@ -340,8 +388,21 @@ public sealed class MoraleSystem(
         candidates.Sort((a, b) => a.D2 != b.D2 ? a.D2.CompareTo(b.D2) : a.Order.CompareTo(b.Order));
         foreach (var c in candidates)
         {
+            var before = squad.Soldiers.Select(s => s.Posture).ToArray();
             if (move.Execute(new MoveOrder(squad.Id, c.X, c.Y, MoveMode.MoveFast)) == MoveResult.Started)
             {
+                if (HoldForAi)
+                {
+                    // Item 2.4 review: no one gets up on the same tick. Every man stays as he was, held, and the unit AI
+                    // lets each go after his own delay (UnitAiBrain.BoltDelay).
+                    for (var i = 0; i < squad.Soldiers.Count; i++)
+                    {
+                        var s = squad.Soldiers[i];
+                        s.Posture = before[i];
+                        move.SetHeldSoldier(s.Id, s.CanLead);
+                    }
+                }
+
                 return;
             }
         }
@@ -391,6 +452,12 @@ public sealed class MoraleSystem(
         public long LastLoss { get; set; } = long.MinValue / 2;
 
         public long LeaderKilled { get; set; } = -1;
+
+        public long LastShelled { get; set; } = long.MinValue / 2;
+
+        public bool FleePending { get; set; }
+
+        public bool Cowering { get; set; }
 
         public MoraleReason Reasons { get; set; }
     }

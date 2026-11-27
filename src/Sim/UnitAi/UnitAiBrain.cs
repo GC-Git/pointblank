@@ -26,6 +26,12 @@ internal interface IAiEffects
     void SetFire(int squadId, int targetId, Fixed x, Fixed y, int teamMask);
 
     void StopFire(int squadId);
+
+    /// <summary>Keeps one of the squad's men from firing on its AI fire task, or lets him fire again (his own decision).</summary>
+    void SetSilent(int squadId, int soldierId, bool silent);
+
+    /// <summary>Holds one man of the squad's move where he is, or frees him (per-man rush and drop).</summary>
+    void SetHeldSoldier(int squadId, int soldierId, bool held);
 }
 
 /// <summary>
@@ -114,6 +120,25 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
             hasher.Add(m.TaskTeam);
             hasher.Add(m.Firing);
             hasher.Add(m.TargetId);
+            hasher.Add(m.DefendTick);
+            hasher.Add(m.LastShelled);
+            hasher.Add(m.FireStart);
+            hasher.Add(m.FireEnd);
+            hasher.Add(m.BoltStart);
+            hasher.Add(m.CowerStart);
+            hasher.Add(m.BoltAt.Count);
+            foreach (var (sid, at) in m.BoltAt)
+            {
+                hasher.Add(sid);
+                hasher.Add(at);
+            }
+
+            hasher.Add(m.BurstDist.Count);
+            foreach (var (sid, bd) in m.BurstDist)
+            {
+                hasher.Add(sid);
+                hasher.Add(bd);
+            }
         }
     }
 
@@ -147,6 +172,12 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
         }
 
         m.LastUnderFire = Math.Max(m.LastUnderFire, e.Tick);
+        if (e.Explosion)
+        {
+            m.LastShelled = Math.Max(m.LastShelled, e.Tick);
+            m.BurstDist[victim.Id] = e.Distance;
+            return; // a shell burst (item 2.4): men go to ground, but there is no one to fire back at
+        }
 
         if (tick - m.LastEnemyFire > rules.UnderFireMemoryTicks)
         {
@@ -168,6 +199,34 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
     {
         var m = MindOf(q.Id);
         var able = q.Soldiers.Where(Able).ToList();
+        if ((q.MoraleReasons & Morale.MoraleReason.Cowering) != 0)
+        {
+            // Broken or routing under shellfire (item 2.4): flat where they are, no fire and no moves of the AI's own.
+            if (m.Firing)
+            {
+                fx.StopFire(q.Id);
+                (m.Firing, m.FireEnd) = (false, tick);
+            }
+
+            // Each man drops on his own reaction (no squad-wide flip), within rush_jitter of the squad starting to cower.
+            if (m.CowerStart < 0)
+            {
+                m.CowerStart = tick;
+            }
+
+            ClearBolt(fx, q, m);
+            foreach (var s in able)
+            {
+                if (s.Posture != Posture.Prone && tick >= m.CowerStart + Draw(s.Id, m.CowerStart, 6, rules.RushJitterTicks))
+                {
+                    fx.SetPosture(s.Id, Posture.Prone);
+                }
+            }
+
+            return;
+        }
+
+        m.CowerStart = -1;
         if (able.Count == 0 || q.Morale == MoraleState.Routing)
         {
             if (m.Firing)
@@ -183,9 +242,12 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
             else
             {
                 m.Phase = 0;
+                ClearBolt(fx, q, m);
                 foreach (var s in able)
                 {
-                    if (tick - m.LastUnderFire <= rules.UnderFireMemoryTicks && s.Posture != rules.PostureOpen)
+                    // Each man on his own reaction (no squad-wide flip): within rush_jitter of the fire spell starting.
+                    if (tick - m.LastUnderFire <= rules.UnderFireMemoryTicks && s.Posture != rules.PostureOpen
+                        && tick >= m.UnderFireSince + Draw(s.Id, m.UnderFireSince, 7, rules.RushJitterTicks))
                     {
                         fx.SetPosture(s.Id, rules.PostureOpen); // routed and stopped under fire: down
                     }
@@ -195,6 +257,7 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
             return;
         }
 
+        ClearBolt(fx, q, m);
         var cx = Fixed.Zero;
         var cy = Fixed.Zero;
         var range = Fixed.Zero;
@@ -242,6 +305,11 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
 
         var inRange = tracked != null && trackedD2 <= engage * engage;
 
+        // Fire discipline (item 2.4 follow-up): on Defend or Ambush the squad opens fire on its own only at close range.
+        var defending = status is { Status: OrderStatus.Done } && order is { Kind: OrderKind.Defend or OrderKind.Ambush };
+        var open = defending && rules.DefendOpenRange < engage ? rules.DefendOpenRange : engage;
+        var openRange = tracked != null && trackedD2 <= open * open;
+
         // The fire task.
         var roe = view.RoeOf(q.Id) ?? RoeMode.FireAtWill;
         var fireId = -2;
@@ -267,7 +335,7 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
                     (fireId, fireX, fireY) = (-1, cx + (dx * r / d), cy + (dy * r / d));
                 }
             }
-            else if (roe == RoeMode.FireAtWill && inRange)
+            else if (roe == RoeMode.FireAtWill && openRange)
             {
                 (fireId, fireX, fireY) = (tracked!.Value.EnemyId, tracked.Value.X, tracked.Value.Y);
             }
@@ -434,6 +502,11 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
                 continue;
             }
 
+            if (want == rules.PostureCover && !moving && tick - m.LastShelled <= rules.UnderFireMemoryTicks)
+            {
+                want = rules.PostureOpen; // under shellfire a man lies flat, even in cover
+            }
+
             if (s.Posture != want)
             {
                 fx.SetPosture(s.Id, want);
@@ -456,16 +529,84 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
             }
         }
 
+        // Defend or Ambush (item 2.4 follow-up): once per order, the men take firing positions at a hedge facing the order
+        // point, where they can see and fire through it (LineOfSight: a man at a hedge), instead of lying blind behind it.
+        if (!moving && status is { Status: OrderStatus.Done } && order is { Kind: OrderKind.Defend or OrderKind.Ambush }
+            && m.DefendTick != status.IssuedTick)
+        {
+            m.DefendTick = status.IssuedTick;
+            TakeFiringPositions(fx, q, able, order.X, order.Y);
+        }
+
         if (fireId >= -1)
         {
+            if (!m.Firing && tick - m.FireEnd > rules.UnderFireMemoryTicks)
+            {
+                m.FireStart = tick;
+            }
+
             fx.SetFire(q.Id, fireId, fireX, fireY, fireMask);
             (m.Firing, m.TargetId) = (true, fireId);
+            Discipline(fx, q, able, m, tick);
         }
         else if (m.Firing)
         {
             fx.StopFire(q.Id);
-            m.Firing = false;
+            (m.Firing, m.FireEnd) = (false, tick);
+            foreach (var s in able)
+            {
+                fx.SetSilent(q.Id, s.Id, false);
+            }
         }
+
+        // A badly suppressed man keeps low (item 2.4 follow-up), whatever the squad is doing, unless he is on the move.
+        foreach (var s in able)
+        {
+            if (!s.Moving && s.Suppression >= rules.FireHoldSuppression && s.Posture != rules.PostureOpen)
+            {
+                fx.SetPosture(s.Id, rules.PostureOpen);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Per-man fire decisions (item 2.4 follow-up) on the squad's AI fire task. A man fires only when all hold: his
+    /// suppression is below <c>fire_hold_suppression</c> (else he keeps his head down); he is not one of the men who stay
+    /// silent through this task (<c>silent_chance</c>, <c>shaken_silent_chance</c> when the squad is shaken, pinned or rallying);
+    /// and his own delay since the task started has run: the leader and the MG gunner within <c>open_delay</c>, the others
+    /// between <c>join_delay_min</c> and <c>join_delay_max</c> (doubled with no leader). The draws are a deterministic hash
+    /// of the man and the task's start tick, so they need no state and no RNG; both sides use the same rules.
+    /// </summary>
+    private void Discipline(IAiEffects fx, SquadView q, List<SoldierView> able, Mind m, long tick)
+    {
+        var shaken = q.Morale is MoraleState.Shaken or MoraleState.Pinned or MoraleState.Rallying;
+        var silentChance = shaken ? rules.ShakenSilentChance : rules.SilentChance;
+        foreach (var s in able)
+        {
+            var first = s.Id == q.LeaderId || s.Role == Role.MgGunner;
+            var delay = first
+                ? Draw(s.Id, m.FireStart, 1, rules.OpenDelayTicks)
+                : rules.JoinDelayMinTicks + Draw(s.Id, m.FireStart, 2, rules.JoinDelayMaxTicks - rules.JoinDelayMinTicks);
+            delay *= q.LeaderId < 0 ? 2 : 1;
+            var silent = !first && Fixed.FromRatio(Draw(s.Id, m.FireStart, 3, 1_000_000), 1_000_000) < silentChance;
+            var hold = s.Suppression >= rules.FireHoldSuppression || silent || tick < m.FireStart + delay;
+            fx.SetSilent(q.Id, s.Id, hold);
+        }
+    }
+
+    /// <summary>A deterministic draw in [0, <paramref name="range"/>] from a man, a tick and a salt (SplitMix64 finaliser).</summary>
+    private static int Draw(int soldierId, long tick, int salt, int range)
+    {
+        if (range <= 0)
+        {
+            return 0;
+        }
+
+        var z = unchecked(((ulong)soldierId * 0x9E3779B97F4A7C15UL) ^ ((ulong)tick * 0xBF58476D1CE4E5B9UL) ^ ((ulong)salt * 0x94D049BB133111EBUL));
+        z = unchecked((z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL);
+        z = unchecked((z ^ (z >> 27)) * 0x94D049BB133111EBUL);
+        z ^= z >> 31;
+        return (int)(z % (ulong)(range + 1));
     }
 
     /// <summary>
@@ -474,36 +615,78 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
     /// </summary>
     private void Flee(IAiEffects fx, SquadView q, List<SoldierView> able, Mind m, long tick)
     {
-        if (tick - m.LastUnderFire > rules.UnderFireMemoryTicks)
+        // Item 2.4 review: each man on his own. He gets up after his own delay from the start of the flee (BoltDelay), and
+        // under fire his rush and drop cycle is offset by his own draw, so the squad never stands or drops on one tick.
+        // The squad still runs one way: the move (MoraleSystem chose where) is shared; a held man just waits.
+        if (m.BoltStart < 0)
         {
-            m.Phase = 0;
-            fx.SetHeldTeams(q.Id, 0, false);
-            return;
+            m.BoltStart = tick;
         }
 
-        if (m.Phase == 0)
-        {
-            (m.Phase, m.PhaseLeft) = (1, rules.RushTicks);
-        }
-        else if (--m.PhaseLeft <= 0)
-        {
-            (m.Phase, m.PhaseLeft) = m.Phase == 1 ? (2, rules.DownTicks) : (1, rules.RushTicks);
-        }
-
-        var all = 0;
+        var underFire = tick - m.LastUnderFire <= rules.UnderFireMemoryTicks;
+        var period = Math.Max(1, rules.RushTicks + rules.DownTicks);
         foreach (var s in able)
         {
-            all |= 1 << s.TeamIndex;
-        }
+            if (!m.BoltAt.TryGetValue(s.Id, out var start))
+            {
+                m.BoltAt[s.Id] = start = m.BoltStart + BoltDelay(q, s, m, tick); // fixed once: his rush cycle keeps its length
+            }
 
-        fx.SetHeldTeams(q.Id, m.Phase == 2 ? all : 0, m.Phase == 1);
-        var want = m.Phase == 2 ? rules.PostureOpen : moveRules.PostureOf(MoveMode.MoveFast);
-        foreach (var s in able)
-        {
+            if (s.SuppressionState == Suppression.SuppressionState.Pinned)
+            {
+                // A pinned man does not get up for the next rush: he stays where he is, and SuppressionSystem lays him flat
+                // on his own reaction. (Re-standing every pinned man on the tick after a pin was the last squad-wide flip.)
+                // Once he is no longer pinned he still takes his own moment (a draw within rush_jitter) before he gets up.
+                var after = tick + 1 + Draw(s.Id, m.BoltStart, 8, rules.RushJitterTicks);
+                m.BoltAt[s.Id] = m.BoltAt.TryGetValue(s.Id, out var was) ? Math.Max(was, after) : Math.Max(m.BoltStart + BoltDelay(q, s, m, tick), after);
+                fx.SetHeldSoldier(q.Id, s.Id, true);
+                continue;
+            }
+
+            var down = tick < start
+                || (underFire && (tick - start + Draw(s.Id, m.BoltStart, 5, rules.RushJitterTicks)) % period >= rules.RushTicks);
+            fx.SetHeldSoldier(q.Id, s.Id, down);
+            var want = down ? rules.PostureOpen : moveRules.PostureOf(MoveMode.MoveFast);
             if (s.Posture != want)
             {
                 fx.SetPosture(s.Id, want);
             }
+        }
+
+        fx.SetHeldTeams(q.Id, 0, underFire);
+    }
+
+    /// <summary>
+    /// The ticks a man of a routing squad waits before getting up: his own draw within <c>bolt_delay</c> (the leader within a
+    /// quarter of it), plus <c>bolt_suppression_delay</c> × his suppression / 100, plus <c>bolt_burst_delay</c> if the last
+    /// burst he noticed (within the under-fire memory) was close, falling to 0 at <c>bolt_burst_radius</c>.
+    /// </summary>
+    private int BoltDelay(SquadView q, SoldierView s, Mind m, long tick)
+    {
+        var delay = Draw(s.Id, m.BoltStart, 4, s.Id == q.LeaderId ? rules.BoltDelayTicks / 4 : rules.BoltDelayTicks);
+        delay += (Fixed.FromInt(rules.BoltSuppressionTicks) * s.Suppression / Fixed.FromInt(100)).ToInt();
+        if (tick - m.LastShelled <= rules.UnderFireMemoryTicks + rules.BoltDelayTicks && m.BurstDist.TryGetValue(s.Id, out var d)
+            && rules.BoltBurstRadius > Fixed.Zero && d < rules.BoltBurstRadius)
+        {
+            delay += (Fixed.FromInt(rules.BoltBurstTicks) * (Fixed.One - (d / rules.BoltBurstRadius))).ToInt();
+        }
+
+        return delay;
+    }
+
+    /// <summary>Frees every man the per-man flee held and forgets its start (the squad is no longer fleeing).</summary>
+    private void ClearBolt(IAiEffects fx, SquadView q, Mind m)
+    {
+        if (m.BoltStart < 0)
+        {
+            return;
+        }
+
+        m.BoltStart = -1;
+        m.BoltAt.Clear();
+        foreach (var s in q.Soldiers)
+        {
+            fx.SetHeldSoldier(q.Id, s.Id, false);
         }
     }
 
@@ -656,6 +839,60 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
         if (goal != TileOf(s.X, s.Y))
         {
             fx.MoveSoldier(q.Id, s.Id, goal, fast);
+        }
+    }
+
+    /// <summary>
+    /// Each man not already at a hedge (or in a building) facing the point goes to the nearest such tile within
+    /// <c>defend_search_radius</c> (one man per tile) and lies down there (reactions under fire may then kneel him).
+    /// </summary>
+    private void TakeFiringPositions(IAiEffects fx, SquadView q, List<SoldierView> able, Fixed px, Fixed py)
+    {
+        _claimed.Clear();
+        var cx = Fixed.Zero;
+        var cy = Fixed.Zero;
+        foreach (var s in able)
+        {
+            cx += s.X;
+            cy += s.Y;
+        }
+
+        cx /= Fixed.FromInt(able.Count);
+        cy /= Fixed.FromInt(able.Count);
+        var l = Len(px - cx, py - cy);
+        if (l <= Fixed.One)
+        {
+            return;
+        }
+
+        var (ux, uy) = ((px - cx) / l, (py - cy) / l);
+        var moving = new List<SoldierView>();
+        foreach (var s in able)
+        {
+            if (CoverScore(TileOf(s.X, s.Y), ux, uy, true) >= 2)
+            {
+                Claim(TileOf(s.X, s.Y));
+            }
+            else
+            {
+                moving.Add(s);
+            }
+        }
+
+        foreach (var s in moving)
+        {
+            if (BestTile(s.X, s.Y, rules.DefendSearchRadius, ux, uy, 2) is { } goal)
+            {
+                Send(fx, q, s, goal);
+            }
+        }
+
+        foreach (var s in able)
+        {
+            if (s.Posture != Posture.Prone) // lying at the hedge: he sees through it (LineOfSight) and shows little
+            {
+                fx.SetPosture(s.Id, Posture.Prone);
+            }
         }
     }
 
@@ -827,6 +1064,30 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
         public int PhaseLeft { get; set; }
 
         public int TaskTeam { get; set; } = -1;
+
+        /// <summary>The issue tick of the Defend or Ambush order whose firing positions were taken (item 2.4 follow-up), or -1.</summary>
+        public long DefendTick { get; set; } = -1;
+
+        /// <summary>The last shell burst near one of its men (item 2.4 follow-up): under shellfire men lie flat.</summary>
+        public long LastShelled { get; set; } = long.MinValue / 2;
+
+        /// <summary>When the squad's current AI fire task began (item 2.4 follow-up: per-man delays count from it).</summary>
+        public long FireStart { get; set; } = -1;
+
+        /// <summary>When its last AI fire task ended: a task that resumes within the under-fire memory keeps its start (and delays).</summary>
+        public long FireEnd { get; set; } = long.MinValue / 2;
+
+        /// <summary>When the squad's current flee began (per-man bolt delays count from it), or -1.</summary>
+        public long BoltStart { get; set; } = -1;
+
+        /// <summary>When the squad began to cower, or -1.</summary>
+        public long CowerStart { get; set; } = -1;
+
+        /// <summary>Each man's distance (band) to the last shell burst he noticed.</summary>
+        public SortedDictionary<int, Fixed> BurstDist { get; } = [];
+
+        /// <summary>The tick each man of a fleeing squad gets up (drawn once, when the flee starts).</summary>
+        public SortedDictionary<int, long> BoltAt { get; } = [];
 
         public bool Firing { get; set; }
 

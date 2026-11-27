@@ -11,6 +11,7 @@ using Xunit.Abstractions;
 namespace PointBlank.Sim.Tests.Movement;
 
 /// <summary>Item 1.4: orders, formation, speed, posture, deadlock, performance.</summary>
+[Collection(TimingCollection.Name)]
 public class MovementTests(ITestOutputHelper output)
 {
     private static Fixed M(int metres) => Fixed.FromInt(metres);

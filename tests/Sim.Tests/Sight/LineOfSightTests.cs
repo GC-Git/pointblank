@@ -10,6 +10,7 @@ using Xunit.Abstractions;
 namespace PointBlank.Sim.Tests.Sight;
 
 /// <summary>Item 1.2: line of sight.</summary>
+[Collection(TimingCollection.Name)]
 public class LineOfSightTests(ITestOutputHelper output)
 {
     private static readonly SightRules Rules =
@@ -80,21 +81,60 @@ public class LineOfSightTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void Prone_soldier_behind_a_hedge_is_unseen_from_100m_but_standing_is_seen()
+    public void Prone_soldier_at_a_hedge_has_only_an_obscured_ray_from_100m_and_standing_is_clear()
     {
         var map = Strip();
         HedgeLine(map, 49); // the line x = 100 m
 
+        // Original 1.2 setup restored (item 2.4 review): the target 1 m behind the hedge. Line of sight is geometry: a man
+        // at a hedge looks out through it, so the ray is clear but obscured, and symmetric. That he stays unseen while still
+        // and silent is concealment, at the spotting layer:
+        // SpottingTests.A_still_silent_man_at_a_hedge_is_unspotted_from_100m_until_he_fires (prone or kneeling). A man a
+        // few metres back from the hedge is not at it, and the hedge blocks the ray outright.
         var prone = Check(map, At(1), At(101, Posture.Prone));
-        Assert.False(prone.Visible);
-        Assert.Equal(LosBlocker.Hedge, prone.Blocker);
-        Assert.Equal(new TilePos(49, 5), prone.BlockerTile);
+        Assert.True(prone.Visible);
+        Assert.Equal(Rules.HedgeAdjacentObscurement, prone.Obscurement);
+        Assert.Equal(prone, Check(map, At(1), At(101, Posture.Kneeling)));
 
-        Assert.False(Check(map, At(1), At(101, Posture.Kneeling)).Visible);
+        var back = Check(map, At(1), At(104, Posture.Prone));
+        Assert.False(back.Visible);
+        Assert.Equal(LosBlocker.Hedge, back.Blocker);
+        Assert.Equal(new TilePos(49, 5), back.BlockerTile);
 
         var standing = Check(map, At(1), At(101));
         Assert.True(standing.Visible);
         Assert.Equal(Fixed.Zero, standing.Obscurement);
+    }
+
+    [Fact]
+    public void A_man_at_a_hedge_sees_through_it_and_is_seen_obscured_both_ways()
+    {
+        var map = Strip();
+        HedgeLine(map, 49); // x = 100 m
+        var atHedge = At(101, Posture.Prone); // 1 m behind it: a firing position
+        var a = Check(map, At(1), atHedge);
+        var b = Check(map, atHedge, At(1));
+        Assert.True(a.Visible);
+        Assert.Equal(Rules.HedgeAdjacentObscurement, a.Obscurement);
+        Assert.Equal(a, b);
+    }
+
+    [Fact]
+    public void Through_a_hedge_close_observers_make_out_shapes_and_far_ones_see_nothing()
+    {
+        var map = Strip();
+        HedgeLine(map, 49); // x = 100 m; the target lies prone 4 m behind it
+        var target = At(104, Posture.Prone);
+        var near = Check(map, At(95), target); // 9 m
+        var mid = Check(map, At(74), target); // 30 m
+        var far = Check(map, At(50), target); // 54 m
+        Assert.True(near.Visible);
+        Assert.Equal(Rules.HedgeNearObscurement, near.Obscurement);
+        Assert.True(mid.Visible);
+        Assert.True(mid.Obscurement > near.Obscurement && mid.Obscurement < Fixed.One);
+        Assert.False(far.Visible);
+        Assert.Equal(LosBlocker.Hedge, far.Blocker);
+        Assert.Equal(mid, Check(map, target, At(74)));
     }
 
     [Fact]
@@ -191,12 +231,13 @@ public class LineOfSightTests(ITestOutputHelper output)
         HedgeLine(map, 49);
         var rules = Rules with { HedgeObscurement = Fixed.FromRatio(1, 2) };
 
-        var r = Check(map, At(1), At(101, Posture.Prone), rules);
+        // Item 2.4: the target lies 4 m back (1 m would be a firing position at the hedge, capped by hedge_adjacent_obscurement).
+        var r = Check(map, At(1), At(104, Posture.Prone), rules);
         Assert.True(r.Visible);
         Assert.Equal(Fixed.FromRatio(1, 2), r.Obscurement);
 
         HedgeLine(map, 30);
-        var two = Check(map, At(1), At(101, Posture.Prone), rules);
+        var two = Check(map, At(1), At(104, Posture.Prone), rules);
         Assert.False(two.Visible);
         Assert.Equal(LosBlocker.Hedge, two.Blocker);
         Assert.Equal(new TilePos(49, 5), two.BlockerTile);

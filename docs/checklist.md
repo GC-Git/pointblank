@@ -122,7 +122,7 @@ Status: draft, awaiting owner sign-off
   more slowly. An unsupported squad that takes 50% casualties breaks in most seeds. A
   squad near its HQ rallies faster.
 
-- [ ] **2.3 Unit AI: reactions and drills** (O)
+- [x] **2.3 Unit AI: reactions and drills** (O)
   Idle units react to contact. Fire and movement within the squad. The squad leader
   assigns tasks to his men (e.g. sends the AT man forward).
   *Done when:* an idle squad that comes under fire takes cover or returns fire within 2 s

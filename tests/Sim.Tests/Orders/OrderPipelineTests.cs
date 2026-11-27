@@ -87,7 +87,7 @@ public class OrderPipelineTests(ITestOutputHelper output)
             Assert.Equal(expected, OrderKinds.ClassOf(kind));
         }
 
-        Assert.Equal(10, Enum.GetValues<OrderKind>().Length); // SetRoe (item 2.3)
+        Assert.Equal(11, Enum.GetValues<OrderKind>().Length); // SetRoe (item 2.3), CallFire (item 2.4)
     }
 
     [Fact]

@@ -50,6 +50,7 @@ public sealed class FireSystem : ISimSystem
     private readonly SortedDictionary<int, FireOrder> _orders = [];
     private readonly SortedDictionary<int, OrderNote> _ended = [];
     private readonly SortedDictionary<int, FireOrder> _ai = [];
+    private readonly SortedSet<int> _aiSilent = []; // men the unit AI keeps from firing (item 2.4 follow-up: fire discipline)
     private readonly List<ShotEvent> _shots = [];
     private readonly List<NearMissEvent> _nearMisses = [];
     private readonly List<(Fixed S, Fixed Lateral, Soldier Soldier)> _candidates = [];
@@ -140,6 +141,19 @@ public sealed class FireSystem : ISimSystem
 
     /// <summary>Ends the squad's AI fire task, if any.</summary>
     internal void StopAiFire(int squadId) => _ai.Remove(squadId);
+
+    /// <summary>Keeps one man from firing on his squad's AI fire task (or lets him fire again): his own decision (item 2.4 follow-up).</summary>
+    internal void SetAiSilent(int soldierId, bool silent)
+    {
+        if (silent)
+        {
+            _aiSilent.Add(soldierId);
+        }
+        else
+        {
+            _aiSilent.Remove(soldierId);
+        }
+    }
 
     /// <summary>Why the squad's last fire order ended (<see cref="OrderNote.None"/> if it was replaced or none ended).</summary>
     internal OrderNote EndNoteOf(int squadId) => _ended.TryGetValue(squadId, out var n) ? n : OrderNote.None;
@@ -407,6 +421,12 @@ public sealed class FireSystem : ISimSystem
             hasher.Add(fo.Mask);
         }
 
+        hasher.Add(_aiSilent.Count);
+        foreach (var id in _aiSilent)
+        {
+            hasher.Add(id);
+        }
+
         hasher.Add(_ended.Count);
         foreach (var (id, note) in _ended)
         {
@@ -533,7 +553,7 @@ public sealed class FireSystem : ISimSystem
             }
 
             armed++;
-            if ((fo.Mask & (1 << s.TeamIndex)) == 0)
+            if ((fo.Mask & (1 << s.TeamIndex)) == 0 || (ai && _aiSilent.Contains(s.Id)))
             {
                 continue;
             }
@@ -582,13 +602,13 @@ public sealed class FireSystem : ISimSystem
         }
     }
 
-    /// <summary>Whether a friendly stands within the mask clearance of the line from the soldier to the aim point, short of it.</summary>
     /// <summary>
     /// The hold-fire clearance of AI fire (item 2.3): the near-miss radius (or the mask clearance if larger), so the unit AI
     /// never fires a round that would pass close enough to suppress one of its own men. Player orders keep the mask clearance.
     /// </summary>
     private Fixed AiClearance => Rules.NearMissRadius > Rules.MaskClearance ? Rules.NearMissRadius : Rules.MaskClearance;
 
+    /// <summary>Whether a friendly stands within the mask clearance of the line from the soldier to the aim point, short of it.</summary>
     private bool Masked(Soldier firer, string side, Fixed x, Fixed y, Fixed clearance)
     {
         var dx = x - firer.X;

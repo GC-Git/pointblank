@@ -79,6 +79,12 @@ public sealed record SuppressionRules
 
     public Fixed SpeedPinned { get; init; }
 
+    /// <summary>
+    /// Ticks within which a man not pinned on his own goes prone after his squad becomes Pinned: each man waits his own
+    /// deterministic draw, so a squad pin never drops every man on one tick.
+    /// </summary>
+    public int PinDropDelayTicks { get; init; }
+
     public Fixed CalibreWeight(CalibreClass c) => _calibre[(int)c];
 
     /// <summary>A copy with one calibre weight changed.</summary>
@@ -123,6 +129,7 @@ public sealed record SuppressionRules
             ObserverMin = Ratio("observer_min"),
             SpeedSuppressed = Ratio("speed_suppressed"),
             SpeedPinned = Ratio("speed_pinned"),
+            PinDropDelayTicks = (F("pin_drop_delay", big) * Fixed.FromInt(World.TicksPerSecond)).ToInt(),
             _calibre = [F("calibre_pistol", big), F("calibre_rifle", big), F("calibre_heavy", big)],
         };
         if (rules.PinnedRelease > rules.PinnedThreshold || rules.SuppressedThreshold > rules.PinnedThreshold || rules.DispersionMax < Fixed.One)

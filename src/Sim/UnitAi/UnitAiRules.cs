@@ -89,6 +89,42 @@ public sealed class UnitAiRules
 
     public Fixed CoverSearchRadius { get; init; }
 
+    /// <summary>How far (m) a man of a squad ordered to Defend or Ambush looks for a firing position at a hedge (item 2.4 follow-up).</summary>
+    public Fixed DefendSearchRadius { get; init; }
+
+    /// <summary>Fire discipline (item 2.4 follow-up): a man at or above this suppression level keeps his head down and does not fire.</summary>
+    public Fixed FireHoldSuppression { get; init; }
+
+    /// <summary>The squad leader and MG gunner open fire within this many ticks of the squad's fire task starting.</summary>
+    public int OpenDelayTicks { get; init; }
+
+    /// <summary>The other men join between these many ticks after the start (each his own, deterministic draw).</summary>
+    public int JoinDelayMinTicks { get; init; }
+
+    public int JoinDelayMaxTicks { get; init; }
+
+    /// <summary>Chance a man stays silent through a fire task; <see cref="ShakenSilentChance"/> when his squad is shaken, pinned or rallying.</summary>
+    public Fixed SilentChance { get; init; }
+
+    public Fixed ShakenSilentChance { get; init; }
+
+    /// <summary>A squad on Defend or Ambush opens fire on its own only at enemies within this range (m), unless fired on.</summary>
+    public Fixed DefendOpenRange { get; init; }
+
+    /// <summary>Per-man bolt (item 2.4): each man of a routing squad gets up within this many ticks of the flee starting (the leader within a quarter of it).</summary>
+    public int BoltDelayTicks { get; init; }
+
+    /// <summary>Extra ticks before a man gets up at suppression 100 (linear).</summary>
+    public int BoltSuppressionTicks { get; init; }
+
+    /// <summary>Extra ticks for a man whose last shell burst was at 0 m, falling linearly to 0 at <see cref="BoltBurstRadius"/>.</summary>
+    public int BoltBurstTicks { get; init; }
+
+    public Fixed BoltBurstRadius { get; init; }
+
+    /// <summary>Each man's rush and drop cycle is offset by up to this many ticks (his own draw).</summary>
+    public int RushJitterTicks { get; init; }
+
     public Fixed LineSpacing { get; init; }
 
     public int LineReformSectors { get; init; }
@@ -155,6 +191,19 @@ public sealed class UnitAiRules
             EffectiveRangeFactor = F(e, "unit_ai", "effective_range_factor", Fixed.Zero, Fixed.One),
             CoverMin = F(e, "unit_ai", "cover_min", Fixed.Zero, Fixed.One),
             CoverSearchRadius = N("cover_search_radius"),
+            DefendSearchRadius = N("defend_search_radius"),
+            FireHoldSuppression = N("fire_hold_suppression"),
+            OpenDelayTicks = (N("open_delay") * Fixed.FromInt(World.TicksPerSecond)).ToInt(),
+            JoinDelayMinTicks = (N("join_delay_min") * Fixed.FromInt(World.TicksPerSecond)).ToInt(),
+            JoinDelayMaxTicks = (N("join_delay_max") * Fixed.FromInt(World.TicksPerSecond)).ToInt(),
+            SilentChance = N("silent_chance"),
+            ShakenSilentChance = N("shaken_silent_chance"),
+            DefendOpenRange = N("defend_open_range"),
+            BoltDelayTicks = (N("bolt_delay") * Fixed.FromInt(World.TicksPerSecond)).ToInt(),
+            BoltSuppressionTicks = (N("bolt_suppression_delay") * Fixed.FromInt(World.TicksPerSecond)).ToInt(),
+            BoltBurstTicks = (N("bolt_burst_delay") * Fixed.FromInt(World.TicksPerSecond)).ToInt(),
+            BoltBurstRadius = N("bolt_burst_radius"),
+            RushJitterTicks = (N("rush_jitter") * Fixed.FromInt(World.TicksPerSecond)).ToInt(),
             LineSpacing = Pos("line_spacing"),
             LineReformSectors = Math.Max(1, N("line_reform_sectors").ToInt()),
             BoundDistance = N("bound_distance"),

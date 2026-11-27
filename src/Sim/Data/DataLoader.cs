@@ -11,7 +11,7 @@ public static class DataLoader
 {
     /// <summary>The tables, in the fixed order used by reports.</summary>
     public static readonly string[] TableNames =
-        ["units", "weapons", "ammo", "materials", "organisation", "terrain", "postures", "sight", "movement", "formation", "command", "spotting", "fire", "suppression", "morale", "unit_ai", "unit_ai_tasks"];
+        ["units", "weapons", "ammo", "materials", "organisation", "terrain", "postures", "sight", "movement", "formation", "command", "spotting", "fire", "suppression", "morale", "unit_ai", "unit_ai_tasks", "artillery"];
 
     private const int MaxIntegerDigits = 9;
     private const int MaxFractionDigits = 9;
@@ -38,7 +38,11 @@ public static class DataLoader
             ("move_cost_fast", N), ("move_cost_sneak", N), ("block_height", N), ("los_obscurement", N),
         ],
         ["postures"] = [("name", T), ("eye_height", N)],
-        ["sight"] = [("name", T), ("floor_height", N), ("block_threshold", N)],
+        ["sight"] =
+        [
+            ("name", T), ("floor_height", N), ("block_threshold", N), ("hedge_far_range", N), ("hedge_near_range", N),
+            ("hedge_near_obscurement", N), ("hedge_adjacent_range", N), ("hedge_adjacent_obscurement", N),
+        ],
         ["movement"] = [("name", T), ("speed", N), ("posture", T), ("terrain_cost", T)],
         ["formation"] = [("name", T), ("spacing", N), ("lateral", N), ("leash", N), ("replan_ticks", N)],
         ["command"] =
@@ -52,7 +56,8 @@ public static class DataLoader
             ("name", T), ("refresh_ticks", N), ("base_rate", N), ("near_range", N), ("max_range", N),
             ("posture_standing", N), ("posture_kneeling", N), ("posture_prone", N), ("motion_still", N),
             ("motion_sneak", N), ("motion_move", N), ("motion_move_fast", N), ("firing_factor", N),
-            ("firing_window", N), ("lost_after", N), ("forget_after", N),
+            ("firing_window", N), ("lost_after", N), ("forget_after", N), ("hedge_position_distance", N), ("hedge_still_range", N),
+            ("hedge_moving_range", N), ("close_range", N), ("close_rate", N),
         ],
         ["fire"] =
         [
@@ -67,7 +72,7 @@ public static class DataLoader
             ("distance_falloff", N), ("share_factor", N), ("share_radius", N), ("hit_nearby", N), ("hit_radius", N),
             ("decay_rate", N), ("under_fire_decay_factor", N), ("under_fire_window", N), ("suppressed_threshold", N),
             ("pinned_threshold", N), ("pinned_release", N), ("dispersion_max", N), ("rate_min", N), ("rate_pinned", N),
-            ("observer_min", N), ("speed_suppressed", N), ("speed_pinned", N),
+            ("observer_min", N), ("speed_suppressed", N), ("speed_pinned", N), ("pin_drop_delay", N),
         ],
         ["morale"] =
         [
@@ -78,14 +83,26 @@ public static class DataLoader
             ("support_radius", N), ("hq_rally_radius", N), ("loss_window", N), ("leader_killed_memory", N),
             ("heavy_casualty_fraction", N), ("shaken_below", N), ("shaken_release", N), ("broken_below", N),
             ("broken_release", N), ("rout_below", N), ("steady_above", N), ("rout_distance", N), ("rout_threat_radius", N),
+            ("cower_radius", N), ("cower_lift", N),
         ],
         ["unit_ai"] =
         [
             ("name", T), ("reaction_time", N), ("under_fire_memory", N), ("distance_band", N), ("effective_range_factor", N),
             ("cover_min", N), ("cover_search_radius", N), ("line_spacing", N), ("line_reform_sectors", N), ("bound_distance", N),
             ("stall_time", N), ("rush_time", N), ("down_time", N), ("posture_open", T), ("posture_cover", T), ("posture_contact", T),
+            ("defend_search_radius", N), ("fire_hold_suppression", N), ("open_delay", N), ("join_delay_min", N), ("join_delay_max", N),
+            ("silent_chance", N), ("shaken_silent_chance", N), ("defend_open_range", N), ("bolt_delay", N), ("bolt_suppression_delay", N),
+            ("bolt_burst_delay", N), ("bolt_burst_radius", N), ("rush_jitter", N),
         ],
         ["unit_ai_tasks"] = [("name", T), ("role", T), ("target_kind", T), ("flank_offset", N), ("search_radius", N)],
+        ["artillery"] =
+        [
+            ("name", T), ("side", T), ("missions", N), ("call_time", N), ("flight_time", N), ("guns", N), ("rounds_per_gun", N),
+            ("duration", N), ("aim_error", N), ("scatter", N), ("lethal_radius", N), ("casualty_radius", N), ("lethal_chance", N),
+            ("direct_hit_radius", N), ("kneeling_factor", N), ("prone_factor", N), ("shelter_factor", N), ("building_factor", N),
+            ("cover_weight", N), ("kill_chance", N), ("incapacitate_chance", N), ("suppression", N), ("suppression_radius", N),
+            ("morale_shock", N), ("morale_radius", N), ("impact_memory", N),
+        ],
     };
 
     public static DataSet LoadDirectory(string directory)

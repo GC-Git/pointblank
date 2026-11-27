@@ -6,7 +6,12 @@
       "values": {
         "name": { "value": "Line-of-sight rules", "unit": "text", "source": { "kind": "placeholder", "note": "Placeholder, not a historical value." } },
         "floor_height": { "value": "3", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: storey height of a building; its walls are floors x this." } },
-        "block_threshold": { "value": "1", "unit": "ratio", "source": { "kind": "placeholder", "note": "Placeholder: accumulated obscurement at which a ray is blocked." } }
+        "block_threshold": { "value": "1", "unit": "ratio", "source": { "kind": "placeholder", "note": "Placeholder: accumulated obscurement at which a ray is blocked." } },
+        "hedge_far_range": { "value": "50", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: a sight line at least this long takes a hedge's full obscurement (terrain hedge los_obscurement: it blocks)." } },
+        "hedge_near_range": { "value": "10", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: a sight line at most this long takes only hedge_near_obscurement; linear up to hedge_far_range." } },
+        "hedge_near_obscurement": { "value": "0.3", "unit": "ratio", "source": { "kind": "placeholder", "note": "Placeholder: a hedge on a short sight line hides little: close observers make out shapes through it." } },
+        "hedge_adjacent_range": { "value": "2", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: a man this close to the hedge crossing (about one tile) is at the hedge, looking through it as from a firing position." } },
+        "hedge_adjacent_obscurement": { "value": "0.25", "unit": "ratio", "source": { "kind": "placeholder", "note": "Placeholder: the most a hedge obscures next to a man at it, either way: a firing position is a gap he looks through. His concealment at range is the spotting rule (spotting.json hedge_still_range, hedge_moving_range)." } }
       }
     }
   ]

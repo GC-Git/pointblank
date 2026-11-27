@@ -55,6 +55,26 @@ public sealed record SpottingRules
 
     public int FiringWindowTicks { get; init; }
 
+    /// <summary>
+    /// A man within this distance (m) of a hedge that lies between him and the observer is at a firing position behind it
+    /// (item 2.4 follow-up). 0 turns the rule off. Still and not firing, he can be spotted only within <see cref="HedgeStillRange"/>;
+    /// moving, only within <see cref="HedgeMovingRange"/>; firing, at any range (the usual rate and firing factor).
+    /// </summary>
+    public Fixed HedgePositionDistance { get; init; }
+
+    public Fixed HedgeStillRange { get; init; }
+
+    public Fixed HedgeMovingRange { get; init; }
+
+    /// <summary>
+    /// Close-range spotting (item 2.4 follow-up): within this distance (m) a man in sight is noticed at no less than
+    /// <see cref="CloseRate"/> × (1 − d / range) × (1 − obscurement) × the observer factor, whatever his posture or cover. 0: off.
+    /// </summary>
+    public Fixed CloseRange { get; init; }
+
+    /// <summary>The close-range spotting rate (progress per second) at zero distance.</summary>
+    public Fixed CloseRate { get; init; }
+
     /// <summary>An unseen contact becomes Lost this many ticks after it was last seen.</summary>
     public int LostAfterTicks { get; init; }
 
@@ -111,6 +131,11 @@ public sealed record SpottingRules
             MaxRange = Num("max_range", Fixed.One, Fixed.FromInt(MaxRangeLimit)),
             FiringFactor = Factor("firing_factor"),
             FiringWindowTicks = Ticks("firing_window"),
+            HedgePositionDistance = Num("hedge_position_distance", Fixed.Zero, big),
+            HedgeStillRange = Num("hedge_still_range", Fixed.Zero, big),
+            HedgeMovingRange = Num("hedge_moving_range", Fixed.Zero, big),
+            CloseRange = Num("close_range", Fixed.Zero, big),
+            CloseRate = Num("close_rate", Fixed.Zero, Fixed.FromInt(100)),
             LostAfterTicks = Ticks("lost_after"),
             ForgetAfterTicks = Ticks("forget_after"),
             _posture = [Factor("posture_standing"), Factor("posture_kneeling"), Factor("posture_prone")],

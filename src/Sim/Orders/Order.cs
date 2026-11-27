@@ -4,7 +4,7 @@ namespace PointBlank.Sim.Orders;
 
 /// <summary>
 /// The one order vocabulary, shared by the player and the AI. Values are hashed and stored in
-/// replays, so never renumber. Implemented today: the four moves, <see cref="Fire"/>, <see cref="Hold"/> and <see cref="SetRoe"/>; the others
+/// replays, so never renumber. Implemented today: the four moves, <see cref="Fire"/>, <see cref="Hold"/>, <see cref="SetRoe"/> and <see cref="CallFire"/>; the others
 /// are delivered through the chain of command and acknowledged as <see cref="OrderNote.NotImplemented"/>.
 /// </summary>
 public enum OrderKind : byte
@@ -26,6 +26,12 @@ public enum OrderKind : byte
 
     /// <summary>Set the squad's rules of engagement (item 2.3): <see cref="Order.TargetId"/> carries the <see cref="RoeMode"/>; X and Y are ignored.</summary>
     SetRoe = 9,
+
+    /// <summary>
+    /// Call an off-map fire mission (item 2.4) on the point X, Y. Only an HQ or a squad with a radio can call, and one of its
+    /// able men must see the point; see <c>Artillery.ArtillerySystem</c>. Never refused or held; moves and fire carry on.
+    /// </summary>
+    CallFire = 10,
 }
 
 /// <summary>A squad's rules of engagement for its own (AI) fire (item 2.3). Values are hashed, so never renumber.</summary>
@@ -172,6 +178,15 @@ public enum OrderNote : byte
 
     /// <summary>A <see cref="OrderKind.SetRoe"/> order's TargetId is not a <see cref="RoeMode"/>.</summary>
     InvalidRoe = 13,
+
+    /// <summary>A CallFire order to a unit that is neither an HQ nor has a radio (item 2.4).</summary>
+    NotObserver = 14,
+
+    /// <summary>A CallFire order whose point no able man of the unit can see.</summary>
+    NoLineOfSight = 15,
+
+    /// <summary>A CallFire order when the side has no battery or no fire missions left.</summary>
+    NoMissionsLeft = 16,
 }
 
 /// <summary>What <see cref="CommandSystem.Issue"/> did with an order. Values are hashed, so never renumber.</summary>
