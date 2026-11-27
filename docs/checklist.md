@@ -152,7 +152,7 @@ Status: draft, awaiting owner sign-off
   *Done when:* screenshot-mode tests capture the expected frames. The UI reads only
   player-side knowledge (test).
 
-- [ ] **2.6 Debug overlays and screenshot mode** (S)
+- [x] **2.6 Debug overlays and screenshot mode** (S)
   Toggleable LOS cones, suppression and morale values, true vs known positions, AI
   intent.
   *Done when:* each overlay toggles and appears in a screenshot test.
@@ -181,6 +181,15 @@ Status: draft, awaiting owner sign-off
   review: overlay text overlaps when zoomed in, and the orange values look like stale-contact
   labels; sight dots clear on every pan or zoom frame, so they stay mostly blank while moving;
   a sight pass costs 9-21 ms per frame (Debug, two squads; first run 48 ms).
+  Also from the 2.6 review: the F4 intent label "firing" takes precedence over reload, ammo and
+  task state (`fix-assault` seed 1: 13% of "firing" man-ticks were reloading, 9% had no fire task
+  or were silenced; "reloading" never appears), so current state must be checked first; several
+  intent states have no test (reloading, aiming, out of range, no ammo, rushing, down, firing
+  line, flanking, ambushing, fleeing, cowering) and target lines are compared against the code
+  under test; "cowering" covers a whole squad before each man reacts and "firing line" includes
+  non-firing men; release builds still highlight F2-F4 although inert.
+  During review the headless `--build-solutions` Godot command once reached build DONE then did
+  not exit for over 8 minutes (not yet checked on main).
   *Done when:* each is fixed or explicitly deferred by the owner, with tests.
 
 - [ ] **2.4c Squad masked by friendlies** (S)

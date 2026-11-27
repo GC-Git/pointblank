@@ -57,26 +57,29 @@ internal static class PostureChange
     public static void Drop(Soldier s) => s.Dropping = s.Posture != Posture.Prone;
 
     /// <summary>
-    /// The squad's move is stopped: drops the posture the move asked for, and any pending rise. A man already on his way
-    /// lower still gets there (a Hold is no reason to stay up).
+    /// The squad's move is stopped: drops any pending rise, whoever asked for it. A man on his way lower (the move's
+    /// posture or a decision of the unit AI) still gets there, with no move left to wait for: a Hold is no reason to
+    /// stay up.
     /// </summary>
     public static void Halt(Soldier s)
     {
-        if (s.AwaitingPosture || s.PendingPosture < s.Posture)
+        if (s.PendingPosture < s.Posture) // a rise (Standing is lowest in the enum)
         {
             Cancel(s);
         }
+
+        s.AwaitingPosture = false;
     }
 
     /// <summary>Drops a pending decision (not a pin drop).</summary>
     public static void Cancel(Soldier s) => (s.PendingPosture, s.PostureDueAt, s.AwaitingPosture) = (null, 0, false);
 
     /// <summary>
-    /// Applies every due change. A man who is <paramref name="pinned"/> does not get up: a rise that falls due then is
-    /// dropped, whoever decided it. In a squad of 3 or more able men they never all move on one tick: if every able man is
+    /// Applies every due change. A man who is <paramref name="heldDown"/> by fire (see
+    /// <c>MovementSystem.HeldDown</c>) does not get up: a rise that falls due then is dropped, whoever decided it. In a squad of 3 or more able men they never all move on one tick: if every able man is
     /// due at once, one (by his own draw) follows on the next tick.
     /// </summary>
-    public static void Apply(IEnumerable<Squad> squads, long tick, int orderDelay, Func<Soldier, bool> pinned)
+    public static void Apply(IEnumerable<Squad> squads, long tick, int orderDelay, Func<Squad, Soldier, bool> heldDown)
     {
         var due = new List<Soldier>();
         foreach (var q in squads)
@@ -111,7 +114,7 @@ internal static class PostureChange
 
                 if (s.PostureDueAt <= tick)
                 {
-                    if (s.PendingPosture < s.Posture && pinned(s)) // a rise (Standing is lowest in the enum)
+                    if (s.PendingPosture < s.Posture && heldDown(q, s)) // a rise (Standing is lowest in the enum)
                     {
                         Cancel(s); // he stays down (and, on a move, crawls); going lower is still allowed
                     }

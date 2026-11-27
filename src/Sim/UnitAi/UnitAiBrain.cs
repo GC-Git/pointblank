@@ -692,13 +692,16 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
             // longer when it lifts (both his own draw), so the men who are down do not all drop or get up together.
             var underFire = tick >= m.UnderFireSince + Draw(s.Id, m.UnderFireSince, 10, rules.RushJitterTicks)
                 && tick - m.LastUnderFire <= rules.UnderFireMemoryTicks + Draw(s.Id, m.LastUnderFire, 9, rules.RushJitterTicks);
-            var down = tick < start
-                || (underFire && (tick - start + Draw(s.Id, m.BoltStart, 5, rules.RushJitterTicks)) % period >= rules.RushTicks);
+            // His offset delays the moment he gets up, and his cycle starts there (item 2.4b): a man who has just got up
+            // to run does not drop again at once because of where the cycle happens to be.
+            var rise = start + Draw(s.Id, m.BoltStart, 5, rules.RushJitterTicks);
+            var down = tick < rise || (underFire && (tick - rise) % period >= rules.RushTicks);
             fx.SetHeldSoldier(q.Id, s.Id, down);
             var want = down ? rules.PostureOpen : moveRules.PostureOf(MoveMode.MoveFast);
-            // The rush cycle is already offset man by man; a man still waiting to bolt (the rout has only just started for
-            // him) goes down on his own reaction.
-            fx.SetPosture(s.Id, want, timed: tick >= start);
+            // Dropping out of a rush is already offset man by man. Getting up (a new rush, or the fire lifting) and the drop
+            // of a man still waiting to bolt take his own reaction, as every other decision does: men whose timers happen
+            // to end together do not get up together.
+            fx.SetPosture(s.Id, want, timed: down && tick >= rise);
         }
 
         fx.SetHeldTeams(q.Id, 0, tick - m.LastUnderFire <= rules.UnderFireMemoryTicks);
