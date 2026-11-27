@@ -47,6 +47,9 @@ public sealed class MovementRules
     /// <summary>Fewest ticks between replans of one man's path.</summary>
     public int ReplanTicks { get; private init; }
 
+    /// <summary>The longest a man takes to react to a move order with a posture change (<c>unit_ai/order_posture_delay</c>).</summary>
+    public int OrderPostureDelayTicks { get; private init; }
+
     public Fixed Speed(MoveMode mode) => _speed[(int)mode];
 
     public Posture PostureOf(MoveMode mode) => _posture[(int)mode];
@@ -71,9 +74,18 @@ public sealed class MovementRules
         Fixed Num(DataEntry e, string name) =>
             e.Get(name).Number ?? throw new DataException($"{e.Id}/{name}: not a number.");
 
+        var ai = data.Table("unit_ai").Entries.FirstOrDefault(e => e.Id == "default")
+            ?? throw new DataException("unit_ai: no entry 'default'.");
+        var orderDelay = Num(ai, "order_posture_delay");
+        if (orderDelay < Fixed.Zero)
+        {
+            throw new DataException("unit_ai/default/order_posture_delay: must not be negative.");
+        }
+
         var types = Enum.GetValues<TerrainType>();
         var rules = new MovementRules
         {
+            OrderPostureDelayTicks = (orderDelay * Fixed.FromInt(World.TicksPerSecond)).ToInt(),
             Spacing = Num(formation, "spacing"),
             Lateral = Num(formation, "lateral"),
             Leash = Num(formation, "leash"),

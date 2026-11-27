@@ -54,7 +54,9 @@ public sealed class UnitAiSystem : ISimSystem
 
         foreach (var side in _sides)
         {
-            _brain.Think(world.ViewFor(side), new Effects(world, this, side));
+            var effects = new Effects(world, this, side);
+            _brain.Think(world.ViewFor(side), effects);
+            effects.ApplyPostures();
         }
     }
 
@@ -63,18 +65,32 @@ public sealed class UnitAiSystem : ISimSystem
     /// <summary>The brain's hands, for one side only.</summary>
     private sealed class Effects(World world, UnitAiSystem ai, string side) : IAiEffects
     {
-        public void SetPosture(int soldierId, Posture posture)
+        private readonly SortedDictionary<int, (Posture Posture, bool Timed, bool Wait)> _postures = [];
+
+        /// <summary>
+        /// Hands each man's last decision of this tick to <see cref="PostureChange"/>: with his own reaction delay, or at
+        /// once when the brain has already waited it (<c>timed</c>).
+        /// </summary>
+        public void ApplyPostures()
+        {
+            foreach (var (id, p) in _postures)
+            {
+                var s = ai._org.FindSoldier(id)!;
+                if (s.CanLead)
+                {
+                    PostureChange.Request(s, p.Posture, world.Tick, p.Timed ? 0 : ai.Rules.AiPostureDelayTicks, p.Wait);
+                }
+            }
+        }
+
+        public void SetPosture(int soldierId, Posture posture, bool timed = false, bool wait = false)
         {
             if (ai._org.FindSquadOf(soldierId) is not { } q || q.Side != side)
             {
                 throw new InvalidOperationException($"Soldier {soldierId} is not on side {side}.");
             }
 
-            var s = ai._org.FindSoldier(soldierId)!;
-            if (s.CanLead)
-            {
-                s.Posture = posture;
-            }
+            _postures[soldierId] = (posture, timed, wait);
         }
 
         public bool MoveSoldier(int squadId, int soldierId, TilePos goal, bool fast) =>

@@ -92,6 +92,9 @@ public sealed class OrgSystem(OrgTables tables) : ISimSystem
                 hasher.Add(s.X);
                 hasher.Add(s.Y);
                 hasher.Add((byte)s.Posture);
+                hasher.Add(s.PendingPosture is { } p ? (byte)(1 + (int)p) : (byte)0);
+                hasher.Add(s.PostureDueAt);
+                hasher.Add(s.AwaitingPosture);
                 hasher.Add((byte)s.Health);
             }
         }

@@ -129,11 +129,21 @@ Status: draft, awaiting owner sign-off
   in 100% of seeds. No unit under fire stays standing in the open for more than 3 s
   unless ordered `MoveFast`.
 
-- [ ] **2.4 Off-map artillery** (O)
+- [x] **2.4 Off-map artillery** (O)
   Call-for-fire with delay and dispersion, HE blast and fragmentation, limited missions.
   *Done when:* after a 2-minute barrage on a defended position, defender morale and
   suppression are measurably degraded. In ≥30% of seeds the attacker has not spotted
   every surviving defender.
+
+- [ ] **2.4a Per-man reactions everywhere** (S)
+  Every order-driven or AI-driven posture change is made man by man, each after his own
+  deterministic reaction delay. A man waits for a move order's posture before he walks,
+  and a later order is never overridden by an older pending change.
+  *Done when:* across the `bombard-creep`, `pin-open`, `fix-assault`, `equal-fire` and
+  idle-reaction scenarios (seeds 1 to 50) no squad with 3 or more able men ever has every
+  able man change posture on the same tick (permanent test; any exception justified in
+  it). The delays are tagged data values and the pending state is in the state hash. All
+  earlier "Done when" tests stay green with no retuned values.
 
 - [ ] **2.5 Godot view and controls** (S)
   Draw the map, units as placeholder shapes, and visible enemies only. Selection,

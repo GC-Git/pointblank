@@ -91,6 +91,14 @@ public sealed class Soldier
 
     public Posture Posture { get; internal set; }
 
+    /// <summary>The posture he is about to take (see <see cref="PostureChange"/>), or null.</summary>
+    internal Posture? PendingPosture { get; set; }
+
+    internal long PostureDueAt { get; set; }
+
+    /// <summary>Whether he waits where he is until the pending change is done.</summary>
+    internal bool AwaitingPosture { get; set; }
+
     public HealthState Health { get; internal set; }
 
     public bool CanLead => Health is HealthState.Ok or HealthState.Wounded;
