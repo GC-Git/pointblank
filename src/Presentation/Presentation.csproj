@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- What the player sees and does, as plain C#: draw lists, camera, selection, orders, clock. No Godot, and no access
+       to Sim internals (CLAUDE.md rule 11). game/ paints its output; tests/Sim.Tests checks it. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>PointBlank.Presentation</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Sim\Sim.csproj" />
+  </ItemGroup>
+
+</Project>

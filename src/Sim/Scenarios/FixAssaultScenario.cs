@@ -12,10 +12,10 @@ using PointBlank.Sim.Spotting;
 using PointBlank.Sim.Suppression;
 using PointBlank.Sim.UnitAi;
 
-namespace PointBlank.Runner;
+namespace PointBlank.Sim.Scenarios;
 
 /// <summary>Who is on the field in a <see cref="FixAssaultScenario"/>.</summary>
-public enum FixAssaultMode
+internal enum FixAssaultMode
 {
     /// <summary>Assault squad, German squad and a US base of fire (<c>fix-assault</c>).</summary>
     BaseOfFire,
@@ -39,7 +39,7 @@ public enum FixAssaultMode
 /// suppressed or pinned after the base of fire opened), <c>de_pinned_ticks</c>, <c>us_held_ticks</c> (ticks the assault
 /// squad's move was held by pinning), <c>us_casualties</c>.
 /// </summary>
-public sealed class FixAssaultScenario : IScenario
+internal sealed class FixAssaultScenario : IScenario
 {
     public const int AssaultTick = 100;
     public const int RunTicks = AssaultTick + 1000;

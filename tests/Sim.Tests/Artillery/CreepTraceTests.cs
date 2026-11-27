@@ -1,3 +1,4 @@
+using PointBlank.Sim.Scenarios;
 using PointBlank.Runner;
 using PointBlank.Sim.Fire;
 using PointBlank.Sim.Org;

@@ -18,8 +18,9 @@ owner wants to sell it someday.
 | `tests/Sim.Tests/` | xUnit tests, run headless. |
 | `data/` | JSON data tables (units, weapons, ammo, materials, organisation, command, fire, suppression, morale, unit_ai, ...); every value has a `source`. Loader: `src/Sim/Data`. |
 | `tools/Runner/` | Headless battle runner CLI and its scenarios. References `Sim`. |
-| `game/` | Godot 4.7 .NET project. Rendering and input only. References `Sim`. |
-| `PointBlank.sln` | All four projects. Godot builds this one (`solution_directory=".."`). |
+| `src/Presentation/` | Plain C#: draw lists, camera, clock, selection and orders, from a `SideView` only. References `Sim`. |
+| `game/` | Godot 4.7 .NET project. Rendering and input only. References `Sim` and `Presentation`. |
+| `PointBlank.sln` | All five projects. Godot builds this one (`solution_directory=".."`). |
 | `docs/` | Spec, checklist, plans, process prompts. |
 
 Requires .NET SDK 9 and the .NET 8 runtime (projects target `net8.0`, the default of
@@ -74,6 +75,34 @@ Run the game headless (loads the main scene and quits):
 Don't rely on the exit code alone: read the output and confirm there are no `ERROR`
 lines.
 
+Play (player is the US side; scenarios `fix-assault`, `bombard-creep`, `view-sandbox`;
+build first):
+
+```powershell
+& "C:\Godot_v4.7-stable_mono_win64\Godot_v4.7-stable_mono_win64.exe" --path game -- --scenario fix-assault --seed 1
+```
+
+Left-click or drag selects squads (Shift adds), right-click gives the chosen order
+(Shift: move fast, Ctrl: sneak). Keys: M F S B D A C pick the order, H hold, R rules of
+engagement, Space pause, 1/2/4 speed, arrows or middle-drag pan, wheel zoom, Esc
+deselect.
+
+Screenshot mode (needs a real renderer, so no `--headless`) saves one PNG per tick and
+quits. `--scripted` also gives the US side's scripted orders; `--select 0,2`,
+`--zoom <pixels per metre>` and `--center x,y` are optional:
+
+```powershell
+& "C:\Godot_v4.7-stable_mono_win64\Godot_v4.7-stable_mono_win64_console.exe" --path game -- --screenshot --scenario fix-assault --seed 1 --ticks 0,600 --scripted --out "$PWD\TestResults\screens"
+```
+
+Screenshot tests (skipped by a plain `dotnet test`; a small Godot window appears
+briefly; set `PB_GODOT` if Godot is elsewhere; frames stay in `TestResults/screens`).
+Run them for any change to `game/` or `src/Presentation/`:
+
+```powershell
+$env:PB_SCREENSHOT=1; dotnet test PointBlank.sln --filter Category=Screenshot; $env:PB_SCREENSHOT=$null
+```
+
 ## Rules
 
 1. **`Sim` never references Godot** — no package, project or `using Godot`. Game rules
@@ -110,7 +139,9 @@ lines.
     only to `Sim.Tests` and the headless runner through `InternalsVisibleTo`. Never widen that
     list for `game/` or AI code, and never make those members public.
     `SpottingSystem.DebugTruth()` is the one public truth accessor, and it is for debug
-    overlays only. Tests in `tests/Sim.Tests/Boundary/` enforce this by reflection.
+    overlays only. `game/` and `src/Presentation/` get a battle from `PlayerBattle`, which
+   hands out only the US `SideView`. Tests in `tests/Sim.Tests/Boundary/` enforce this by
+   reflection, including an allow list of the Sim types those two assemblies may name.
 12. **Realism first**: realistic unit behaviour beats hitting a scripted moment or test bar. Never
     tune or reshape a scenario only to make a test pass; report the conflict instead.
 13. **Split scope creep into new checklist items**: when a new realism or scope problem

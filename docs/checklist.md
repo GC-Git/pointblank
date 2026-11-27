@@ -135,7 +135,7 @@ Status: draft, awaiting owner sign-off
   suppression are measurably degraded. In ≥30% of seeds the attacker has not spotted
   every surviving defender.
 
-- [ ] **2.4a Per-man reactions everywhere** (S)
+- [x] **2.4a Per-man reactions everywhere** (S)
   Every order-driven or AI-driven posture change is made man by man, each after his own
   deterministic reaction delay. A man waits for a move order's posture before he walks,
   and a later order is never overridden by an older pending change.

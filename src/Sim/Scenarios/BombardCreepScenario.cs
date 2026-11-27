@@ -13,7 +13,7 @@ using PointBlank.Sim.Spotting;
 using PointBlank.Sim.Suppression;
 using PointBlank.Sim.UnitAi;
 
-namespace PointBlank.Runner;
+namespace PointBlank.Sim.Scenarios;
 
 /// <summary>
 /// Item 2.4 "bombard and creep". On a 400 × 120 m field with a hedge at x = <see cref="HedgeX"/> m:
@@ -36,7 +36,7 @@ namespace PointBlank.Runner;
 /// <c>de_suppression</c>, <c>de_peak_suppression</c> and <c>de_morale</c> at the advance; <c>de_casualties</c>;
 /// <c>us_creep_casualties</c> (US squad men down during the creep).
 /// </summary>
-public sealed class BombardCreepScenario : IScenario
+internal sealed class BombardCreepScenario : IScenario
 {
     public const int TargetX = 112;
     public const int HedgeX = 110;
