@@ -97,7 +97,9 @@ quits. `--scripted` also gives the US side's scripted orders; `--select 0,2`,
 
 Screenshot tests (skipped by a plain `dotnet test`; a small Godot window appears
 briefly; set `PB_GODOT` if Godot is elsewhere; frames stay in `TestResults/screens`).
-Run them for any change to `game/` or `src/Presentation/`:
+Run them for any change to `game/` or `src/Presentation/`. They build the game (Debug,
+which Godot runs) themselves, and `dotnet test` builds it too for the UI boundary test,
+so neither sees stale binaries (don't pass `--no-build`):
 
 ```powershell
 $env:PB_SCREENSHOT=1; dotnet test PointBlank.sln --filter Category=Screenshot; $env:PB_SCREENSHOT=$null

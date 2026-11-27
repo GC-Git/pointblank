@@ -53,6 +53,22 @@ public class UiBoundaryTests
         "PointBlank.Sim.Artillery.ShellImpactView",
     ];
 
+    /// <summary>Namespaces (by prefix) whose types look members up by name at run time.</summary>
+    private static readonly string[] ByNameNamespaces =
+    [
+        "System.Reflection.", "System.Linq.Expressions.", "System.Linq.IQueryable", "System.Dynamic.", "Microsoft.CSharp.",
+        "System.Runtime.Loader.", "System.ComponentModel.", "System.Text.Json.", "System.Xml.Serialization.",
+    ];
+
+    /// <summary>Types from those namespaces that Godot's generated glue names and that look nothing up.</summary>
+    private static readonly HashSet<string> Harmless = ["System.Reflection.Assembly", "System.ComponentModel.EditorBrowsableState"];
+
+    private static readonly HashSet<string> ByNameTypes =
+    [
+        "System.Activator", "System.Runtime.CompilerServices.UnsafeAccessorAttribute",
+        "System.Runtime.CompilerServices.CallSite", "System.Runtime.CompilerServices.CallSiteBinder",
+    ];
+
     private static string Root([CallerFilePath] string here = "") =>
         Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, "..", "..", ".."));
 
@@ -67,7 +83,7 @@ public class UiBoundaryTests
 
     [Theory]
     [MemberData(nameof(UiAssemblies))]
-    public void UI_code_names_only_player_side_sim_types_and_no_reflection(string which)
+    public void UI_code_names_only_player_side_sim_types_and_nothing_that_reaches_members_by_name(string which)
     {
         using var pe = new PEReader(File.OpenRead(PathOf(which)));
         var md = pe.GetMetadataReader();
@@ -96,10 +112,13 @@ public class UiBoundaryTests
                 }
             }
 
-            // Reflection (or runtime loading) could reach internal members behind the compiler's back.
+            // Reflection, expression trees, dynamic binding and runtime loading all reach private members by name, behind
+            // the compiler's back (Expression.Property(battle, "World") hands out the whole truth).
             // Godot's generated glue names the type Assembly; calling anything on it is refused below.
-            var reflection = ns == "System.Reflection" && name != "System.Reflection.Assembly" && !name.EndsWith("Attribute", StringComparison.Ordinal);
-            if (reflection || name is "System.Activator" or "System.Runtime.CompilerServices.UnsafeAccessorAttribute")
+            var outerName = name.Split('+')[0];
+            var byName = ByNameNamespaces.Any(n => outerName.StartsWith(n, StringComparison.Ordinal))
+                && !Harmless.Contains(name) && !name.EndsWith("Attribute", StringComparison.Ordinal);
+            if (byName || ByNameTypes.Contains(name.Split('`')[0]))
             {
                 offenders.Add(name);
             }
@@ -117,6 +136,7 @@ public class UiBoundaryTests
             var owner = $"{md.GetString(parent.Namespace)}.{md.GetString(parent.Name)}";
             var called = md.GetString(member.Name);
             if (owner == "System.Reflection.Assembly"
+                || (owner == "System.Delegate" && called is "CreateDelegate" or "DynamicInvoke")
                 || (owner == "System.Type" && called is not ("GetTypeFromHandle" or "op_Equality" or "op_Inequality" or "get_Assembly")))
             {
                 offenders.Add($"{owner}.{called}");

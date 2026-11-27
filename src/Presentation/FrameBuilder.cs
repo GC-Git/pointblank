@@ -156,12 +156,12 @@ public static class FrameBuilder
     /// <summary>The latest order in a few words, or null when there is nothing to say.</summary>
     private static string? OrderText(OrderView? order) => order?.Order is not { Kind: var kind } ? null : order.Status switch
     {
-        OrderStatus.Pending => $"{kind} pending {Seconds(order.TicksRemaining)}",
-        OrderStatus.Hesitating => $"{kind} hesitating {Seconds(order.TicksRemaining)}",
-        OrderStatus.Refused => $"{kind} refused ({order.Note})",
-        OrderStatus.Rejected => $"{kind} not possible ({order.Note})",
-        OrderStatus.Held => $"{kind} held ({order.Note})",
-        OrderStatus.Executing => $"{kind} under way",
+        OrderStatus.Pending => $"{Words.Of(kind)} pending {Seconds(order.TicksRemaining)}",
+        OrderStatus.Hesitating => $"{Words.Of(kind)} hesitating {Seconds(order.TicksRemaining)}",
+        OrderStatus.Refused => $"{Words.Of(kind)} refused ({Words.Of(order.Note)})",
+        OrderStatus.Rejected => $"{Words.Of(kind)} not possible ({Words.Of(order.Note)})",
+        OrderStatus.Held => $"{Words.Of(kind)} held ({Words.Of(order.Note)})",
+        OrderStatus.Executing => $"{Words.Of(kind)} under way",
         _ => null,
     };
 
@@ -193,19 +193,19 @@ public static class FrameBuilder
         var name = $"#{q.Id} {q.OrgId}";
         if (q.Morale != MoraleState.Steady)
         {
-            name += $" {q.Morale}";
+            name += $" {Words.Of(q.Morale)}";
         }
 
         if (q.Suppression != SuppressionState.None)
         {
-            name += $" {q.Suppression}";
+            name += $" {Words.Of(q.Suppression)}";
         }
 
         Label(list, at, name, c.Selected.Contains(q.Id) ? Palette.Selected : Palette.Text);
         Bar(list, at.X, at.Y + 4, 60, 3, q.MoraleLevel.F() / 100, Palette.MoraleBar);
         Bar(list, at.X, at.Y + 10, 60, 3, q.SuppressionLevel.F() / 100, Palette.SuppressionBar);
 
-        var text = c.Queued(q.Id) is { } queued ? $"{queued} queued" : OrderText(order);
+        var text = c.Queued(q.Id) is { } queued ? $"{Words.Of(queued)} queued" : OrderText(order);
         if (text == null)
         {
             return;
@@ -227,7 +227,7 @@ public static class FrameBuilder
         var clock = c.Clock.Paused ? "PAUSED" : $"{c.Clock.Speed}x";
         list.Add(new TextPrim(
             new Pt(10, 20),
-            $"{c.Battle.ScenarioId}  seed {c.Battle.Seed}   time {seconds / 60:00}:{seconds % 60:00}   {clock}   right-click: {c.Mode}",
+            $"{c.Battle.ScenarioId}  seed {c.Battle.Seed}   time {seconds / 60:00}:{seconds % 60:00}   {clock}   right-click: {Words.Of(c.Mode)}",
             Palette.Text, 14));
         list.Add(new TextPrim(new Pt(c.Layout.Panel.X + 10, 20), $"contacts {c.Battle.View.KnownEnemies.Count}", Palette.DimText, 13));
     }
@@ -261,32 +261,32 @@ public static class FrameBuilder
         {
             var q = chosen[0];
             Line($"#{q.Id} {q.OrgId}{(chosen.Length > 1 ? $"  (+{chosen.Length - 1} more)" : "")}", Palette.Selected, 15);
-            Line($"Morale: {q.Morale} {Number(q.MoraleLevel)}");
+            Line($"Morale: {Words.Of(q.Morale)} {Number(q.MoraleLevel)}");
             Bar(list, x, y - 11, 200, 5, q.MoraleLevel.F() / 100, Palette.MoraleBar);
             y += 8;
             foreach (var reason in q.MoraleTopReasons.Where(r => r != MoraleReason.None))
             {
-                Line($"  {reason}", Palette.DimText, 12);
+                Line($"  {Words.Of(reason)}", Palette.DimText, 12);
             }
 
-            Line($"Suppression: {q.Suppression} {Number(q.SuppressionLevel)}");
+            Line($"Suppression: {Words.Of(q.Suppression)} {Number(q.SuppressionLevel)}");
             Bar(list, x, y - 11, 200, 5, q.SuppressionLevel.F() / 100, Palette.SuppressionBar);
             y += 8;
             var leader = q.Soldiers.FirstOrDefault(s => s.Id == q.LeaderId);
-            Line(q.LeaderId < 0 ? $"No leader (successor in {Seconds(q.TicksToSuccession)})" : $"Leader: {leader.Role}");
-            Line($"Ammo: {q.Ammo}   RoE: {c.Battle.View.RoeOf(q.Id)}");
+            Line(q.LeaderId < 0 ? $"No leader (successor in {Seconds(q.TicksToSuccession)})" : $"Leader: {Words.Of(leader.Role)}");
+            Line($"Ammo: {Words.Of(q.Ammo)}   RoE: {(c.Battle.View.RoeOf(q.Id) is { } roe ? Words.Of(roe) : "-")}");
 
             var order = c.Battle.View.StatusOf(q.Id);
             if (c.Queued(q.Id) is { } queued)
             {
-                Line($"Order: {queued} queued", Palette.DelayBar);
+                Line($"Order: {Words.Of(queued)} queued", Palette.DelayBar);
             }
             else if (order?.Order is { } o)
             {
-                Line($"Order: {o.Kind}: {order.Status}", Palette.DelayBar);
+                Line($"Order: {Words.Of(o.Kind)}: {Words.Of(order.Status)}", Palette.DelayBar);
                 if (order.Note != OrderNote.None)
                 {
-                    Line($"  {order.Note}", Palette.DimText, 12);
+                    Line($"  {Words.Of(order.Note)}", Palette.DimText, 12);
                 }
             }
             else
@@ -300,16 +300,16 @@ public static class FrameBuilder
             }
 
             var why = c.Battle.View.ReasonsFor(q.Id) ?? DelayReason.None;
-            Line(why == DelayReason.None ? "Delay factors: none" : $"Delay factors: {why}", Palette.DimText, 12);
+            Line(why == DelayReason.None ? "Delay factors: none" : $"Delay factors: {Words.Of(why)}", Palette.DimText, 12);
 
             y += 6;
             Line("Man            health    posture    sup  rds", Palette.DimText, 12);
             foreach (var s in q.Soldiers)
             {
                 var row = y;
-                Line(s.Role.ToString(), size: 12);
-                list.Add(new TextPrim(new Pt(x + 100, row), s.Health.ToString(), Palette.Text, 12));
-                list.Add(new TextPrim(new Pt(x + 175, row), s.Posture.ToString(), Palette.Text, 12));
+                Line(Words.Of(s.Role), size: 12);
+                list.Add(new TextPrim(new Pt(x + 100, row), Words.Of(s.Health), Palette.Text, 12));
+                list.Add(new TextPrim(new Pt(x + 175, row), Able(s) ? Words.Of(s.Posture) : "-", Palette.Text, 12));
                 list.Add(new TextPrim(new Pt(x + 245, row), Number(s.Suppression), Palette.Text, 12));
                 list.Add(new TextPrim(new Pt(x + 278, row), s.Rounds < 0 ? "-" : s.Rounds.ToString(CultureInfo.InvariantCulture), Palette.Text, 12));
             }
@@ -319,7 +319,7 @@ public static class FrameBuilder
         Line($"Fire missions left: {c.Battle.View.MissionsLeft}", Palette.DimText, 12);
         foreach (var m in c.Battle.View.FireMissions.TakeLast(2))
         {
-            Line($"  mission {m.Id}: {m.Status}, eta {Seconds(m.EtaTicks)}, {m.RoundsLeft}/{m.RoundsTotal}", Palette.DimText, 12);
+            Line($"  mission {m.Id}: {Words.Of(m.Status)}, eta {Seconds(m.EtaTicks)}, {m.RoundsLeft}/{m.RoundsTotal}", Palette.DimText, 12);
         }
     }
 

@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using PointBlank.Presentation;
 using PointBlank.Sim.Map;
 using PointBlank.Sim.Org;
+using PointBlank.Sim.Sight;
 
 namespace PointBlank.Sim.Tests.Presentation;
 
@@ -32,12 +33,27 @@ public class ScreenshotTests
 
     private static float F(Fixed v) => v.Raw / 4294967296f;
 
+    private static readonly Lazy<bool> Built = new(() =>
+    {
+        // Godot runs the project's Debug assemblies whatever configuration the tests use, so build exactly those first:
+        // a frame from a stale game proves nothing.
+        Start("dotnet", ["build", Path.Combine("game", "PointBlank.csproj"), "-c", "Debug", "--disable-build-servers", "-nologo"], null);
+        return true;
+    });
+
     private static void Capture(params string[] options)
     {
+        Assert.True(Built.Value);
         var godot = Environment.GetEnvironmentVariable("PB_GODOT")
             ?? @"C:\Godot_v4.7-stable_mono_win64\Godot_v4.7-stable_mono_win64_console.exe";
-        var start = new ProcessStartInfo(godot) { RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = Root() };
-        foreach (var a in new[] { "--path", "game", "--audio-driver", "Dummy", "--windowed", "--resolution", "320x180", "--", "--screenshot" }.Concat(options))
+        string[] launch = ["--path", "game", "--audio-driver", "Dummy", "--windowed", "--resolution", "320x180", "--", "--screenshot"];
+        Start(godot, [.. launch, .. options], "ERROR");
+    }
+
+    private static void Start(string program, IEnumerable<string> arguments, string? forbidden)
+    {
+        var start = new ProcessStartInfo(program) { RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = Root() };
+        foreach (var a in arguments)
         {
             start.ArgumentList.Add(a);
         }
@@ -48,11 +64,13 @@ public class ScreenshotTests
         if (!process.WaitForExit(180_000))
         {
             process.Kill(entireProcessTree: true);
-            Assert.Fail("Godot did not finish within three minutes.");
+            Assert.Fail($"{program} did not finish within three minutes.");
         }
 
         var output = stdout.Result + stderr.Result;
-        Assert.True(process.ExitCode == 0 && !output.Contains("ERROR", StringComparison.Ordinal), $"exit {process.ExitCode}\n{output}");
+        Assert.True(
+            process.ExitCode == 0 && (forbidden == null || !output.Contains(forbidden, StringComparison.Ordinal)),
+            $"{program}: exit {process.ExitCode}\n{output}");
     }
 
     private static GameController Twin(string scenario, bool script, params int[] select)
@@ -77,6 +95,70 @@ public class ScreenshotTests
 
     private static float Gap(Pt a, Pt b) => MathF.Max(MathF.Abs(a.X - b.X), MathF.Abs(a.Y - b.Y));
 
+    /// <summary>Where a squad's label and bars start: above its topmost man, centred on its able men.</summary>
+    private static Pt LabelOf(GameController c, SquadView q)
+    {
+        var able = q.Soldiers.Where(s => s.Health is HealthState.Ok or HealthState.Wounded).ToArray();
+        var centre = able.Average(s => c.Camera.ToScreen(F(s.X), F(s.Y)).X);
+        return new Pt(centre - 30, q.Soldiers.Min(s => c.Camera.ToScreen(F(s.X), F(s.Y)).Y) - 30);
+    }
+
+    /// <summary>A bar's pixels: its colour over the given fraction of the area, the dark background over the rest.</summary>
+    private static void BarShows(Png frame, Area bar, Rgb colour, float fraction, string what)
+    {
+        var all = bar.W * bar.H;
+        var filled = frame.Count(bar, p => p == colour);
+        var dark = frame.Count(bar, p => p == Palette.BarBack);
+        Assert.True(
+            Math.Abs(filled - (fraction * all)) <= all / 5 && Math.Abs(dark - ((1 - fraction) * all)) <= all / 5,
+            $"{what} at {fraction:0.00}: {filled} filled and {dark} dark of {all}");
+    }
+
+    /// <summary>
+    /// Of the points around a man's ring that no man's shape covers (rings are drawn under the men), how many have about
+    /// the selection colour within a pixel.
+    /// </summary>
+    private static (int Ringed, int Open) OnRing(Png frame, Pt centre, float radius, (Pt At, Posture Posture)[] men, GameController c)
+    {
+        var r = Math.Clamp(0.7f * c.Camera.Scale, 3, 12);
+        bool Covers((Pt At, Posture Posture) man, Pt p)
+        {
+            // A prone man is a long low bar; the others fit in a square.
+            var (w, h) = man.Posture == Posture.Prone ? (1.6f * r, 0.6f * r) : (r, r);
+            return MathF.Abs(man.At.X - p.X) <= w + 1 && MathF.Abs(man.At.Y - p.Y) <= h + 1;
+        }
+
+        var open = Enumerable.Range(0, 64)
+            .Select(i => MathF.SinCos(i * MathF.Tau / 64))
+            .Select(a => new Pt(centre.X + (radius * a.Cos), centre.Y + (radius * a.Sin)))
+            .Where(p => !men.Any(m => Covers(m, p)))
+            .ToArray();
+        return (open.Count(p => frame.Near(p, 1, q => q.R > 200 && q.G > 180 && q.B < 110)), open.Length);
+    }
+
+    /// <summary>The panel shows the squad's two bars, and a line per man in its suppression and rounds columns.</summary>
+    private static void PanelShowsTheSquad(Png frame, GameController c, int squad)
+    {
+        var view = c.Battle.View.Squads.Single(q => q.Id == squad);
+
+        // The morale and suppression bars (200 by 5, in a dark frame one pixel wider all round).
+        var (morale, suppression) = (F(view.MoraleLevel) / 100, F(view.SuppressionLevel) / 100);
+        var dark = frame.Count(c.Layout.Panel, p => p == Palette.BarBack);
+        var expected = (2 * 202 * 7) - (1000 * (morale + suppression));
+        Assert.True(Math.Abs(dark - expected) <= 150, $"panel bars: {dark} dark pixels, expected {expected:0}");
+        var filled = frame.Count(c.Layout.Panel, p => p == Palette.SuppressionBar);
+        Assert.True(Math.Abs(filled - (1000 * suppression)) <= 100, $"panel suppression bar: {filled} at {suppression:0.00}");
+
+        var men = view.Soldiers.Count;
+        foreach (var (name, offset) in new[] { ("suppression", 245), ("rounds", 278) })
+        {
+            var column = new Area(c.Layout.Panel.X + 10 + offset, c.Layout.Panel.Y, 22, c.Layout.Panel.H);
+            var rows = frame.Find(column, p => p.R > 190 && p.G > 190 && p.B > 180).Select(p => (int)p.Y).Distinct().Order().ToArray();
+            var lines = rows.Where((y, i) => i == 0 || y > rows[i - 1] + 2).Count();
+            Assert.True(lines == men, $"panel {name} column: {lines} lines for {men} men");
+        }
+    }
+
     [ScreenshotFact]
     public void Fix_assault_frames_show_own_units_orders_and_only_spotted_enemies()
     {
@@ -96,14 +178,35 @@ public class ScreenshotTests
         Assert.True(first.Count(c.Layout.Panel, p => p == Palette.Panel) > 50_000, "panel");
         Assert.True(first.Count(c.Layout.Panel, p => p == Palette.Text) > 200, "panel text");
 
+        PanelShowsTheSquad(first, c, 2);
+
         // 1.5 s in, the scripted orders are still travelling down the chain of command.
         StepTo(c, 15);
         Assert.Contains(c.Battle.View.Squads, q => c.Battle.View.StatusOf(q.Id)!.Status == global::PointBlank.Sim.Orders.OrderStatus.Pending);
         Assert.True(Frame(15).Count(c.Layout.Map, p => p == Palette.DelayBar) > 60, "order delay shown on the unit");
         Assert.True(Frame(15).Count(c.Layout.Panel, p => p == Palette.DelayBar) > 30, "order delay shown in the panel");
+        var waiting = c.Battle.View.Squads
+            .Where(q => c.Battle.View.StatusOf(q.Id)!.Status == global::PointBlank.Sim.Orders.OrderStatus.Pending).ToArray();
+        Assert.All(waiting, q =>
+        {
+            // The delay progress bar, right of the morale bar: filled as far as the delay has run, dark beyond.
+            var order = c.Battle.View.StatusOf(q.Id)!;
+            var done = 1 - (order.TicksRemaining / (float)order.TotalDelayTicks);
+            var at = LabelOf(c, q);
+            BarShows(Frame(15), new Area(at.X + 64, at.Y + 4, 30, 9), Palette.DelayBar, done, $"delay bar of squad {q.Id}");
+        });
 
         StepTo(c, 600);
         var late = Frame(600);
+        PanelShowsTheSquad(late, c, 2);
+
+        // Suppression bars on every squad, as long as its suppression; the battle must have suppressed someone.
+        Assert.Contains(c.Battle.View.Squads, q => F(q.SuppressionLevel) > 10);
+        Assert.All(c.Battle.View.Squads, q =>
+        {
+            var at = LabelOf(c, q);
+            BarShows(late, new Area(at.X, at.Y + 10, 60, 3), Palette.SuppressionBar, F(q.SuppressionLevel) / 100, $"suppression bar of squad {q.Id}");
+        });
         var contacts = c.Battle.View.KnownEnemies.Select(k => c.Camera.ToScreen(F(k.X), F(k.Y))).ToArray();
         Assert.NotEmpty(contacts);
         Assert.All(contacts, at => Assert.True(late.Near(at, 8, Palette.IsEnemy), "contact drawn"));
@@ -113,6 +216,35 @@ public class ScreenshotTests
         Assert.All(
             Men(c, "de").Select(s => ScreenOf(c, s)).Where(at => contacts.All(k => Gap(at, k) > 40)),
             at => Assert.False(late.Near(at, 2, Palette.IsEnemy), "an unspotted enemy is drawn"));
+    }
+
+    [ScreenshotFact]
+    public void Selection_rings_are_drawn_round_the_selected_squads_men_only()
+    {
+        // Close in on the selected squad: at the default zoom its men stand on top of one another's rings.
+        var c = Twin("fix-assault", true, 2);
+        var us = c.Battle.World.GetSystem<OrgSystem>().Squads.Where(q => q.Side == "us").ToArray();
+        var squad = us.Single(q => q.Id == 2).Soldiers;
+        var (x, y) = (MathF.Round(squad.Average(s => F(s.X))), MathF.Round(squad.Average(s => F(s.Y))));
+        const float zoom = 14;
+        var out_ = Path.Combine(Root(), "TestResults", "screens", "zoomed");
+        Capture(
+            "--scenario", "fix-assault", "--seed", "1", "--ticks", "0", "--scripted", "--select", "2",
+            "--zoom", $"{zoom}", "--center", $"{x},{y}", "--out", out_);
+        c.Camera.Set(x, y, zoom);
+        var frame = Png.Load(Path.Combine(out_, "fix-assault-seed1-tick0.png"));
+
+        var radius = (Math.Clamp(0.7f * zoom, 3, 12) * 1.6f) + 2;
+        var men = Men(c, "us").Select(m => (At: ScreenOf(c, m), m.Posture)).ToArray();
+        var picked = squad.Select(m => ScreenOf(c, m)).Where(c.Layout.Map.Contains).ToArray();
+        Assert.True(picked.Length >= squad.Count / 2, "the selected squad is in view");
+        var rings = picked.Select(at => (At: at, Seen: OnRing(frame, at, radius, men, c))).ToArray();
+        Assert.True(rings.Sum(r => r.Seen.Open) >= 32 * picked.Length, "most of each ring is in the open");
+        Assert.All(rings, r => Assert.True(r.Seen.Ringed >= r.Seen.Open * 3 / 4, $"selection ring at {r.At}: {r.Seen}"));
+
+        var apart = us.Where(q => q.Id != 2).SelectMany(q => q.Soldiers).Select(m => ScreenOf(c, m))
+            .Where(at => c.Layout.Map.Contains(at) && picked.All(p => Gap(p, at) > 3 * radius)).ToArray();
+        Assert.All(apart, at => Assert.True(OnRing(frame, at, radius, men, c).Ringed < 8, $"ring on an unselected man at {at}"));
     }
 
     [ScreenshotFact]

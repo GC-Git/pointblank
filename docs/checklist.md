@@ -170,6 +170,14 @@ Status: draft, awaiting owner sign-off
   leaves men low, and an AI get-down is not cancelled by a pending order. Existing criteria
   stay green with no retuning.
 
+- [ ] **2.5a View and control follow-ups** (S)
+  Do before 2.7. From the 2.5 review: the rules-of-engagement key pressed just after a move
+  silently cancels the pending move (needs an owner decision on whether it should); at default
+  zoom squads are tiny blobs and men and postures can't be told apart; with several squads
+  selected the panel shows only the first, e.g. 'Order: none' while another has a pending order;
+  Smoke and Ambush aren't offered; incoming-fire bearings and order rejections aren't drawn.
+  *Done when:* each is fixed or explicitly deferred by the owner, with tests.
+
 - [ ] **2.7 First playable scenarios** (S) ⛳
   Two scenarios: *fix and assault* (US platoon + tank vs German MG position) and
   *bombard and creep* (US with artillery vs dug-in German squad), against a simple
