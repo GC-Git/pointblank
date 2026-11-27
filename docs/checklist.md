@@ -157,6 +157,19 @@ Status: draft, awaiting owner sign-off
   intent.
   *Done when:* each overlay toggles and appears in a screenshot test.
 
+- [ ] **2.4b Realistic posture under pin and orders** (S)
+  Do before 2.7. Follow-ups from the 2.4a review: men get up while their squad is pinned
+  (seeds 1-50: `fix-assault` 227 such rises, `equal-fire` 271; before 2.4a 183 and 216; one
+  routing man rises every 4 s); quick stand/drop reversals remain; by code reading, not yet
+  tested, `Halt` cancels any awaited posture change including going lower, so `Hold` just
+  after `Sneak` may leave men standing, and an AI get-down made while a man awaits an order
+  is also cancellable.
+  *Done when:* over seeds 1-50, men don't get up while their squad is pinned unless a
+  documented realistic reason applies; quick stand/drop reversals within 1 s are no higher
+  than the pre-change baseline in every scenario; a test shows `Hold` just after `Sneak`
+  leaves men low, and an AI get-down is not cancelled by a pending order. Existing criteria
+  stay green with no retuning.
+
 - [ ] **2.7 First playable scenarios** (S) ⛳
   Two scenarios: *fix and assault* (US platoon + tank vs German MG position) and
   *bombard and creep* (US with artillery vs dug-in German squad), against a simple

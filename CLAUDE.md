@@ -121,14 +121,16 @@ lines.
 ## Merge rule (owner's standing instruction, 2026-11-25)
 
 The coordinating session may merge a checklist item's PR when the independent evaluator's
-verdict is MERGE and all tests pass, then start the next item. It stops and waits for the
-owner at every ⛳ sign-off item, on any evaluator FAIL or DON'T MERGE, or if a build
-session is blocked. Build sessions never merge their own PR.
+verdict is MERGE and all tests pass, then start the next item. It always stops and waits
+for the owner at every ⛳ sign-off item. On an evaluator FAIL or DON'T MERGE, or a blocked
+build session, it first gives one automatic fix round if the fix is clear (below);
+otherwise it stops and waits for the owner. Build sessions never merge their own PR.
 
-**One automatic fix round (owner's rule):** on a DON'T MERGE, or a blocked build with a
-clear fix, the coordinator sends it back for one fix round without asking. If the second
-attempt also fails, or a design or realism decision is needed, it stops and waits for the
-owner. Nothing is ever merged on a DON'T MERGE without the owner's explicit OK.
+**One automatic fix round (owner's rule):** on a FAIL or DON'T MERGE, or a blocked build,
+with a clear fix, the coordinator sends it back for one fix round without asking. If there
+is no clear fix, the second attempt also fails, or a design or realism decision is needed,
+it stops and waits for the owner. Nothing is ever merged on a DON'T MERGE without the
+owner's explicit OK.
 
 ## Permissions
 
