@@ -21,6 +21,8 @@ public class UiBoundaryTests
         "PointBlank.Sim.SquadView",
         "PointBlank.Sim.SoldierView",
         "PointBlank.Sim.IncomingFireView",
+        "PointBlank.Sim.SeenShotView",
+        "PointBlank.Sim.SeenCasualtyView",
         "PointBlank.Sim.MapView",
         "PointBlank.Sim.MapTileView",
         "PointBlank.Sim.BuildingView",

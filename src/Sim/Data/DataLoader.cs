@@ -101,7 +101,7 @@ public static class DataLoader
             ("name", T), ("side", T), ("missions", N), ("call_time", N), ("flight_time", N), ("guns", N), ("rounds_per_gun", N),
             ("duration", N), ("aim_error", N), ("scatter", N), ("lethal_radius", N), ("casualty_radius", N), ("lethal_chance", N),
             ("direct_hit_radius", N), ("kneeling_factor", N), ("prone_factor", N), ("shelter_factor", N), ("building_factor", N),
-            ("cover_weight", N), ("kill_chance", N), ("incapacitate_chance", N), ("suppression", N), ("suppression_radius", N),
+            ("cover_weight", N), ("kill_chance", N), ("incapacitate_chance", N), ("suppression", N), ("suppression_radius", N), ("plume_height", N),
             ("morale_shock", N), ("morale_radius", N), ("impact_memory", N),
         ],
     };

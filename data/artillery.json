@@ -29,7 +29,8 @@
         "suppression_radius": { "value": "40", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: burst suppression falls linearly to 0 at this radius." } },
         "morale_shock": { "value": "1.5", "unit": "points", "source": { "kind": "placeholder", "note": "Placeholder: morale a squad loses from a burst at its nearest man (scale 0 to 100)." } },
         "morale_radius": { "value": "40", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: the morale shock falls linearly to 0 at this radius." } },
-        "impact_memory": { "value": "10", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: how long a shell impact stays in the impacts list shown to both sides." } }
+        "impact_memory": { "value": "10", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: how long a shell impact stays in the impacts list shown to both sides." } },
+        "plume_height": { "value": "6", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: height the smoke and thrown earth of a burst reach; decides who can see where it fell." } }
       }
     },
     {
@@ -60,7 +61,8 @@
         "suppression_radius": { "value": "40", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: burst suppression falls linearly to 0 at this radius." } },
         "morale_shock": { "value": "1.5", "unit": "points", "source": { "kind": "placeholder", "note": "Placeholder: morale a squad loses from a burst at its nearest man (scale 0 to 100)." } },
         "morale_radius": { "value": "40", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: the morale shock falls linearly to 0 at this radius." } },
-        "impact_memory": { "value": "10", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: how long a shell impact stays in the impacts list shown to both sides." } }
+        "impact_memory": { "value": "10", "unit": "s", "source": { "kind": "placeholder", "note": "Placeholder: how long a shell impact stays in the impacts list shown to both sides." } },
+        "plume_height": { "value": "6", "unit": "m", "source": { "kind": "placeholder", "note": "Placeholder: height the smoke and thrown earth of a burst reach; decides who can see where it fell." } }
       }
     }
   ]

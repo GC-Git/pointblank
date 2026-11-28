@@ -56,13 +56,13 @@ public sealed class GameController
 {
     private const float PickPixels = 9;
 
-    /// <summary>The least pixels per metre of the opening view: below it men and postures cannot be told apart.</summary>
-    public const float ReadableScale = 6;
+    /// <summary>The least pixels per metre of the opening view.</summary>
+    public const float LeastOpeningScale = 2;
 
     /// <summary>The sight overlay's line-of-sight checks per frame.</summary>
     public const int SightChecksPerFrame = 150;
 
-    private const float OpeningScale = 10;
+    private const float OpeningScale = 14;
     private const float OpeningMargin = 15;
 
     /// <summary>How long an incoming-fire mark stays after the last round of its bearing (display only).</summary>
@@ -78,6 +78,7 @@ public sealed class GameController
     private readonly Dictionary<int, (long Tick, RoeMode Roe)> _queuedRoe = [];
     private readonly MapView _map;
     private readonly SightOverlay _sight = new();
+    private readonly Effects _effects = new();
 
     public GameController(PlayerBattle battle, Layout? layout = null)
     {
@@ -97,6 +98,13 @@ public sealed class GameController
     public SimClock Clock { get; } = new();
 
     public OrderMode Mode { get; set; } = OrderMode.Move;
+
+    /// <summary>Whether the key to the symbols is on the screen (item 2.13).</summary>
+    public bool ShowLegend { get; private set; }
+
+    public void ToggleLegend() => ShowLegend = !ShowLegend;
+
+    public Effects Effects => _effects;
 
     /// <summary>The selected own squads, by id.</summary>
     public IReadOnlyList<int> Selected => _selected.ToArray();
@@ -133,23 +141,23 @@ public sealed class GameController
     internal SightOverlay Sight => _sight;
 
     /// <summary>
-    /// The opening view (item 2.5a): close enough to tell men and postures apart, on the player's own forces; if they are
-    /// too far apart to show together, on the first squad.
+    /// The opening view (item 2.13): the whole battlefield, so every own squad and wherever the fight can be are on
+    /// screen from the start. Only a map too big to show at <see cref="LeastOpeningScale"/> is framed on the player's own
+    /// forces instead, and the edge markers then point to the rest. The camera is set once and never moved by the game.
     /// </summary>
     public void FrameOwnForces()
     {
-        var squads = Battle.View.Squads;
-        if (squads.Count == 0)
+        Camera.Fit(_map);
+        var men = Battle.View.Squads.SelectMany(q => q.Soldiers).ToArray();
+        if (Camera.Scale >= LeastOpeningScale || men.Length == 0)
         {
             return;
         }
 
-        var men = squads.SelectMany(q => q.Soldiers).ToArray();
         var (left, right) = (men.Min(s => s.X.F()), men.Max(s => s.X.F()));
         var (top, bottom) = (men.Min(s => s.Y.F()), men.Max(s => s.Y.F()));
         var fit = MathF.Min(Layout.Map.W / (right - left + (2 * OpeningMargin)), Layout.Map.H / (bottom - top + (2 * OpeningMargin)));
-        var (x, y) = fit >= ReadableScale ? ((left + right) / 2, (top + bottom) / 2) : Centre(squads[0]);
-        Camera.Set(x, y, Math.Clamp(fit, ReadableScale, OpeningScale));
+        Camera.Set((left + right) / 2, (top + bottom) / 2, Math.Clamp(fit, LeastOpeningScale, OpeningScale));
     }
 
     public void Step()
@@ -157,6 +165,7 @@ public sealed class GameController
         Battle.Step();
         RememberIncoming();
         RememberRefusals();
+        _effects.Remember(Battle.View);
     }
 
     /// <summary>Notes when each own squad's refused or impossible order was first seen to be so.</summary>
@@ -313,8 +322,9 @@ public sealed class GameController
             return;
         }
 
+        var places = Places.Of(Battle.View.Squads, Camera);
         var best = Battle.View.Squads
-            .SelectMany(q => q.Soldiers.Select(s => (q.Id, D: Distance(Camera.ToScreen(s.X.F(), s.Y.F()), at))))
+            .SelectMany(q => q.Soldiers.Select(s => (q.Id, D: Distance(Drawn(places, s), at))))
             .Where(h => h.D <= PickPixels)
             .OrderBy(h => h.D)
             .Select(h => (int?)h.Id)
@@ -339,14 +349,19 @@ public sealed class GameController
             _selected.Clear();
         }
 
+        var places = Places.Of(Battle.View.Squads, Camera);
         foreach (var q in Battle.View.Squads)
         {
-            if (q.Soldiers.Any(s => box.Contains(Camera.ToScreen(s.X.F(), s.Y.F()))))
+            if (q.Soldiers.Any(s => box.Contains(Drawn(places, s))))
             {
                 _selected.Add(q.Id);
             }
         }
     }
+
+    /// <summary>Where a man is on the screen: his figure's place, or for a man who is down his own.</summary>
+    internal Pt Drawn(IReadOnlyDictionary<int, Pt> places, SoldierView s) =>
+        places.TryGetValue(s.Id, out var at) ? at : Camera.ToScreen(s.X.F(), s.Y.F());
 
     public void Select(IEnumerable<int> squads)
     {

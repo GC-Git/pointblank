@@ -35,6 +35,15 @@ public partial class PrimLayer : Node2D
                 case CirclePrim c:
                     DrawArc(ToVector(c.Centre), c.Radius, 0, Mathf.Tau, 24, colour, c.Width);
                     break;
+                case PolyPrim g:
+                    var points = new Vector2[g.Points.Count];
+                    for (var i = 0; i < points.Length; i++)
+                    {
+                        points[i] = ToVector(g.Points[i]);
+                    }
+
+                    DrawColoredPolygon(points, colour);
+                    break;
                 case LinePrim l:
                     DrawLine(ToVector(l.A), ToVector(l.B), colour, l.Width);
                     break;

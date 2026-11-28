@@ -115,6 +115,19 @@ public sealed class LineOfSight
     /// <summary>Whether the eyes of <paramref name="a"/> and <paramref name="b"/> see each other.</summary>
     public LosResult Check(Viewpoint a, Viewpoint b) => Run(a, b, null);
 
+    /// <summary>
+    /// Whether <paramref name="observer"/> sees something standing <paramref name="height"/> metres above the ground at the
+    /// point, such as the smoke of a shell burst (item 2.13). Reads only.
+    /// </summary>
+    internal bool SeesRaised(Viewpoint observer, Fixed x, Fixed y, Fixed height)
+    {
+        var top = new Viewpoint(x, y, Posture.Prone);
+        var ea = EyeHeight(observer);
+        var eb = EyeHeight(top) - _rules.EyeHeight(Posture.Prone) + height;
+        var swap = Compare(observer, ea, top, eb) > 0;
+        return (swap ? new Walk(this, top, eb, observer, ea, null).Run() : new Walk(this, observer, ea, top, eb, null).Run()).Visible;
+    }
+
     /// <summary>Debug helper: every tile the ray visits, from <paramref name="a"/> to <paramref name="b"/>.</summary>
     public IReadOnlyList<LosStep> Trace(Viewpoint a, Viewpoint b)
     {

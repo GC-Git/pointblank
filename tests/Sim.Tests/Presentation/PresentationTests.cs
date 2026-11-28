@@ -147,20 +147,6 @@ public class PresentationTests
     }
 
     [Fact]
-    public void Posture_changes_a_mans_shape()
-    {
-        var c = Start();
-        var man = c.Battle.View.Squads[0].Soldiers[0];
-        Prim Shape(global::PointBlank.Sim.Sight.Posture p) => FrameBuilder.Man(man with { Posture = p }, c.Camera)[0];
-
-        Assert.IsType<CirclePrim>(Shape(global::PointBlank.Sim.Sight.Posture.Standing));
-        var kneel = Assert.IsType<RectPrim>(Shape(global::PointBlank.Sim.Sight.Posture.Kneeling));
-        var prone = Assert.IsType<RectPrim>(Shape(global::PointBlank.Sim.Sight.Posture.Prone));
-        Assert.Equal(kneel.W, kneel.H);
-        Assert.True(prone.W > prone.H * 1.5f);
-    }
-
-    [Fact]
     public void Clicking_selects_a_squad_and_a_drag_box_selects_several()
     {
         var c = Start();

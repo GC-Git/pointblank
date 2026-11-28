@@ -355,6 +355,16 @@ public sealed class SpottingSystem : ISimSystem
             && _los.Check(new Viewpoint(observer.X, observer.Y, observer.Posture), new Viewpoint(x, y, target)).Visible;
     }
 
+    /// <summary>As <see cref="Sees"/>, for something rising <paramref name="height"/> metres above the point (item 2.13).</summary>
+    internal bool SeesRaised(Soldier observer, Fixed x, Fixed y, Fixed height)
+    {
+        var dx = x - observer.X;
+        var dy = y - observer.Y;
+        return observer.CanLead && _move.IsOnMap(observer.X, observer.Y) && _move.IsOnMap(x, y)
+            && (dx * dx) + (dy * dy) <= Rules.MaxRange * Rules.MaxRange
+            && _los.SeesRaised(new Viewpoint(observer.X, observer.Y, observer.Posture), x, y, height);
+    }
+
     public void Tick(World world)
     {
         Sync();

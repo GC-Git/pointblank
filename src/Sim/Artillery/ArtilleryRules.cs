@@ -64,6 +64,9 @@ public sealed record BatteryRules
 
     public int ImpactMemoryTicks { get; init; }
 
+    /// <summary>How high a burst's smoke and earth rise, in metres: what an observer's line of sight needs to reach (item 2.13).</summary>
+    public Fixed PlumeHeight { get; init; }
+
     /// <summary>Rounds per mission: guns × rounds per gun.</summary>
     public int Rounds => Guns * RoundsPerGun;
 }
@@ -129,6 +132,7 @@ public sealed record ArtilleryRules
                 MoraleShock = F("morale_shock", Fixed.FromInt(100)),
                 MoraleRadius = F("morale_radius", big),
                 ImpactMemoryTicks = Ticks("impact_memory"),
+                PlumeHeight = F("plume_height", Fixed.FromInt(100)),
             };
             if (b.LethalRadius > b.CasualtyRadius || b.KillChance + b.IncapacitateChance > Fixed.One || b.Rounds == 0)
             {

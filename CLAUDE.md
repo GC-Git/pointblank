@@ -74,6 +74,11 @@ List placeholder counts in the data files (deterministic; optional directory arg
 dotnet run --project tools/Runner -- --data-report
 ```
 
+Game controls: left-click or drag selects (Shift adds), right-click gives the order (Shift fast,
+Ctrl sneak); M move, F fast, S sneak, B fall back, D defend, A fire, C call fire, H hold, R rules of
+engagement; Space pause, 1 / 2 / 4 speed; arrows or middle-drag pan, wheel zoom; L legend of the
+symbols; F1-F4 debug overlays; Escape clears the selection.
+
 Build the C# project through Godot (headless):
 
 ```powershell
@@ -163,6 +168,9 @@ $env:PB_SCREENSHOT=1; dotnet test PointBlank.sln --filter Category=Screenshot; $
     `SpottingSystem.KnownEnemies`, `MovementSystem.Execute`) is `internal` to `Sim`, visible
     only to `Sim.Tests` and the headless runner through `InternalsVisibleTo`. Never widen that
     list for `game/` or AI code, and never make those members public.
+    What a side sees of fire, bursts and enemy casualties is `SideView.SeenShots`, `SeenBursts` and
+    `SeenCasualties` (rules in `src/Sim/SideViewEvents.cs`); `ShellImpacts` is the truth and is
+    `internal`.
     `SpottingSystem.DebugTruth()` is the public truth accessor, for debug overlays only.
     `PlayerBattle.DebugTruth()` is the only other (owner's approval, item 2.6): a
     debug-overlay-only bridge to it, called by the truth overlays alone, that works only
