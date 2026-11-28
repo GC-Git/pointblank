@@ -57,7 +57,8 @@ public readonly record struct SquadView(
     SuppressionState Suppression,
     Fixed MoraleLevel,
     MoraleReason MoraleReasons,
-    IReadOnlyList<MoraleReason> MoraleTopReasons);
+    IReadOnlyList<MoraleReason> MoraleTopReasons,
+    bool IsHalting = false);
 
 /// <summary>
 /// What one side may know, and the only API for UI and AI code (project rule, see CLAUDE.md). It
@@ -295,5 +296,6 @@ public sealed class SideView
         _suppression?.SquadStateOf(q.Id) ?? SuppressionState.None,
         q.MoraleLevel,
         _morale?.ReasonsOf(q.Id) ?? MoraleReason.None,
-        MoraleReasons.Top(_morale?.ReasonsOf(q.Id) ?? MoraleReason.None, 3));
+        MoraleReasons.Top(_morale?.ReasonsOf(q.Id) ?? MoraleReason.None, 3),
+        _move?.IsHalting(q.Id) ?? false);
 }

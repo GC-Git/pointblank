@@ -302,6 +302,47 @@ public class ViewFollowUpTests
     }
 
     [Fact]
+    public void A_defend_order_to_a_marching_squad_reads_done_only_once_it_has_halted()
+    {
+        var c = Start("fix-assault");
+        var q = c.Battle.View.Squads[0];
+        c.Select([q.Id]);
+        c.Battle.View.Issue(q.Id, new Order(OrderKind.Move, q.Soldiers[0].X + Fixed.FromInt(60), q.Soldiers[0].Y));
+        for (var i = 0; i < 600 && !c.Battle.View.Squads[0].IsMoving; i++)
+        {
+            c.Step();
+        }
+
+        Run(c, 50);
+        c.Battle.View.Issue(q.Id, new Order(OrderKind.Defend, q.Soldiers[0].X + Fixed.FromInt(100), q.Soldiers[0].Y));
+        var inProgress = false;
+        for (var i = 0; i < 600; i++)
+        {
+            c.Step();
+            var status = c.Battle.View.StatusOf(q.Id)!;
+            if (status.Order!.Kind != OrderKind.Defend)
+            {
+                continue;
+            }
+
+            var texts = Texts(c).Select(t => t.Text).ToArray();
+            if (c.Battle.View.Squads[0].IsMoving)
+            {
+                Assert.DoesNotContain("Order: Defend: Done", texts);
+                inProgress |= texts.Contains("Order: Defend: Executing");
+            }
+            else if (status.Status == OrderStatus.Done)
+            {
+                Assert.Contains("Order: Defend: Done", texts);
+                Assert.True(inProgress, "the halt was never shown as under way");
+                return;
+            }
+        }
+
+        Assert.Fail("the Defend was never done");
+    }
+
+    [Fact]
     public void A_rejected_order_is_marked_at_its_point_with_the_reason()
     {
         var c = Start("bombard-creep");

@@ -245,7 +245,7 @@ Status: draft, awaiting owner sign-off
   the hash, it changed the final hash in 4 `fix-assault`, 4 `fix-assault-nobase`, 6
   `bombard-creep` and no `pin-open` battles.
 
-- [ ] **2.12 Faster tests** (S)
+- [x] **2.12 Faster tests** (S)
   Do next after 2.4c. A full test run takes about 13 minutes and every build and review
   repeats it.
   *Done when:* a documented quick test command for everyday work runs much faster (report
@@ -454,3 +454,6 @@ Status: draft, awaiting owner sign-off
   **Owner signs off on the release candidate.**
   Note: Release-configuration test runs currently show 13 failures (9 predate 2.5a); mostly
   debug-only overlays being inert, two game boundary failures undiagnosed. Resolve here.
+  From the 2.12 review: some Quick_check tests pass with suppression disabled; the speed guard
+  misses an added Skip or a removed test file; the 40-squad AI budget test has no quick
+  equivalent; the bombard quick check takes 18 s; SeedRuns has no direct test.
