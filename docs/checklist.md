@@ -260,7 +260,7 @@ Status: draft, awaiting owner sign-off
   *Done when:* a delivered Defend halts the move through the chain of command with per-man
   reactions, with tests.
 
-- [ ] **2.4d Posture follow-ups** (S)
+- [x] **2.4d Posture follow-ups** (S)
   Do before 2.7 unless the owner defers it. From the 2.4b review (seeds 1-50): the posture
   metric excuses every routing rise, including a few personally pinned men (4 cases in
   equal-fire and fix-assault); a new movement order replaces a pending AI get-down with a
@@ -483,3 +483,5 @@ Status: draft, awaiting owner sign-off
   From the 2.12 review: some Quick_check tests pass with suppression disabled; the speed guard
   misses an added Skip or a removed test file; the 40-squad AI budget test has no quick
   equivalent; the bombard quick check takes 18 s; SeedRuns has no direct test.
+  From the 2.4d review: no test isolates a new rise requested mid-halt; the pinned get-down
+  case passes without the fix; no test that a routing move still replaces a get-down.

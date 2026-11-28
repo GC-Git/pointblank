@@ -9,7 +9,7 @@ namespace PointBlank.Presentation;
 /// <summary>The key to the symbols (item 2.13), drawn with the same figures as the battle, in the map's lower left.</summary>
 internal static class Legend
 {
-    private const float Row = 25;
+    private const float Row = 24;
     private const float Figure = 8;
 
     public static void Draw(List<Prim> list, GameController c)
@@ -47,6 +47,11 @@ internal static class Legend
                 new RectPrim(at.X - 20, at.Y - 5, 18, 10, Palette.Terrain(TerrainType.Road, 0)),
                 new RectPrim(at.X + 4, at.Y - 9, 18, 18, Palette.Building),
                 new RectPrim(at.X + 4, at.Y - 9, 18, 18, Palette.Wall, false, 2),
+            ]),
+            ("Where an order sends the squad", at =>
+            [
+                new LinePrim(new Pt(at.X - 18, at.Y), new Pt(at.X + 10, at.Y), Palette.OrderLine, 1),
+                new CirclePrim(new Pt(at.X + 14, at.Y), 4, Palette.OrderLine, false, 1.5f),
             ]),
             ("Squad bars: morale / suppression", at =>
             [

@@ -123,7 +123,7 @@ public static class Palette
     public static readonly Rgb MoraleBar = new(80, 210, 96);
     public static readonly Rgb SuppressionBar = new(236, 196, 24);
     public static readonly Rgb DelayBar = new(110, 200, 240);
-    public static readonly Rgb OrderLine = new(224, 240, 255);
+    public static readonly Rgb OrderLine = new(168, 186, 160);
     public static readonly Rgb Impact = new(255, 250, 210);
     public static readonly Rgb Mission = new(196, 90, 220);
     public static readonly Rgb Incoming = new(255, 204, 180);

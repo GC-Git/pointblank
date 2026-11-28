@@ -36,8 +36,8 @@ public static class Figures
         {
             case Posture.Standing:
                 var shoulders = MathF.Max(3, 0.6f * r);
-                list.Add(new LinePrim(P(-0.15f, -1.25f), P(-0.15f, 1.25f), Palette.Shadow, shoulders + 2));
-                list.Add(new LinePrim(P(-0.15f, -1.15f), P(-0.15f, 1.15f), Palette.Own, shoulders));
+                list.Add(new LinePrim(P(-0.15f, -1.05f), P(-0.15f, 1.05f), Palette.Shadow, shoulders + 2));
+                list.Add(new LinePrim(P(-0.15f, -0.95f), P(-0.15f, 0.95f), Palette.Own, shoulders));
                 list.Add(new CirclePrim(at, (0.62f * r) + 1, Palette.Shadow));
                 list.Add(new CirclePrim(at, 0.62f * r, Palette.Own));
                 Weapon(P(0.1f, 0.35f), 1.65f);
