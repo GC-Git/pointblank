@@ -84,6 +84,12 @@ public class GraphicsTests(ITestOutputHelper output)
         var drawn = c.Frame();
         Assert.All(
             Figures.Fallen(at, FrameBuilder.Size(c.Camera), Palette.EnemyDown, null), p => Assert.Contains(p, drawn));
+        // Neither the cross of the dead nor the red cross of the wounded lies on him.
+        var marks = new bool?[] { true, false }
+            .SelectMany(dead => Figures.Fallen(at, FrameBuilder.Size(c.Camera), Palette.EnemyDown, dead))
+            .Where(p => p.Colour != Palette.EnemyDown).ToArray();
+        Assert.NotEmpty(marks);
+        Assert.All(marks, p => Assert.DoesNotContain(p, drawn));
         c.ToggleLegend();
         var texts = c.Frame().OfType<TextPrim>().Select(t => t.Text).ToArray();
         Assert.Contains("Enemy fallen (hurt or dead)", texts);
