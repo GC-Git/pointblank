@@ -462,8 +462,9 @@ public sealed class CommandSystem(
 
         if (kind == OrderKind.Hold)
         {
-            move.Stop(squad.Id);
-            t.Status = OrderStatus.Done;
+            // Item 2.4d: each man stops on his own reaction; a marching squad's Hold is Done once the last has stopped.
+            move.Halt(squad.Id, world.Tick, goDown: false);
+            t.Status = move.IsMoving(squad.Id) ? OrderStatus.Executing : OrderStatus.Done;
             t.Note = OrderNote.None;
             return;
         }

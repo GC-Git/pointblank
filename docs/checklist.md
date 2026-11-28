@@ -253,7 +253,7 @@ Status: draft, awaiting owner sign-off
   merging; no test is weakened, skipped from the full run, or given fewer seeds in the full
   run.
 
-- [ ] **2.9 Defend halts a move** (S)
+- [x] **2.9 Defend halts a move** (S)
   Do before 2.7 (owner decision). From the 2.5a review: a delivered Defend order does not stop
   a move already under way (4 of 4 squads still moving 3 s later; same on main before 2.5a),
   and the panel then shows 'Defend: Done' while the squad marches.
@@ -269,9 +269,32 @@ Status: draft, awaiting owner sign-off
   morale says Pinned but suppression does not. From the 2.4c review: the routing no-route
   get-down test (`RoutingNoRouteTests`) asserts only "no rises"; removing the reaction delay
   still passes it.
+  From the 2.9 review: when a Defend halt is delivered under fire, men stood up from prone 1-5
+  ticks after delivery while halting, then dropped; one `DefendHaltTests` assertion was always
+  true. Owner decision (added during the build): a delivered Hold stops each man after his own
+  reaction delay, as the Defend halt does, instead of every man on one tick.
   *Done when:* each is measured, then fixed or documented as realistic, with tests; the
   no-route test also asserts that the man gets down, and tests per-man timing (no
-  synchrony; it fails without the reaction delay); no retuning or scenario reshaping.
+  synchrony; it fails without the reaction delay); men do not spring up during a halt, with a
+  real check in `DefendHaltTests`; a delivered Hold stops the men one by one, with tests, the
+  delay a tagged data value and delivery through the chain of command unchanged; no retuning
+  or scenario reshaping.
+  Measured over seeds 1-50 in the scenarios of `PostureDesyncTests`:
+  - Pinned men's routing rises and rises under morale "Pinned": none were of a man, or squad
+    morale, pinned when the tick began; each was pinned later in that tick, by fire arriving
+    after he moved. Realistic, no change; the metric no longer excuses a pinned man.
+  - A new move replacing a pending AI get-down (`fix-assault` 34 of 1054 man-orders): fixed for
+    men suppressed or pinned (they finish getting down). A calm man's change is overtaken by the
+    order, which is realistic. A routing move still replaces it; the man stays down until he
+    bolts.
+  - Calm men prone over 5 s in moving squads (`fix-assault` 245): all are on a Sneak move, in a
+    team covering the others, routing, or in a squad under enemy fire in the last 6 s. No
+    unexplained stretch over 1 s. Realistic, no change.
+  - Rises while a Defend halted a squad under fire (each marching squad ordered at its first
+    man under fire; `fix-assault`, `bombard-creep`, `equal-fire`): 12 in 101 halts, now 0.
+  - Hold uses the same `order_posture_delay` as the Defend halt (no new value). Men keep their
+    posture, or finish getting lower; men of an idle squad on their own short moves stop the
+    same way. A squad stopped by a pin or by morale still stops at once.
 
 - [ ] **2.13 Readable placeholder graphics** (S)
   Do before 2.7: the owner could not tell what was happening when playing. Plain placeholder
@@ -293,7 +316,8 @@ Status: draft, awaiting owner sign-off
   building: men stay hidden and hold fire until the enemy is close or their leader opens
   fire, then each man joins after his own reaction; it differs from Defend and is offered
   in the view. Also from the 2.5a build: selection rings and nearby squad names can
-  overlap (the Defend order's 'not available yet' reading was fixed in 2.5a).
+  overlap (the Defend order's 'not available yet' reading was fixed in 2.5a). Open question for
+  the owner: whether Ambush should halt a move.
   *Done when:* the owner has confirmed the behaviour, tests show it differs from Defend with
   no all-at-once opening, the view offers it, and the display follow-up is fixed.
 
@@ -312,6 +336,8 @@ Status: draft, awaiting owner sign-off
   (masked men of a stationary squad stepping to a clear line) and a safe friendly firing
   distance (how close to a comrade a man may fire: today AI fire holds within 2 m of the line,
   player-ordered fire within 0.5 m).
+  Also postponed until after the 2.7 play-through: whether halting men (Defend or Hold) should
+  finish crossing an open gap or doorway first.
   *Done when:* the owner has decided, then it is implemented or documented, with tests.
 
 ## Milestone 3 — Art style
