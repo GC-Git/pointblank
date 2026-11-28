@@ -217,17 +217,28 @@ Status: draft, awaiting owner sign-off
   `bombard-creep` the first two of those squads are masked entirely by another squad, the
   third by another squad for 55%; moving squads are blocked by their own men while they move
   (nearly all of the `fix-assault` assault squad's masked time).
+  A major cause of masking is the hold-fire distance: AI fire already holds for a comrade
+  within 2 m of the line, short of the target (the larger of `near_miss_radius`, 2 m, and
+  `mask_clearance`, 0.5 m); only player-ordered fire uses `mask_clearance` alone. An
+  independent re-measurement over seeds 1-50 found base of fire masked 73% and
+  `bombard-creep` squads 71/70/43% (another squad blocking for 100/100/55%); all three
+  `bombard-creep` squads are on AI fire, and in 60-75% of their masked time every blocker is
+  more than 0.5 m off the line.
   Tried (seeds 1-50): in a stationary squad with a fire task, each masked man stepped to a
   clear line. Without limits this reached 29% and 31/34/13%, by moving men who were under
   fire, suppressed or pinned. With gates and limits it reached 54% and 46/47/17%, but the
   `fix-assault` base of fire passed its own men closely, pinned itself and fired less: 40
   against 63 man-shot-ticks per seed, and the share of stationary masked time spent pinned or
   broken rose from 27% to 78%.
+  The drill figures (the 29% and 54% results with their per-squad shares, 40 against 63
+  shot-ticks, 27% to 78%) were measured with code since removed and can't be reproduced from
+  the repo.
   Removed for that reason: the owner decided to take the drill out and let masked squads stay.
-  Suspected cause, not proven: a man holds fire only for a comrade within `mask_clearance`
-  (0.5 m) of his line, while a round within `near_miss_radius` (2 m) suppresses. Friendly near
-  misses already occur without the drill. Both the drill and a safe friendly firing distance
-  are in item 2.11. The masking test is flat (it ignores height), kept as is.
+  Suspected cause of the side-stepping squad pinning itself, not proven: under player-ordered
+  fire a man holds only for a comrade within `mask_clearance` (0.5 m) of his line, so friendly
+  near misses within `near_miss_radius` (2 m) can still suppress. Friendly near misses already
+  occur without the drill. Both the drill and a safe friendly firing distance are in item 2.11.
+  The masking test is flat (it ignores height), kept as is.
   Kept from the item, independent of the drill: a routing man who has reached the end of his
   run while others of his squad are still running gets down under fire and stays down until he
   has somewhere to run (`RoutingNoRouteTests`). Over seeds 1-50, before its state was added to
@@ -255,9 +266,12 @@ Status: draft, awaiting owner sign-off
   equal-fire and fix-assault); a new movement order replaces a pending AI get-down with a
   higher posture (34 of 1054 man-orders in fix-assault); calm men in unpinned moving squads
   lie prone over 5 s (240 cases in fix-assault, same before 2.4b); a few men rise while
-  morale says Pinned but suppression does not.
-  *Done when:* each is measured, then fixed or documented as realistic, with tests; no
-  retuning or scenario reshaping.
+  morale says Pinned but suppression does not. From the 2.4c review: the routing no-route
+  get-down test (`RoutingNoRouteTests`) asserts only "no rises"; removing the reaction delay
+  still passes it.
+  *Done when:* each is measured, then fixed or documented as realistic, with tests; the
+  no-route test also asserts that the man gets down, and tests per-man timing (no
+  synchrony; it fails without the reaction delay); no retuning or scenario reshaping.
 
 - [ ] **2.13 Readable placeholder graphics** (S)
   Do before 2.7: the owner could not tell what was happening when playing. Plain placeholder
@@ -296,7 +310,8 @@ Status: draft, awaiting owner sign-off
   its own men spreads out or halts a team to shoot, and whether a whole squad may shift without
   an order when another squad blocks it. Also revisits, from 2.4c, the side-stepping drill
   (masked men of a stationary squad stepping to a clear line) and a safe friendly firing
-  distance (how close to a comrade a man may fire).
+  distance (how close to a comrade a man may fire: today AI fire holds within 2 m of the line,
+  player-ordered fire within 0.5 m).
   *Done when:* the owner has decided, then it is implemented or documented, with tests.
 
 ## Milestone 3 — Art style
