@@ -49,7 +49,8 @@ public sealed record FireRules
 
     public Fixed AreaAimHeight { get; init; }
 
-    /// <summary>A soldier holds fire while a friendly is this close to his line of fire, short of the target.</summary>
+    /// <summary>A soldier firing under a player order holds fire while a friendly is this close to his line of fire, short of
+    /// the target. AI fire holds at the larger of this and <see cref="NearMissRadius"/> (2 m with the current data).</summary>
     public Fixed MaskClearance { get; init; }
 
     public Fixed KillChance { get; init; }

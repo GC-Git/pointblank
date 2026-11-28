@@ -20,7 +20,9 @@ Build checklist item **<NUMBER AND TITLE>** of Point Blank. Branch: **`item/<num
    "Done when" list before the code, watch them fail, then make them pass. Don't weaken
    or skip a test to get it passing.
 4. Stay inside the item. List other problems you notice as follow-ups; don't fix them.
-5. Verify with the commands in `CLAUDE.md` and keep the output.
+5. Verify with the commands in `CLAUDE.md` and keep the output. While iterating use the quick
+   tests (`dotnet test PointBlank.sln --filter "Speed!=Slow"`). Before opening the PR run the full suite once,
+   `dotnet test PointBlank.sln`, on the final code; a quick run does not count.
 6. Commit on your branch, push it, and open a PR against `main`. Put the verification
    output, any new placeholder values and any known gaps in the description. If `gh` is
    not installed, give the owner the compare URL

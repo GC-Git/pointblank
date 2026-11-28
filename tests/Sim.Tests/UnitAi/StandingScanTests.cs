@@ -159,6 +159,7 @@ public class StandingScanTests(ITestOutputHelper output)
         return rig.World;
     }
 
+    [Trait(Speed.Name, Speed.Slow)]
     [Theory]
     [InlineData("fix-assault")]
     [InlineData("fix-assault-nobase")]
@@ -170,11 +171,16 @@ public class StandingScanTests(ITestOutputHelper output)
     {
         int violations = 0, worst = 0, routing = 0;
         string? first = null;
-        for (ulong seed = 1; seed <= Seeds; seed++)
+        var scans = SeedRuns.Map(Seeds, seed =>
         {
             var world = id.StartsWith("fix-", StringComparison.Ordinal) ? Runner(id, seed, out var ticks) : Rig(id, seed, out ticks);
             var scan = new Scan(world);
             scan.Run(ticks);
+            return scan;
+        });
+        for (var seed = 1; seed <= scans.Count; seed++)
+        {
+            var scan = scans[seed - 1];
             violations += scan.Violations;
             worst = Math.Max(worst, scan.Worst);
             routing += scan.RoutingOver;
@@ -184,4 +190,16 @@ public class StandingScanTests(ITestOutputHelper output)
         output.WriteLine($"{id}: {violations} violations over {Seeds} seeds; longest run standing in the open under fire {worst / (double)World.TicksPerSecond:F1} s; of them routing: {routing}");
         Assert.True(violations == 0, first);
     }
+
+    /// <summary>The quick set's smaller check (item 2.12): the first 3 seeds.</summary>
+    [Theory]
+    [InlineData("fix-assault")]
+    [InlineData("equal-fire")]
+    public void Quick_check_no_soldier_under_fire_stays_standing_in_the_open(string id) => SeedRuns.ForEach(3, seed =>
+    {
+        var world = id.StartsWith("fix-", StringComparison.Ordinal) ? Runner(id, seed, out var ticks) : Rig(id, seed, out ticks);
+        var scan = new Scan(world);
+        scan.Run(ticks);
+        Assert.True(scan.Violations == 0, scan.First);
+    });
 }

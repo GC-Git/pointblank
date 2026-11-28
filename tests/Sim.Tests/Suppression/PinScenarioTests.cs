@@ -15,10 +15,13 @@ public class PinScenarioTests(ITestOutputHelper output)
         Assert.Equal(PinScenario.RunTicks, scenario.Ticks); // 30 s
         var pinned = 0;
         long ticks = 0;
-        for (ulong seed = 1; seed <= Seeds; seed++)
+        var runs = SeedRuns.Map(Seeds, seed =>
         {
             var m = Battle.Run(scenario, seed).World;
-            var metrics = scenario.Measure(m).ToDictionary(x => x.Name, x => x.Value.ToInt());
+            return scenario.Measure(m).ToDictionary(x => x.Name, x => x.Value.ToInt());
+        });
+        foreach (var metrics in runs)
+        {
             if (metrics["pinned"] == 1)
             {
                 pinned++;
@@ -36,6 +39,7 @@ public class PinScenarioTests(ITestOutputHelper output)
         return (pinned, mean);
     }
 
+    [Trait(Speed.Name, Speed.Slow)]
     [Fact]
     public void Sustained_MG_fire_pins_a_squad_in_the_open_and_hedges_make_it_clearly_harder()
     {
@@ -45,6 +49,7 @@ public class PinScenarioTests(ITestOutputHelper output)
         Assert.True(open.Pinned - hedges.Pinned >= 20, $"open {open.Pinned}% vs hedges {hedges.Pinned}%");
     }
 
+    [Trait(Speed.Name, Speed.Slow)]
     [Fact]
     public void Near_misses_alone_pin_a_squad_in_the_open()
     {
@@ -62,5 +67,15 @@ public class PinScenarioTests(ITestOutputHelper output)
         var scenario = ScenarioCatalog.Find(id)!;
         var result = Battle.Run(scenario, 7);
         Assert.Equal(result.Replay.FinalHash, Battle.Play(scenario, result.Replay).ComputeStateHash());
+    }
+
+    /// <summary>The quick set's smaller check (item 2.12): 10 seeds of the open-ground criterion, loosely.</summary>
+    [Fact]
+    public void Quick_check_sustained_MG_fire_pins_a_squad_in_the_open()
+    {
+        var scenario = ScenarioCatalog.Find("pin-open")!;
+        var pinned = SeedRuns.Map(10, seed => scenario.Measure(Battle.Run(scenario, seed).World)
+            .Single(m => m.Name == "pinned").Value.ToInt()).Sum();
+        Assert.True(pinned >= 6, $"pinned in {pinned}/10");
     }
 }

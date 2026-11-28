@@ -13,6 +13,8 @@ namespace PointBlank.Sim.Tests.UnitAi;
 /// </summary>
 internal sealed class PostureMetrics
 {
+    private const int MaxSamples = 12;
+
     public int All, Most, AllButOne, PinnedStandUps, QuickReversals, Changes;
 
     /// <summary>Rises (item 2.4b): a man took a higher posture while his squad was pinned by fire. Seen: it was pinned
@@ -35,90 +37,124 @@ internal sealed class PostureMetrics
 
     public static PostureMetrics Measure(string id, int seeds)
     {
-        var r = new PostureMetrics();
-        for (ulong seed = 1; seed <= (ulong)seeds; seed++)
+        var total = new PostureMetrics();
+        foreach (var one in SeedRuns.Map(seeds, seed => MeasureSeed(id, seed)))
         {
-            var scripted = id is "bombard-creep" or "pin-open" || id.StartsWith("fix-", StringComparison.Ordinal);
-            var world = scripted ? StandingScanTests.Runner(id, seed, out var ticks) : StandingScanTests.Rig(id, seed, out ticks);
-            var org = world.GetSystem<OrgSystem>();
-            var suppression = world.GetSystem<SuppressionSystem>();
-            var last = new Dictionary<int, Posture>();
-            var left = new Dictionary<int, (Posture From, long Tick)>();
-            var pinnedBefore = new HashSet<int>();
-            for (var i = 0; i <= ticks; i++)
+            total.Add(one);
+        }
+
+        return total;
+    }
+
+    /// <summary>Adds the next seed's counts; call in seed order, so the samples are the first seeds'.</summary>
+    private void Add(PostureMetrics o)
+    {
+        All += o.All;
+        Most += o.Most;
+        AllButOne += o.AllButOne;
+        PinnedStandUps += o.PinnedStandUps;
+        QuickReversals += o.QuickReversals;
+        Changes += o.Changes;
+        RisesSeenPinned += o.RisesSeenPinned;
+        RisesAfterPinned += o.RisesAfterPinned;
+        RisesMoralePinned += o.RisesMoralePinned;
+        UnexcusedRises += o.UnexcusedRises;
+        foreach (var (key, n) in o.RiseKinds)
+        {
+            RiseKinds[key] = RiseKinds.GetValueOrDefault(key) + n;
+        }
+
+        foreach (var (key, n) in o.ReversalKinds)
+        {
+            ReversalKinds[key] = ReversalKinds.GetValueOrDefault(key) + n;
+        }
+
+        Samples.AddRange(o.Samples.Take(MaxSamples - Samples.Count));
+    }
+
+    private static PostureMetrics MeasureSeed(string id, ulong seed)
+    {
+        var r = new PostureMetrics();
+        var scripted = id is "bombard-creep" or "pin-open" || id.StartsWith("fix-", StringComparison.Ordinal);
+        var world = scripted ? StandingScanTests.Runner(id, seed, out var ticks) : StandingScanTests.Rig(id, seed, out ticks);
+        var org = world.GetSystem<OrgSystem>();
+        var suppression = world.GetSystem<SuppressionSystem>();
+        var last = new Dictionary<int, Posture>();
+        var left = new Dictionary<int, (Posture From, long Tick)>();
+        var pinnedBefore = new HashSet<int>();
+        for (var i = 0; i <= ticks; i++)
+        {
+            if (i > 0)
             {
-                if (i > 0)
+                pinnedBefore = org.Squads.Where(q => suppression.IsPinned(q.Id)).Select(q => q.Id).ToHashSet();
+                world.Step();
+            }
+
+            foreach (var q in org.Squads)
+            {
+                var able = 0;
+                var changed = 0;
+                foreach (var s in q.Soldiers)
                 {
-                    pinnedBefore = org.Squads.Where(q => suppression.IsPinned(q.Id)).Select(q => q.Id).ToHashSet();
-                    world.Step();
-                }
-
-                foreach (var q in org.Squads)
-                {
-                    var able = 0;
-                    var changed = 0;
-                    foreach (var s in q.Soldiers)
-                    {
-                        var had = last.TryGetValue(s.Id, out var was);
-                        last[s.Id] = s.Posture;
-                        if (!s.CanLead)
-                        {
-                            continue;
-                        }
-
-                        able++;
-                        if (!had || was == s.Posture)
-                        {
-                            continue;
-                        }
-
-                        changed++;
-                        r.Changes++;
-                        if (s.Posture < was) // a rise (Standing is lowest in the enum)
-                        {
-                            var seen = pinnedBefore.Contains(q.Id);
-                            var after = suppression.IsPinned(q.Id);
-                            r.RisesSeenPinned += seen ? 1 : 0;
-                            r.RisesAfterPinned += after ? 1 : 0;
-                            r.RisesMoralePinned += q.Morale == MoraleState.Pinned ? 1 : 0;
-                            if (seen)
-                            {
-                                r.UnexcusedRises += q.Morale != MoraleState.Routing ? 1 : 0;
-                                var key = $"{q.Morale}{(suppression.StateOf(s.Id) == SuppressionState.Pinned ? "/manPinned" : "")}/{was}>{s.Posture}";
-                                r.RiseKinds[key] = r.RiseKinds.GetValueOrDefault(key) + 1;
-                            }
-                        }
-
-                        if (s.Posture == Posture.Standing && suppression.StateOf(s.Id) == SuppressionState.Pinned)
-                        {
-                            r.PinnedStandUps++;
-                        }
-
-                        if (left.TryGetValue(s.Id, out var l) && l.From == s.Posture && world.Tick - l.Tick <= World.TicksPerSecond)
-                        {
-                            r.QuickReversals++;
-                            var key = $"{q.Morale}/{s.Posture}>{was}>{s.Posture}";
-                            r.ReversalKinds[key] = r.ReversalKinds.GetValueOrDefault(key) + 1;
-                        }
-
-                        left[s.Id] = (was, world.Tick);
-                    }
-
-                    if (able < 3)
+                    var had = last.TryGetValue(s.Id, out var was);
+                    last[s.Id] = s.Posture;
+                    if (!s.CanLead)
                     {
                         continue;
                     }
 
-                    r.All += changed == able ? 1 : 0;
-                    r.AllButOne += changed == able - 1 ? 1 : 0;
-                    if (changed * 4 >= able * 3)
+                    able++;
+                    if (!had || was == s.Posture)
                     {
-                        r.Most++;
-                        if (r.Samples.Count < 12)
+                        continue;
+                    }
+
+                    changed++;
+                    r.Changes++;
+                    if (s.Posture < was) // a rise (Standing is lowest in the enum)
+                    {
+                        var seen = pinnedBefore.Contains(q.Id);
+                        var after = suppression.IsPinned(q.Id);
+                        r.RisesSeenPinned += seen ? 1 : 0;
+                        r.RisesAfterPinned += after ? 1 : 0;
+                        r.RisesMoralePinned += q.Morale == MoraleState.Pinned ? 1 : 0;
+                        if (seen)
                         {
-                            r.Samples.Add($"seed {seed} tick {world.Tick} squad {q.Id}: {changed}/{able} changed, now " + string.Join(" ",
-                                q.Soldiers.Where(s => s.CanLead).Select(s => $"{s.Posture}{(suppression.StateOf(s.Id) == SuppressionState.Pinned ? "!" : "")}")));
+                            r.UnexcusedRises += q.Morale != MoraleState.Routing ? 1 : 0;
+                            var key = $"{q.Morale}{(suppression.StateOf(s.Id) == SuppressionState.Pinned ? "/manPinned" : "")}/{was}>{s.Posture}";
+                            r.RiseKinds[key] = r.RiseKinds.GetValueOrDefault(key) + 1;
                         }
+                    }
+
+                    if (s.Posture == Posture.Standing && suppression.StateOf(s.Id) == SuppressionState.Pinned)
+                    {
+                        r.PinnedStandUps++;
+                    }
+
+                    if (left.TryGetValue(s.Id, out var l) && l.From == s.Posture && world.Tick - l.Tick <= World.TicksPerSecond)
+                    {
+                        r.QuickReversals++;
+                        var key = $"{q.Morale}/{s.Posture}>{was}>{s.Posture}";
+                        r.ReversalKinds[key] = r.ReversalKinds.GetValueOrDefault(key) + 1;
+                    }
+
+                    left[s.Id] = (was, world.Tick);
+                }
+
+                if (able < 3)
+                {
+                    continue;
+                }
+
+                r.All += changed == able ? 1 : 0;
+                r.AllButOne += changed == able - 1 ? 1 : 0;
+                if (changed * 4 >= able * 3)
+                {
+                    r.Most++;
+                    if (r.Samples.Count < MaxSamples)
+                    {
+                        r.Samples.Add($"seed {seed} tick {world.Tick} squad {q.Id}: {changed}/{able} changed, now " + string.Join(" ",
+                            q.Soldiers.Where(s => s.CanLead).Select(s => $"{s.Posture}{(suppression.StateOf(s.Id) == SuppressionState.Pinned ? "!" : "")}")));
                     }
                 }
             }

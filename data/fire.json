@@ -113,7 +113,7 @@
           "unit": "m",
           "source": {
             "kind": "placeholder",
-            "note": "Placeholder: a soldier holds fire while a friendly is this close to his line of fire, short of the target."
+            "note": "Placeholder: a soldier under a player fire order holds fire while a friendly is this close to his line of fire, short of the target; AI fire holds at max(near_miss_radius, mask_clearance), 2 m with the current values."
           }
         },
         "kill_chance": {
