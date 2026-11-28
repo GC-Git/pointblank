@@ -162,6 +162,43 @@ public class SideViewEventTests
     }
 
     [Theory]
+    [InlineData(ContactQuality.Stale)]
+    [InlineData(ContactQuality.Lost)]
+    public void A_shooter_the_side_is_no_longer_tracking_is_not_shown(ContactQuality quality)
+    {
+        var battle = PlayerBattle.Create("fix-assault", 1, playOwnScript: true);
+        var spotting = battle.World.GetSystem<SpottingSystem>();
+        for (var t = 0; t < 1800 && !battle.View.SeenShots.Any(s => !s.Own); t++)
+        {
+            battle.Step();
+        }
+
+        var before = battle.View.SeenShots;
+        Assert.Contains(before, s => !s.Own);
+
+        // The same tick, with every enemy contact gone cold (edited directly: the open field seldom does it by itself).
+        foreach (var contact in spotting.Sides.Single(k => k.Side == "us").Contacts.Values)
+        {
+            contact.Quality = quality;
+        }
+
+        Assert.Equal(before.Where(s => s.Own).Select(s => s.FirerId), battle.View.SeenShots.Select(s => s.FirerId));
+        Assert.Empty(battle.View.SeenCasualties);
+    }
+
+    [Theory]
+    [Trait("Speed", "Slow")]
+    [InlineData("fix-assault")]
+    [InlineData("bombard-creep")]
+    public void Many_seeds_hold_the_rules(string scenario)
+    {
+        for (var seed = 2UL; seed <= 10; seed++)
+        {
+            Run(scenario, seed, 1800);
+        }
+    }
+
+    [Theory]
     [InlineData("fix-assault")]
     [InlineData("bombard-creep")]
     public void Reading_the_events_changes_nothing(string scenario)
