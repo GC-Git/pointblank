@@ -109,14 +109,22 @@ public static class TerrainLayer
                 {
                     var at = camera.ToScreen((x + 1) * tile, y * tile);
                     list.Add(new RectPrim(at.X - (hedge / 2), at.Y, hedge, px, Palette.Hedge));
-                    list.Add(new CirclePrim(new Pt(at.X, at.Y + (px * 0.25f)), hedge * 0.45f, Palette.HedgeLeaf));
+                    if (px >= 14)
+                    {
+                        list.Add(new CirclePrim(new Pt(at.X, at.Y + (px * 0.15f)), hedge * 0.4f, Palette.HedgeLeaf));
+                    }
+
                 }
 
                 if (t.HedgeSouth)
                 {
                     var at = camera.ToScreen(x * tile, (y + 1) * tile);
                     list.Add(new RectPrim(at.X, at.Y - (hedge / 2), px, hedge, Palette.Hedge));
-                    list.Add(new CirclePrim(new Pt(at.X + (px * 0.25f), at.Y), hedge * 0.45f, Palette.HedgeLeaf));
+                    if (px >= 14)
+                    {
+                        list.Add(new CirclePrim(new Pt(at.X + (px * 0.15f), at.Y), hedge * 0.4f, Palette.HedgeLeaf));
+                    }
+
                 }
             }
         }
