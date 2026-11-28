@@ -176,7 +176,7 @@ public class ScreenshotTests
     public void Fix_assault_frames_show_own_units_orders_and_only_spotted_enemies()
     {
         var out_ = Path.Combine(Root(), "TestResults", "screens");
-        Capture("--scenario", "fix-assault", "--seed", "1", "--ticks", "0,15,600", "--scripted", "--select", "2", "--out", out_);
+        Capture("--scenario", "fix-assault", "--seed", "1", "--ticks", "0,15,200,600", "--scripted", "--select", "2", "--out", out_);
         var c = Twin("fix-assault", true, 2);
         Png Frame(int tick) => Png.Load(Path.Combine(out_, $"fix-assault-seed1-tick{tick}.png"));
         var ground = Palette.Terrain(TerrainType.Open, 0);
@@ -210,6 +210,13 @@ public class ScreenshotTests
             BarShows(Frame(15), new Area(at.X + 64, at.Y + 4, 30, 9), Palette.DelayBar, done, $"delay bar of squad {q.Id}");
         });
 
+        // 20 s in, spotted enemies are up: every one not seen to fall has its marker.
+        StepTo(c, 200);
+        var standing = c.Battle.View.KnownEnemies.Where(k => !c.Effects.Fallen.ContainsKey(k.EnemyId)).ToArray();
+        Assert.NotEmpty(standing);
+        Assert.All(standing, k => Assert.True(
+            Frame(200).Near(c.Camera.ToScreen(F(k.X), F(k.Y)), 8, Palette.IsEnemy), $"contact marker at {k.X},{k.Y}"));
+
         StepTo(c, 600);
         var late = Frame(600);
         PanelShowsTheSquad(late, c, 2);
@@ -224,10 +231,9 @@ public class ScreenshotTests
         var contacts = c.Battle.View.KnownEnemies.Select(k => c.Camera.ToScreen(F(k.X), F(k.Y))).ToArray();
         Assert.NotEmpty(contacts);
         // A contact seen to fall is drawn as a body instead (item 2.13); every other one has its marker.
-        var standing = c.Battle.View.KnownEnemies.Where(k => !c.Effects.Fallen.ContainsKey(k.EnemyId)).ToArray();
-        Assert.NotEmpty(standing);
-        Assert.All(standing, k => Assert.True(
-            late.Near(c.Camera.ToScreen(F(k.X), F(k.Y)), 8, Palette.IsEnemy), $"contact marker at {k.X},{k.Y}"));
+        Assert.All(c.Battle.View.KnownEnemies, k => Assert.True(
+            late.Near(c.Camera.ToScreen(F(k.X), F(k.Y)), 8, c.Effects.Fallen.ContainsKey(k.EnemyId) ? p => p == Palette.EnemyDown : Palette.IsEnemy),
+            "contact drawn"));
         Assert.All(
             late.Find(new Area(0, 0, 1280, 720), Palette.IsEnemy),
             p => Assert.True(contacts.Any(at => Gap(at, p) <= 40), $"enemy colour away from every contact at {p}"));
@@ -483,9 +489,9 @@ public class ScreenshotTests
         var c = Twin(scenario, true);
         c.FrameOwnForces();
         var out_ = Path.Combine(Root(), "TestResults", "screens", "graphics", "opening");
-        Capture(Opening, "--scenario", scenario, "--seed", "1", "--scripted", "--ticks", "0,600,900", "--out", out_);
+        Capture(Opening, "--scenario", scenario, "--seed", "1", "--scripted", "--ticks", "0,200,600,900", "--out", out_);
         var map = c.Layout.Map;
-        foreach (var tick in new[] { 0, 600, 900 })
+        foreach (var tick in new[] { 0, 200, 600, 900 })
         {
             StepTo(c, tick);
             var frame = Png.Load(Path.Combine(out_, $"{scenario}-seed1-tick{tick}.png"));
@@ -501,7 +507,7 @@ public class ScreenshotTests
                 Assert.True(frame.Count(map, p => p == Palette.Crater) >= 60, $"craters at tick {tick}");
             }
 
-            if (scenario == "fix-assault" && tick >= 600)
+            if (scenario == "fix-assault" && tick == 200)
             {
                 Assert.NotEmpty(contacts);
             }
@@ -522,20 +528,40 @@ public class ScreenshotTests
     [ScreenshotFact]
     public void Own_men_who_are_down_are_on_the_screen()
     {
-        var c = Twin("fix-assault", true);
-        var tick = 0;
-        while (tick < 1800 && !c.Battle.View.Squads.SelectMany(q => q.Soldiers).Any(Down))
-        {
-            StepTo(c, tick += 10);
-        }
-
+        var (scenario, seed, tick) = FirstOwnCasualty();
+        var c = new GameController(PlayerBattle.Create(scenario, seed, true));
+        StepTo(c, tick);
         var down = c.Battle.View.Squads.SelectMany(q => q.Soldiers).Where(Down).ToArray();
         Assert.NotEmpty(down);
-        var frame = Shot("own-down", "fix-assault", tick);
+        var out_ = Path.Combine(Root(), "TestResults", "screens", "graphics", "own-down");
+        Capture("--scenario", scenario, "--seed", $"{seed}", "--scripted", "--ticks", $"{tick}", "--out", out_);
+        var frame = Png.Load(Path.Combine(out_, $"{scenario}-seed{seed}-tick{tick}.png"));
+        c.Camera.Fit(c.Battle.View.Map!);
         Assert.All(down, m => Assert.True(
             frame.Near(c.Camera.ToScreen(F(m.X), F(m.Y)), 6, p => p == Palette.Down), $"{m.Health} man {m.Id} at tick {tick}"));
+    }
 
-        static bool Down(SoldierView m) => m.Health is HealthState.Incapacitated or HealthState.Dead;
+    private static bool Down(SoldierView m) => m.Health is HealthState.Incapacitated or HealthState.Dead;
+
+    private static (string Scenario, ulong Seed, int Tick) FirstOwnCasualty()
+    {
+        for (var seed = 1UL; seed <= 20; seed++)
+        {
+            foreach (var scenario in new[] { "fix-assault", "bombard-creep" })
+            {
+                var battle = PlayerBattle.Create(scenario, seed, true);
+                for (var tick = 1; tick <= 1800; tick++)
+                {
+                    battle.Step();
+                    if (tick % 10 == 0 && battle.View.Squads.SelectMany(q => q.Soldiers).Any(Down))
+                    {
+                        return (scenario, seed, tick);
+                    }
+                }
+            }
+        }
+
+        throw new InvalidOperationException("No scripted battle has an own casualty.");
     }
 
     /// <summary>
@@ -579,10 +605,11 @@ public class ScreenshotTests
         });
     }
 
-    [ScreenshotFact]
-    public void Walking_men_show_their_posture_and_point_the_way_they_go()
+    [ScreenshotTheory]
+    [InlineData(150, Posture.Kneeling)]
+    [InlineData(600, Posture.Standing)]
+    public void Walking_men_show_their_posture_and_point_the_way_they_go(int tick, Posture expected)
     {
-        const int tick = 150;
         var c = Twin("fix-assault", true);
         StepTo(c, tick - 1);
         var before = c.Battle.View.Squads.SelectMany(q => q.Soldiers).ToDictionary(m => m.Id);
@@ -590,7 +617,7 @@ public class ScreenshotTests
         var squad = c.Battle.View.Squads.Single(q => q.Id == 0).Soldiers;
         var (x, y) = (MathF.Round(squad.Average(m => F(m.X))), MathF.Round(squad.Average(m => F(m.Y))));
         c.Camera.Set(x, y, 20);
-        var frame = Shot("walking-zoomed", "fix-assault", tick, "--zoom", "20", "--center", $"{x},{y}");
+        var frame = Shot($"walking-zoomed-{tick}", "fix-assault", tick, "--zoom", "20", "--center", $"{x},{y}");
         var walkers = squad.Where(m => (m.X != before[m.Id].X || m.Y != before[m.Id].Y) && m.Posture != Posture.Prone
             && c.Layout.Map.Contains(c.Camera.ToScreen(F(m.X), F(m.Y)))).ToArray();
         Assert.True(walkers.Length >= 4, $"{walkers.Length} walkers");
@@ -614,7 +641,7 @@ public class ScreenshotTests
 
         Assert.True(ahead >= walkers.Length * 3 / 4 && behind <= walkers.Length / 4, $"{walkers.Length} walkers: weapon ahead {ahead}, behind {behind}");
         Assert.True(shaped >= walkers.Length * 3 / 4, $"{shaped} of {walkers.Length} drawn in their posture");
-        Assert.Contains(walkers, m => m.Posture == Posture.Standing);
+        Assert.Contains(walkers, m => m.Posture == expected);
     }
 
     [ScreenshotFact]

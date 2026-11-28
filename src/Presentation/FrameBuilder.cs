@@ -470,13 +470,16 @@ public static class FrameBuilder
         var at = new Pt(centre.X - 30, top - 30);
 
         // Far out, neighbouring squads' labels would run together: a later one moves up clear of those placed.
-        Area Box() => new(at.X, at.Y - 24, 170, 38);
+        Area Box() => new(at.X, at.Y - 24, 112, 38);
         for (var i = 0; i < taken.Count; i++)
         {
             var (box, other) = (Box(), taken[i]);
             if (box.X < other.Right && other.X < box.Right && box.Y < other.Bottom && other.Y < box.Bottom)
             {
-                at = at with { Y = other.Y - 15 };
+                // Off to the right if this squad lies that way, else up: either keeps the label by its own men.
+                at = centre.X > other.X + (other.W / 2) && other.Right - at.X < 90
+                    ? at with { X = other.Right + 2 }
+                    : at with { Y = other.Y - 15 };
                 i = -1;
             }
         }
@@ -537,7 +540,7 @@ public static class FrameBuilder
         }
 
         list.Add(new TextPrim(new Pt(465, 20), "L: legend", c.ShowLegend ? Palette.Selected : Palette.Text, 13));
-        list.Add(new TextPrim(new Pt(c.Layout.Panel.X + 10, 20), $"contacts {c.Battle.View.KnownEnemies.Count}", Palette.DimText, 13));
+        list.Add(new TextPrim(new Pt(c.Layout.Panel.X + 10, 20), $"enemies spotted {c.Battle.View.KnownEnemies.Count(k => !c.Effects.Fallen.ContainsKey(k.EnemyId))}   fallen {c.Effects.Fallen.Count}", Palette.DimText, 13));
     }
 
     private static void SidePanel(List<Prim> list, GameController c, IReadOnlyList<SquadView> squads)

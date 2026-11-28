@@ -83,6 +83,9 @@ public static class Figures
                 break;
             default:
                 var limb = MathF.Max(2.5f, 0.32f * r);
+                // A dark edge keeps crowded sprawls apart to the eye.
+                list.Add(new LinePrim(P(-1.0f, -1.0f), P(1.0f, 1.0f), Palette.Shadow, limb + 2));
+                list.Add(new LinePrim(P(-1.0f, 1.0f), P(1.0f, -1.0f), Palette.Shadow, limb + 2));
                 list.Add(new LinePrim(P(-0.95f, -0.95f), P(0.95f, 0.95f), Palette.Own, limb));
                 list.Add(new LinePrim(P(-0.95f, 0.95f), P(0.95f, -0.95f), Palette.Own, limb));
                 list.Add(new CirclePrim(at, 0.35f * r, Palette.Own));

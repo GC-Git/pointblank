@@ -20,7 +20,7 @@ internal static class Legend
             ("Your man, standing", at => Figures.Man(Sample(Posture.Standing), at, Figure, right)),
             ("Kneeling", at => Figures.Man(Sample(Posture.Kneeling), at, Figure, right)),
             ("Prone (lying down)", at => Figures.Man(Sample(Posture.Prone), at, Figure, right)),
-            ("Facing unknown: stand, kneel, prone", at => new[] { Posture.Standing, Posture.Kneeling, Posture.Prone }
+            ("Facing unknown (three postures)", at => new[] { Posture.Standing, Posture.Kneeling, Posture.Prone }
                 .SelectMany((p, i) => Figures.Man(Sample(p), new Pt(at.X + ((i - 1) * 17), at.Y), 7, null))),
             ("Wounded, still fighting", at => Figures.Man(Sample(Posture.Kneeling, HealthState.Wounded), at, Figure, right)),
             ("Badly hurt, out of action", at => Figures.Fallen(at, Figure, Palette.Down, false)),
