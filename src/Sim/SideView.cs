@@ -17,12 +17,10 @@ namespace PointBlank.Sim;
 /// <see cref="Suppression"/> is his suppression level (0 to 100) and <see cref="SuppressionState"/> its state.
 /// <see cref="Moving"/>: he is walking now (on his squad's move and not held, or on a local move of the unit AI).
 /// <see cref="PendingPosture"/>: the posture he is about to take on his own reaction (item 2.4a), or null.
-/// <see cref="Destination"/>: where his own local move ends, or null when he is not on one.
 /// </summary>
 public readonly record struct SoldierView(
     int Id, string Key, Role Role, int Rank, string WeaponId, int TeamIndex, Fixed X, Fixed Y, Posture Posture, HealthState Health, int Rounds,
-    Fixed Suppression, SuppressionState SuppressionState, bool Moving = false, Posture? PendingPosture = null,
-    (Fixed X, Fixed Y)? Destination = null);
+    Fixed Suppression, SuppressionState SuppressionState, bool Moving = false, Posture? PendingPosture = null);
 
 /// <summary>
 /// A round that passed close to (or hit) one of the side's own soldiers on the last fire tick, as the side knows it
@@ -292,8 +290,7 @@ public sealed class SideView
         q.Soldiers.Select(s => new SoldierView(
             s.Id, s.Key, s.Role, s.Rank, s.WeaponId, s.TeamIndex, s.X, s.Y, s.Posture, s.Health, _fire?.RoundsOf(s.Id) ?? -1,
             _suppression?.LevelOf(s.Id) ?? Fixed.Zero, _suppression?.StateOf(s.Id) ?? SuppressionState.None,
-            _move?.IsSoldierMoving(s.Id) ?? false, s.PendingPosture,
-            _move?.GoalOf(s.Id) is { Local: true } g ? (g.X, g.Y) : null)).ToArray(),
+            _move?.IsSoldierMoving(s.Id) ?? false, s.PendingPosture)).ToArray(),
         _suppression?.SquadLevelOf(q.Id) ?? Fixed.Zero,
         _suppression?.SquadStateOf(q.Id) ?? SuppressionState.None,
         q.MoraleLevel,

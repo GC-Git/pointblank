@@ -115,7 +115,7 @@ public class MaskedFireMetrics(ITestOutputHelper output)
                         a.FirerMoving++;
                     }
 
-                    // Item 2.4c review: why a masked man of a stationary squad may not step aside.
+                    // Masked time of a stationary squad, and the share spent pinned, broken or suppressed.
                     if (!move.IsMoving(q.Id))
                     {
                         a.Still++;

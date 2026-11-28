@@ -209,31 +209,45 @@ Status: draft, awaiting owner sign-off
   *Done when:* the cause is measured over seeds 1-50, and a squad that cannot fire because
   friendlies are in the way realistically shifts for a clear line or the reason it stays is
   documented; no scenario reshaping and no retuning.
-  Measured over seeds 1-50 (`MaskedFireMetrics`, run with `PB_MASK_REPORT=1`), share of
-  on-task man-time masked by friendlies, before the item then now: `fix-assault` base of fire
-  73% to 54% (it stood in ranks along its own line of fire under a Fire order, which forms no
-  firing line); `bombard-creep` stationary squads 72/70/43% to 46/47/17%. A first version
-  without the review's limits reached 29% and 31/34/13%, by moving men who were under fire,
-  suppressed or pinned. Now: in a stationary squad with a fire task, a masked man steps to a
-  clear line after his own delay, at most twice before the squad next moves, never ending more
-  than a tile nearer the target than where he began, by a way that crosses no comrade's live
-  line of fire and no ground with less cover. Over the four runner scenarios no man shifted
-  more than twice (before: up to 8, in the first version).
-  Men stay masked, by design: when their squad is pinned, broken, routing or cowering, shells
-  burst near, or it was told to Hold (a walk under way stops, each man on his own reaction, and
-  he ends low); when they are suppressed or pinned; for a few seconds after an enemy round
-  passes them; with no clear tile and safe way within the search distance; after two shifts.
-  In the `fix-assault` base of fire, 78% of stationary masked time is in a pinned or broken
-  squad and a further 10% a suppressed man, and 173 of its 178 shift walks were called off.
-  Friendly rounds suppress too: a squad firing through its own ranks can pin itself with no
-  enemy fire (suppression 86-96 after 90 s in the test block), which then keeps its men where
-  they are (whether that is right is an owner decision; not changed here). Open: because of
-  this the drill makes that base of fire fire less than with no shifting (40 against 63
-  man-shot-ticks per seed; masked 54% against 73%), and one view test fails; see
-  [progress](process/progress/item-2.4c.md).
-  Squads on a move (nearly all of the `fix-assault` assault squad's masked time) and squads
-  blocked by another squad are left to item 2.11. The masking test is flat (it ignores
-  height), kept as is.
+  **Masked squads stay where they are (owner decision).** Measured over seeds 1-50
+  (`MaskedFireMetrics`, run with `PB_MASK_REPORT=1`), share of on-task man-time masked by
+  friendlies: `fix-assault` base of fire 73%; `bombard-creep` stationary squads 71/70/43%.
+  Cause: the `fix-assault` base of fire stands in ranks along its own line of fire under a
+  Fire order, which forms no firing line (all its masked time is behind its own men); in
+  `bombard-creep` the first two of those squads are masked entirely by another squad, the
+  third by another squad for 55%; moving squads are blocked by their own men while they move
+  (nearly all of the `fix-assault` assault squad's masked time).
+  Tried (seeds 1-50): in a stationary squad with a fire task, each masked man stepped to a
+  clear line. Without limits this reached 29% and 31/34/13%, by moving men who were under
+  fire, suppressed or pinned. With gates and limits it reached 54% and 46/47/17%, but the
+  `fix-assault` base of fire passed its own men closely, pinned itself and fired less: 40
+  against 63 man-shot-ticks per seed, and the share of stationary masked time spent pinned or
+  broken rose from 27% to 78%.
+  Removed for that reason: the owner decided to take the drill out and let masked squads stay.
+  Suspected cause, not proven: a man holds fire only for a comrade within `mask_clearance`
+  (0.5 m) of his line, while a round within `near_miss_radius` (2 m) suppresses. Friendly near
+  misses already occur without the drill. Both the drill and a safe friendly firing distance
+  are in item 2.11. The masking test is flat (it ignores height), kept as is.
+  Kept from the item, independent of the drill: a routing man who has reached the end of his
+  run while others of his squad are still running gets down under fire and stays down until he
+  has somewhere to run (`RoutingNoRouteTests`). Over seeds 1-50, before its state was added to
+  the hash, it changed the final hash in 4 `fix-assault`, 4 `fix-assault-nobase`, 6
+  `bombard-creep` and no `pin-open` battles.
+
+- [ ] **2.12 Faster tests** (S)
+  Do next after 2.4c. A full test run takes about 13 minutes and every build and review
+  repeats it.
+  *Done when:* a documented quick test command for everyday work runs much faster (report
+  timings) while the full suite still runs every existing test and is required before
+  merging; no test is weakened, skipped from the full run, or given fewer seeds in the full
+  run.
+
+- [ ] **2.9 Defend halts a move** (S)
+  Do before 2.7 (owner decision). From the 2.5a review: a delivered Defend order does not stop
+  a move already under way (4 of 4 squads still moving 3 s later; same on main before 2.5a),
+  and the panel then shows 'Defend: Done' while the squad marches.
+  *Done when:* a delivered Defend halts the move through the chain of command with per-man
+  reactions, with tests.
 
 - [ ] **2.4d Posture follow-ups** (S)
   Do before 2.7 unless the owner defers it. From the 2.4b review (seeds 1-50): the posture
@@ -245,12 +259,13 @@ Status: draft, awaiting owner sign-off
   *Done when:* each is measured, then fixed or documented as realistic, with tests; no
   retuning or scenario reshaping.
 
-- [ ] **2.9 Defend halts a move** (S)
-  Do before 2.7 (owner decision). From the 2.5a review: a delivered Defend order does not stop
-  a move already under way (4 of 4 squads still moving 3 s later; same on main before 2.5a),
-  and the panel then shows 'Defend: Done' while the squad marches.
-  *Done when:* a delivered Defend halts the move through the chain of command with per-man
-  reactions, with tests.
+- [ ] **2.13 Readable placeholder graphics** (S)
+  Do before 2.7: the owner could not tell what was happening when playing. Plain placeholder
+  shapes; pixel art stays milestone 3.
+  *Done when:* soldier shapes clearly show standing, kneeling and prone and which way each man
+  is working; tracers and muzzle flashes are drawn only for fire the player's side could see;
+  shell explosions, wounded and dead are visible; spotted-enemy markers are clearer; the
+  starting zoom is sensible; screenshot tests cover each and the fog-of-war boundary holds.
 
 - [ ] **2.7 First playable scenarios** (S) ⛳
   Two scenarios: *fix and assault* (US platoon + tank vs German MG position) and
@@ -279,7 +294,9 @@ Status: draft, awaiting owner sign-off
 - [ ] **2.11 Movement when friendlies block fire** (S)
   Postponed by the owner until after the formal play-through: whether a moving squad blocked by
   its own men spreads out or halts a team to shoot, and whether a whole squad may shift without
-  an order when another squad blocks it.
+  an order when another squad blocks it. Also revisits, from 2.4c, the side-stepping drill
+  (masked men of a stationary squad stepping to a clear line) and a safe friendly firing
+  distance (how close to a comrade a man may fire).
   *Done when:* the owner has decided, then it is implemented or documented, with tests.
 
 ## Milestone 3 — Art style
