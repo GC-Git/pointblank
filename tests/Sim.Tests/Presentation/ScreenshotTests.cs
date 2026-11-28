@@ -184,7 +184,8 @@ public class ScreenshotTests
         var first = Frame(0);
         Assert.Equal((1280, 720), (first.Width, first.Height));
         Assert.True(first.Is(c.Camera.ToScreen(390, 110), ground), "open ground");
-        Assert.All(Men(c, "us"), s => Assert.True(first.Near(ScreenOf(c, s), 3, p => p == Palette.Own), "own man drawn"));
+        var whole = Places.Of(c.Battle.View.Squads, c.Camera);
+        Assert.All(Men(c, "us"), s => Assert.True(first.Near(whole[s.Id], 3, p => p == Palette.Own), "own man drawn"));
         Assert.All(Men(c, "de"), s => Assert.True(first.Is(ScreenOf(c, s), ground), "unspotted enemy not drawn"));
         Assert.Equal(0, first.Count(new Area(0, 0, 1280, 720), Palette.IsEnemy));
         Assert.True(first.Count(c.Layout.Map, p => p == Palette.MoraleBar) >= 100, "morale bars on the units");
@@ -222,10 +223,11 @@ public class ScreenshotTests
         });
         var contacts = c.Battle.View.KnownEnemies.Select(k => c.Camera.ToScreen(F(k.X), F(k.Y))).ToArray();
         Assert.NotEmpty(contacts);
-        // A contact seen to fall is drawn as a body instead (item 2.13).
-        Assert.All(c.Battle.View.KnownEnemies, k => Assert.True(
-            late.Near(c.Camera.ToScreen(F(k.X), F(k.Y)), 8, c.Effects.Fallen.ContainsKey(k.EnemyId) ? p => p == Palette.EnemyDown : Palette.IsEnemy),
-            "contact drawn"));
+        // A contact seen to fall is drawn as a body instead (item 2.13); every other one has its marker.
+        var standing = c.Battle.View.KnownEnemies.Where(k => !c.Effects.Fallen.ContainsKey(k.EnemyId)).ToArray();
+        Assert.NotEmpty(standing);
+        Assert.All(standing, k => Assert.True(
+            late.Near(c.Camera.ToScreen(F(k.X), F(k.Y)), 8, Palette.IsEnemy), $"contact marker at {k.X},{k.Y}"));
         Assert.All(
             late.Find(new Area(0, 0, 1280, 720), Palette.IsEnemy),
             p => Assert.True(contacts.Any(at => Gap(at, p) <= 40), $"enemy colour away from every contact at {p}"));
@@ -365,12 +367,13 @@ public class ScreenshotTests
         Assert.True(wanted.Length >= 3 * c.Battle.View.Squads.Count, $"{wanted.Length} lines");
         Assert.All(wanted, t => Assert.True(Shows(first, t), t.Text));
 
-        // Men are drawn at the opening scale, each at his own place.
+        // Every own man is on the opening view, drawn at (or eased a little from) his own place.
+        var places = Places.Of(c.Battle.View.Squads, c.Camera);
         var men = c.Battle.View.Squads.SelectMany(q => q.Soldiers)
             .Where(m => m.Health is HealthState.Ok or HealthState.Wounded)
-            .Select(m => c.Camera.ToScreen(F(m.X), F(m.Y))).Where(map.Contains).ToArray();
-        Assert.True(men.Length >= 8, $"{men.Length} men on screen");
-        Assert.All(men, at => Assert.True(fired.Near(at, 5, p => p == Palette.Own), $"man at {at.X},{at.Y}"));
+            .ToArray();
+        Assert.All(men, m => Assert.True(map.Contains(c.Camera.ToScreen(F(m.X), F(m.Y))), $"man {m.Id} off the opening view"));
+        Assert.All(men, m => Assert.True(fired.Near(places[m.Id], 5, p => p == Palette.Own), $"man at {places[m.Id]}"));
 
         var arrows = late.OfType<LinePrim>().Where(l => l.Colour == Palette.Incoming && map.Contains(l.A) && map.Contains(l.B)).ToArray();
         Assert.NotEmpty(arrows);
@@ -468,31 +471,150 @@ public class ScreenshotTests
         Assert.Equal(0, Shot(folder + "-before", scenario, 0).Count(c.Layout.Map, p => p == colour));
     }
 
-    [ScreenshotFact]
-    public void The_three_postures_and_the_weapon_lines_are_on_the_screen()
+    /// <summary>
+    /// The opening view as the battle goes on: where the fight is stays on screen without the camera moving. The truth is
+    /// used here, so the check does not lean on the view code.
+    /// </summary>
+    [ScreenshotTheory]
+    [InlineData("fix-assault")]
+    [InlineData("bombard-creep")]
+    public void The_opening_view_still_holds_the_fight_a_minute_and_more_in(string scenario)
     {
-        // The rifle squad starts prone and the HQ kneeling; both are on the opening view.
-        var c = Twin("bombard-creep", true);
+        var c = Twin(scenario, true);
         c.FrameOwnForces();
-        var frame = Shot("postures", "bombard-creep", 0, Opening);
-        var men = c.Battle.View.Squads.SelectMany(q => q.Soldiers).ToArray();
-        Assert.Contains(men, m => m.Posture == Posture.Prone);
-        Assert.Contains(men, m => m.Posture == Posture.Kneeling);
-        foreach (var man in men.Where(m => c.Layout.Map.Contains(c.Camera.ToScreen(F(m.X), F(m.Y)))))
+        var out_ = Path.Combine(Root(), "TestResults", "screens", "graphics", "opening");
+        Capture(Opening, "--scenario", scenario, "--seed", "1", "--scripted", "--ticks", "0,600,900", "--out", out_);
+        var map = c.Layout.Map;
+        foreach (var tick in new[] { 0, 600, 900 })
         {
-            foreach (var part in FrameBuilder.Man(man, c.Camera).OfType<PolyPrim>())
+            StepTo(c, tick);
+            var frame = Png.Load(Path.Combine(out_, $"{scenario}-seed1-tick{tick}.png"));
+            Assert.All(Men(c, "us").Concat(Men(c, "de")), s => Assert.True(map.Contains(ScreenOf(c, s)), $"man {s.Id} at tick {tick}"));
+            var places = Places.Of(c.Battle.View.Squads, c.Camera);
+            Assert.All(places.Values, at => Assert.True(frame.Near(at, 5, p => p == Palette.Own), $"own man at {at}, tick {tick}"));
+            var contacts = c.Battle.View.KnownEnemies.Where(k => !c.Effects.Fallen.ContainsKey(k.EnemyId)).ToArray();
+            Assert.All(contacts, k => Assert.True(
+                frame.Near(c.Camera.ToScreen(F(k.X), F(k.Y)), 10, Palette.IsEnemy), $"contact at {k.X},{k.Y}, tick {tick}"));
+            if (scenario == "bombard-creep" && tick >= 600)
             {
-                var middle = new Pt(part.Points.Average(p => p.X), part.Points.Average(p => p.Y));
-                Assert.True(frame.Near(middle, 3, p => p == Palette.Own), $"{man.Posture} body at {middle}");
+                Assert.True(frame.Count(map, p => p == Palette.Mission) >= 20, $"target mark at tick {tick}");
+                Assert.True(frame.Count(map, p => p == Palette.Crater) >= 60, $"craters at tick {tick}");
+            }
+
+            if (scenario == "fix-assault" && tick >= 600)
+            {
+                Assert.NotEmpty(contacts);
             }
         }
+    }
 
-        // Walking men show standing or crouched figures with their weapons the way they go.
-        var moving = Twin("fix-assault", true);
-        moving.FrameOwnForces();
-        StepTo(moving, 150);
-        var walk = Shot("walking", "fix-assault", 150, Opening);
-        Assert.True(walk.Count(moving.Layout.Map, p => p == Palette.Weapon) >= 20, "weapon lines");
+    [ScreenshotFact]
+    public void Craters_stay_on_the_screen_where_shells_burst()
+    {
+        var c = Twin("bombard-creep", true);
+        StepTo(c, 900);
+        var frame = Shot("craters", "bombard-creep", 900);
+        Assert.NotEmpty(c.Effects.Craters);
+        var seen = c.Effects.Craters.Count(k => frame.Near(c.Camera.ToScreen(F(k.X), F(k.Y)), 5, p => p == Palette.Crater));
+        Assert.True(seen >= (c.Effects.Craters.Count + 1) / 2, $"{seen} of {c.Effects.Craters.Count} craters");
+    }
+
+    [ScreenshotFact]
+    public void Own_men_who_are_down_are_on_the_screen()
+    {
+        var c = Twin("fix-assault", true);
+        var tick = 0;
+        while (tick < 1800 && !c.Battle.View.Squads.SelectMany(q => q.Soldiers).Any(Down))
+        {
+            StepTo(c, tick += 10);
+        }
+
+        var down = c.Battle.View.Squads.SelectMany(q => q.Soldiers).Where(Down).ToArray();
+        Assert.NotEmpty(down);
+        var frame = Shot("own-down", "fix-assault", tick);
+        Assert.All(down, m => Assert.True(
+            frame.Near(c.Camera.ToScreen(F(m.X), F(m.Y)), 6, p => p == Palette.Down), $"{m.Health} man {m.Id} at tick {tick}"));
+
+        static bool Down(SoldierView m) => m.Health is HealthState.Incapacitated or HealthState.Dead;
+    }
+
+    /// <summary>
+    /// Whether the man's pixels have the side's colour at a place beside him, given in figure half-sizes along and across
+    /// the way he faces. The places below are the shapes as the legend describes them, not asked of the drawing code.
+    /// </summary>
+    private static bool Blue(Png frame, Pt at, (float X, float Y) way, float along, float across) =>
+        frame.Is(
+            new Pt(at.X + (14 * ((way.X * along) - (way.Y * across))), at.Y + (14 * ((way.Y * along) + (way.X * across)))),
+            Palette.Own);
+
+    private static int Corners(Png frame, Pt at, float x, float y) =>
+        new[] { (x, y), (-x, y), (x, -y), (-x, -y) }.Count(p => Blue(frame, at, (1, 0), p.Item1, p.Item2));
+
+    [ScreenshotTheory]
+    [InlineData("fix-assault", 0, Posture.Standing)]
+    [InlineData("fix-assault", 0, Posture.Kneeling)]
+    [InlineData("bombard-creep", 1, Posture.Kneeling)]
+    [InlineData("bombard-creep", 0, Posture.Prone)]
+    public void Men_with_no_known_direction_show_their_posture_and_no_facing(string scenario, int squad, Posture posture)
+    {
+        var c = Twin(scenario, true);
+        var men = c.Battle.View.Squads.Single(q => q.Id == (scenario == "fix-assault" && posture == Posture.Kneeling ? 2 : squad)).Soldiers;
+        var (x, y) = (MathF.Round(men.Average(m => F(m.X))), MathF.Round(men.Average(m => F(m.Y))));
+        c.Camera.Set(x, y, 20);
+        var frame = Shot($"unknown-{posture}-{scenario}", scenario, 0, "--zoom", "20", "--center", $"{x},{y}");
+        Assert.All(men, m => Assert.Equal(posture, m.Posture));
+        Assert.All(men, m =>
+        {
+            var at = c.Camera.ToScreen(F(m.X), F(m.Y));
+            // A disc reaches (0, .6) only; a square its corners at .62 too; a sprawl the far corners and not the sides.
+            var (side, corner, far) = (Corners(frame, at, 0, 0.58f), Corners(frame, at, 0.62f, 0.62f), Corners(frame, at, 0.84f, 0.84f));
+            var seen = posture switch
+            {
+                Posture.Standing => side == 4 && corner == 0 && far == 0,
+                Posture.Kneeling => side == 4 && corner == 4 && far == 0,
+                _ => side == 0 && far == 4,
+            };
+            Assert.True(seen, $"{posture} man {m.Id}: side {side}, corner {corner}, far {far}");
+            Assert.False(frame.Near(at, 14, p => p == Palette.Weapon), "a weapon line on a man whose direction is not known");
+        });
+    }
+
+    [ScreenshotFact]
+    public void Walking_men_show_their_posture_and_point_the_way_they_go()
+    {
+        const int tick = 150;
+        var c = Twin("fix-assault", true);
+        StepTo(c, tick - 1);
+        var before = c.Battle.View.Squads.SelectMany(q => q.Soldiers).ToDictionary(m => m.Id);
+        StepTo(c, tick);
+        var squad = c.Battle.View.Squads.Single(q => q.Id == 0).Soldiers;
+        var (x, y) = (MathF.Round(squad.Average(m => F(m.X))), MathF.Round(squad.Average(m => F(m.Y))));
+        c.Camera.Set(x, y, 20);
+        var frame = Shot("walking-zoomed", "fix-assault", tick, "--zoom", "20", "--center", $"{x},{y}");
+        var walkers = squad.Where(m => (m.X != before[m.Id].X || m.Y != before[m.Id].Y) && m.Posture != Posture.Prone
+            && c.Layout.Map.Contains(c.Camera.ToScreen(F(m.X), F(m.Y)))).ToArray();
+        Assert.True(walkers.Length >= 4, $"{walkers.Length} walkers");
+        int ahead = 0, behind = 0, shaped = 0;
+        foreach (var m in walkers)
+        {
+            var (dx, dy) = (F(m.X - before[m.Id].X), F(m.Y - before[m.Id].Y));
+            var length = MathF.Sqrt((dx * dx) + (dy * dy));
+            var way = (X: dx / length, Y: dy / length);
+            var at = c.Camera.ToScreen(F(m.X), F(m.Y));
+            bool Gun(float sign) => frame.Near(
+                new Pt(at.X + (sign * 14 * ((way.X * 1.5f) - (way.Y * 0.31f))), at.Y + (sign * 14 * ((way.Y * 1.5f) + (way.X * 0.31f)))),
+                3, p => p == Palette.Weapon);
+            ahead += Gun(1) ? 1 : 0;
+            behind += Gun(-1) ? 1 : 0;
+            // Standing: shoulders out to the sides. Kneeling: wide at the back, behind the shoulders' line.
+            var shoulders = Blue(frame, at, way, -0.2f, 0.95f) || Blue(frame, at, way, -0.2f, -0.95f);
+            var haunches = Blue(frame, at, way, -0.65f, 0.75f) || Blue(frame, at, way, -0.65f, -0.75f);
+            shaped += (m.Posture == Posture.Standing ? shoulders && !haunches : haunches) ? 1 : 0;
+        }
+
+        Assert.True(ahead >= walkers.Length * 3 / 4 && behind <= walkers.Length / 4, $"{walkers.Length} walkers: weapon ahead {ahead}, behind {behind}");
+        Assert.True(shaped >= walkers.Length * 3 / 4, $"{shaped} of {walkers.Length} drawn in their posture");
+        Assert.Contains(walkers, m => m.Posture == Posture.Standing);
     }
 
     [ScreenshotFact]

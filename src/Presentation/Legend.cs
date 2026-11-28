@@ -20,13 +20,15 @@ internal static class Legend
             ("Your man, standing", at => Figures.Man(Sample(Posture.Standing), at, Figure, right)),
             ("Kneeling", at => Figures.Man(Sample(Posture.Kneeling), at, Figure, right)),
             ("Prone (lying down)", at => Figures.Man(Sample(Posture.Prone), at, Figure, right)),
+            ("Facing unknown: stand, kneel, prone", at => new[] { Posture.Standing, Posture.Kneeling, Posture.Prone }
+                .SelectMany((p, i) => Figures.Man(Sample(p), new Pt(at.X + ((i - 1) * 17), at.Y), 7, null))),
             ("Wounded, still fighting", at => Figures.Man(Sample(Posture.Kneeling, HealthState.Wounded), at, Figure, right)),
             ("Badly hurt, out of action", at => Figures.Fallen(at, Figure, Palette.Down, false)),
             ("Killed", at => Figures.Fallen(at, Figure, Palette.Down, true)),
             ("Enemy in sight (square: MG)", at => Figures.Contact(Enemy(ContactQuality.Tracked), at, Figure, 0)),
             ("Enemy last seen here", at => Figures.Contact(Enemy(ContactQuality.Stale), at, Figure, 100).Where(p => p is not TextPrim)),
             ("Enemy lost track of", at => Figures.Contact(Enemy(ContactQuality.Lost), at, Figure, 0)),
-            ("Enemy seen to fall", at => Figures.Fallen(at, Figure, Palette.EnemyDown, true)),
+            ("Enemy fallen (hurt or dead)", at => Figures.Fallen(at, Figure, Palette.EnemyDown, null)),
             ("Your fire", at => Streak(at, Palette.OwnTracer)),
             ("Enemy fire you can see", at => Streak(at, Palette.EnemyTracer)),
             ("Fire coming in from that side", at =>
@@ -66,7 +68,7 @@ internal static class Legend
         list.Add(new RectPrim(x, y, 300, height, Palette.Panel));
         list.Add(new RectPrim(x, y, 300, height, Palette.DimText, false));
         list.Add(new TextPrim(new Pt(x + 10, y + 18), "Symbols (L closes)", Palette.Selected, 13));
-        list.Add(new TextPrim(new Pt(x + 10, y + 34), "A man's dark line points where he aims or goes.", Palette.DimText, 11));
+        list.Add(new TextPrim(new Pt(x + 10, y + 34), "Dark line: aim or way. Crowded men are eased apart.", Palette.DimText, 11));
         for (var i = 0; i < rows.Length; i++)
         {
             var at = new Pt(x + 34, y + 52 + (i * Row));

@@ -35,7 +35,7 @@ public static class FrameBuilder
             var at = camera.ToScreen(cx.F(), cy.F());
             if (c.Layout.Map.Contains(at))
             {
-                list.Add(new CirclePrim(at, MathF.Max(3, 0.9f * camera.Scale), Palette.Crater));
+                list.Add(new CirclePrim(at, MathF.Max(5, 0.9f * camera.Scale), Palette.Crater));
             }
         }
 
@@ -46,16 +46,18 @@ public static class FrameBuilder
 
         Incoming(list, c, squads);
 
+        var places = Places.Of(squads, camera);
+
         // Selection rings go under every man, so a ring never hides a neighbour.
         foreach (var man in squads.Where(q => c.Selected.Contains(q.Id)).SelectMany(q => q.Soldiers).Where(Able))
         {
-            list.Add(new CirclePrim(camera.ToScreen(man.X.F(), man.Y.F()), (Size(camera) * 1.6f) + 2, Palette.Selected, false, 1.5f));
+            list.Add(new CirclePrim(places[man.Id], (Size(camera) * 1.6f) + 2, Palette.Selected, false, 1.5f));
         }
 
         var fallen = c.Effects.Fallen;
         foreach (var body in fallen.Values)
         {
-            list.AddRange(Figures.Fallen(camera.ToScreen(body.X.F(), body.Y.F()), Size(camera), Palette.EnemyDown, true));
+            list.AddRange(Figures.Fallen(camera.ToScreen(body.X.F(), body.Y.F()), Size(camera), Palette.EnemyDown, null));
         }
 
         // The down lie under the living.
@@ -67,7 +69,7 @@ public static class FrameBuilder
             foreach (var man in q.Soldiers.OrderBy(Able))
             {
                 var facing = c.Effects.Facing(man, view.Tick, target);
-                list.AddRange(Man(man, camera, facing is var (fx, fy) ? new Pt(fx, fy) : null));
+                list.AddRange(Figures.Man(man, c.Drawn(places, man), Size(camera), facing is var (fx, fy) ? new Pt(fx, fy) : null));
             }
         }
 
@@ -88,9 +90,10 @@ public static class FrameBuilder
         }
 
         // Labels last, so no man hides his own squad's state.
+        var labels = new List<Area>();
         foreach (var q in squads)
         {
-            SquadLabel(list, c, q);
+            SquadLabel(list, c, q, labels);
         }
 
         foreach (var q in squads)
@@ -124,44 +127,58 @@ public static class FrameBuilder
     public static IReadOnlyList<Prim> Contact(ContactView contact, Camera camera, long tick) =>
         Figures.Contact(contact, camera.ToScreen(contact.X.F(), contact.Y.F()), Size(camera), tick);
 
+    /// <summary>Half the least size of a man's figure or a marker, in pixels, however far out the view is.</summary>
+    public const float LeastSize = 8;
+
+    /// <summary>How far a tracer flies on the screen at most, and how long its streak is, in pixels (display only).</summary>
+    public const float TracerReach = 170;
+
+    public const float TracerLength = 30;
+
     /// <summary>Half the size of a man's figure, in pixels.</summary>
-    internal static float Size(Camera camera) => Math.Clamp(0.8f * camera.Scale, 4, 14);
+    public static float Size(Camera camera) => Math.Clamp(0.8f * camera.Scale, LeastSize, 14);
 
     /// <summary>
-    /// A shot seen: a flash at the muzzle and a line along the round's flight, to where it was seen to stop or else a
-    /// short way only.
+    /// A shot seen: a flash at the muzzle and a short streak flying along the round's way as it ages. It goes at most
+    /// <see cref="TracerReach"/> pixels, and stops sooner only where the round was seen to stop. A round whose stop was
+    /// not seen looks like any long shot, so the picture tells nothing the view does not.
     /// </summary>
     private static void Tracers(List<Prim> list, GameController c)
     {
-        const float UnseenMetres = 12;
         var camera = c.Camera;
         var tick = c.Battle.View.Tick;
+        var life = Effects.TracerTicks(c.Clock.Speed);
+        var places = Places.Of(c.Battle.View.Squads, camera);
         foreach (var shot in c.Effects.Shots(tick, c.Clock.Speed))
         {
-            var (x, y, dx, dy) = (shot.X.F(), shot.Y.F(), shot.DirX.F(), shot.DirY.F());
+            var (dx, dy) = (shot.DirX.F(), shot.DirY.F());
             var r = Size(camera);
-            var man = camera.ToScreen(x, y);
+            var origin = camera.ToScreen(shot.X.F(), shot.Y.F());
+            var man = shot.Own && places.TryGetValue(shot.FirerId, out var drawn) ? drawn : origin;
             var muzzle = new Pt(man.X + (dx * 1.6f * r), man.Y + (dy * 1.6f * r));
-            var end = shot.HasEnd
-                ? camera.ToScreen(shot.EndX.F(), shot.EndY.F())
-                : new Pt(muzzle.X + (dx * UnseenMetres * camera.Scale), muzzle.Y + (dy * UnseenMetres * camera.Scale));
-            var colour = shot.Own ? Palette.OwnTracer : Palette.EnemyTracer;
-            if (Clip(c.Layout.Map, muzzle, end) is var (a, b))
+            var reach = TracerReach;
+            if (shot.HasEnd)
             {
-                list.Add(new LinePrim(a, b, colour, tick - shot.Tick <= 1 ? 2.5f : 1));
+                var end = camera.ToScreen(shot.EndX.F(), shot.EndY.F());
+                reach = MathF.Min(reach, ((end.X - muzzle.X) * dx) + ((end.Y - muzzle.Y) * dy));
             }
 
-            if (c.Layout.Map.Contains(muzzle) && tick - shot.Tick <= 2)
+            var age = tick - shot.Tick;
+            var head = MathF.Max(0, reach) * MathF.Min(1, (age + 1) / (float)(life + 1));
+            var tail = MathF.Max(0, head - TracerLength);
+            Pt At(float along) => new(muzzle.X + (dx * along), muzzle.Y + (dy * along));
+            var colour = shot.Own ? Palette.OwnTracer : Palette.EnemyTracer;
+            if (head > tail && Clip(c.Layout.Map, At(tail), At(head)) is var (a, b))
+            {
+                list.Add(new LinePrim(a, b, colour, 2.5f));
+            }
+
+            if (c.Layout.Map.Contains(muzzle) && age <= 2)
             {
                 var s = 0.8f * r;
                 list.Add(new LinePrim(new Pt(muzzle.X - s, muzzle.Y), new Pt(muzzle.X + s, muzzle.Y), Palette.Flash, 2));
                 list.Add(new LinePrim(new Pt(muzzle.X, muzzle.Y - s), new Pt(muzzle.X, muzzle.Y + s), Palette.Flash, 2));
                 list.Add(new CirclePrim(muzzle, 0.35f * r, Palette.Flash));
-            }
-
-            if (shot.HasEnd && c.Layout.Map.Contains(end))
-            {
-                list.Add(new CirclePrim(end, 2, colour));
             }
         }
     }
@@ -199,22 +216,66 @@ public static class FrameBuilder
         }
     }
 
-    /// <summary>An arrow at the picture's edge toward each own squad with nobody on it, so no force is lost from view.</summary>
+    /// <summary>
+    /// Markers at the picture's edge toward what is off it and the side knows of: its own squads (saying if they are
+    /// under fire), spotted enemies, shell bursts it saw or felt and its own fire missions' targets. Markers of a kind
+    /// that would fall on one another are shown once.
+    /// </summary>
     private static void OffScreen(List<Prim> list, GameController c, IReadOnlyList<SquadView> squads)
     {
+        var view = c.Battle.View;
         var map = c.Layout.Map;
+        var placed = new List<(string Text, Pt At)>();
+        void Mark(float x, float y, string what, Rgb colour)
+        {
+            var to = c.Camera.ToScreen(x, y);
+            if (map.Contains(to))
+            {
+                return;
+            }
+
+            var edge = new Pt(Math.Clamp(to.X, map.X + 8, map.Right - 8), Math.Clamp(to.Y, map.Y + 8, map.Bottom - 8));
+            if (placed.Any(p => p.Text == what && MathF.Abs(p.At.X - edge.X) < 90 && MathF.Abs(p.At.Y - edge.Y) < 40))
+            {
+                return;
+            }
+
+            // A marker on another's place steps aside along the edge.
+            while (placed.Any(p => MathF.Abs(p.At.X - edge.X) < 90 && MathF.Abs(p.At.Y - edge.Y) < 16) && edge.Y < map.Bottom - 26)
+            {
+                edge = edge with { Y = edge.Y + 18 };
+            }
+
+            placed.Add((what, edge));
+            list.Add(new CirclePrim(edge, 7, colour));
+            list.Add(new CirclePrim(edge, 7, Palette.Text, false, 1.5f));
+            var text = $"{what} (off screen)";
+            var width = TextBox.Of(new TextPrim(edge, text, Palette.Text, 11)).W;
+            Label(list, new Pt(
+                Math.Clamp(edge.X + 12, map.X + 2, MathF.Max(map.X + 2, map.Right - width - 2)),
+                Math.Clamp(edge.Y + (edge.Y > map.Y + 30 ? -10 : 20), map.Y + 12, map.Bottom - 4)), text, Palette.Text);
+        }
+
+        var underFire = c.Incoming.Select(i => i.Squad).ToHashSet();
         foreach (var q in squads.Where(q => q.Soldiers.Count > 0 && !q.Soldiers.Any(s => map.Contains(c.Camera.ToScreen(s.X.F(), s.Y.F())))))
         {
             var (x, y) = GameController.Centre(q);
-            var to = c.Camera.ToScreen(x, y);
-            var edge = new Pt(Math.Clamp(to.X, map.X + 8, map.Right - 8), Math.Clamp(to.Y, map.Y + 8, map.Bottom - 8));
-            list.Add(new CirclePrim(edge, 7, Palette.Own));
-            list.Add(new CirclePrim(edge, 7, Palette.Text, false, 1.5f));
-            var text = $"#{q.Id} {Words.Unit(q.OrgId)} (off screen)";
-            var width = TextBox.Of(new TextPrim(edge, text, Palette.Text, 11)).W;
-            Label(list, new Pt(
-                Math.Clamp(edge.X + 12, map.X + 2, map.Right - width - 2),
-                Math.Clamp(edge.Y + (edge.Y > map.Y + 30 ? -10 : 20), map.Y + 12, map.Bottom - 4)), text, Palette.Text);
+            Mark(x, y, $"#{q.Id} {Words.Unit(q.OrgId)}{(underFire.Contains(q.Id) ? " under fire" : "")}", Palette.Own);
+        }
+
+        foreach (var k in view.KnownEnemies.Where(k => !c.Effects.Fallen.ContainsKey(k.EnemyId)).OrderBy(k => k.Quality))
+        {
+            Mark(k.X.F(), k.Y.F(), "enemy", Palette.Contact(k.Quality));
+        }
+
+        foreach (var (_, x, y) in c.Effects.Bursts.Where(b => view.Tick - b.Tick <= Effects.BurstTicks))
+        {
+            Mark(x.F(), y.F(), "shells", Palette.Fireball);
+        }
+
+        foreach (var m in view.FireMissions.Where(m => m.RoundsLeft > 0 && m.Status != MissionStatus.Complete))
+        {
+            Mark(m.X.F(), m.Y.F(), "fire mission", Palette.Mission);
         }
     }
 
@@ -401,12 +462,26 @@ public static class FrameBuilder
     }
 
     /// <summary>Above the squad: name and state, morale and suppression bars, and the order with its remaining delay.</summary>
-    private static void SquadLabel(List<Prim> list, GameController c, SquadView q)
+    private static void SquadLabel(List<Prim> list, GameController c, SquadView q, List<Area> taken)
     {
         var (x, y) = GameController.Centre(q);
         var centre = c.Camera.ToScreen(x, y);
         var top = q.Soldiers.Min(s => c.Camera.ToScreen(s.X.F(), s.Y.F()).Y);
         var at = new Pt(centre.X - 30, top - 30);
+
+        // Far out, neighbouring squads' labels would run together: a later one moves up clear of those placed.
+        Area Box() => new(at.X, at.Y - 24, 170, 38);
+        for (var i = 0; i < taken.Count; i++)
+        {
+            var (box, other) = (Box(), taken[i]);
+            if (box.X < other.Right && other.X < box.Right && box.Y < other.Bottom && other.Y < box.Bottom)
+            {
+                at = at with { Y = other.Y - 15 };
+                i = -1;
+            }
+        }
+
+        taken.Add(Box());
         var order = c.Battle.View.StatusOf(q.Id);
 
         var name = $"#{q.Id} {Words.Unit(q.OrgId)}";

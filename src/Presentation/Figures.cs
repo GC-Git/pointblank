@@ -6,9 +6,11 @@ using PointBlank.Sim.Spotting;
 namespace PointBlank.Presentation;
 
 /// <summary>
-/// The placeholder figures (item 2.13), seen from above and drawn from shapes. Standing: a round head-and-shoulders;
-/// kneeling: a wedge with one leg out behind; prone: a long thin body with its legs apart; down: a grey lying body. The
-/// weapon line points the way the man is working, and is left out when the view has nothing to go by.
+/// The placeholder figures (item 2.13), seen from above and drawn from shapes. With a known direction: standing is wide
+/// shoulders, a head and two arms on the weapon; kneeling a wedge with one leg out behind; prone a long thin body with
+/// its legs apart; the weapon line points the way the man is working. When the view has nothing to go by, each posture
+/// has a shape that points nowhere (a disc, a square, a cross-shaped sprawl) and no weapon, so no facing is invented.
+/// Down: a lying body.
 /// </summary>
 public static class Figures
 {
@@ -20,28 +22,30 @@ public static class Figures
             return Fallen(at, r, Palette.Down, man.Health == HealthState.Dead);
         }
 
-        var f = Unit(facing);
+        if (facing is not { } way || (way.X == 0 && way.Y == 0))
+        {
+            return Unturned(man, at, r);
+        }
+
+        var f = Unit(way);
         Pt P(float along, float across) => new(at.X + (r * ((f.X * along) - (f.Y * across))), at.Y + (r * ((f.Y * along) + (f.X * across))));
         var list = new List<Prim>();
         var gun = man.Role == Role.MgGunner;
-        void Weapon(Pt from, float reach)
-        {
-            if (facing != null)
-            {
-                list.Add(new LinePrim(from, P(reach, 0.3f), Palette.Weapon, gun ? 3 : 2));
-            }
-        }
+        void Weapon(Pt from, float reach) => list.Add(new LinePrim(from, P(reach, 0.3f), Palette.Weapon, gun ? 4 : 2.5f));
 
         switch (man.Posture)
         {
             case Posture.Standing:
-                var shoulders = MathF.Max(3, 0.6f * r);
-                list.Add(new LinePrim(P(-0.15f, -1.05f), P(-0.15f, 1.05f), Palette.Shadow, shoulders + 2));
-                list.Add(new LinePrim(P(-0.15f, -0.95f), P(-0.15f, 0.95f), Palette.Own, shoulders));
-                list.Add(new CirclePrim(at, (0.62f * r) + 1, Palette.Shadow));
-                list.Add(new CirclePrim(at, 0.62f * r, Palette.Own));
-                Weapon(P(0.1f, 0.35f), 1.65f);
-                list.Add(new CirclePrim(P(0.34f, 0), 0.25f * r, Palette.Helmet));
+                var shoulders = MathF.Max(3, 0.45f * r);
+                list.Add(new LinePrim(P(-0.2f, -1.15f), P(-0.2f, 1.15f), Palette.Shadow, shoulders + 2));
+                list.Add(new LinePrim(P(-0.2f, -1.05f), P(-0.2f, 1.05f), Palette.Own, shoulders));
+                var arm = MathF.Max(2, 0.25f * r);
+                list.Add(new LinePrim(P(-0.2f, -0.95f), P(0.85f, 0.25f), Palette.Own, arm));
+                list.Add(new LinePrim(P(-0.2f, 0.95f), P(0.55f, 0.35f), Palette.Own, arm));
+                list.Add(new CirclePrim(P(-0.05f, 0), (0.5f * r) + 1, Palette.Shadow));
+                list.Add(new CirclePrim(P(-0.05f, 0), 0.5f * r, Palette.Own));
+                Weapon(P(0.35f, 0.3f), 1.9f);
+                list.Add(new CirclePrim(P(0.12f, 0), 0.22f * r, Palette.Helmet));
                 break;
             case Posture.Kneeling:
                 list.Add(new LinePrim(P(-0.5f, -0.4f), P(-1.2f, -0.65f), Palette.Own, MathF.Max(2, 0.4f * r)));
@@ -60,20 +64,50 @@ public static class Figures
                 break;
         }
 
+        return Marked(list, man, at, r);
+    }
+
+    /// <summary>The figure of a man whose direction is not known: the same turned any quarter.</summary>
+    private static IReadOnlyList<Prim> Unturned(SoldierView man, Pt at, float r)
+    {
+        Pt P(float x, float y) => new(at.X + (x * r), at.Y + (y * r));
+        var list = new List<Prim>();
+        switch (man.Posture)
+        {
+            case Posture.Standing:
+                list.Add(new CirclePrim(at, (0.75f * r) + 1.5f, Palette.Shadow));
+                list.Add(new CirclePrim(at, 0.75f * r, Palette.Own));
+                break;
+            case Posture.Kneeling:
+                Poly(list, Palette.Own, P(-0.75f, -0.75f), P(0.75f, -0.75f), P(0.75f, 0.75f), P(-0.75f, 0.75f));
+                break;
+            default:
+                var limb = MathF.Max(2.5f, 0.32f * r);
+                list.Add(new LinePrim(P(-0.95f, -0.95f), P(0.95f, 0.95f), Palette.Own, limb));
+                list.Add(new LinePrim(P(-0.95f, 0.95f), P(0.95f, -0.95f), Palette.Own, limb));
+                list.Add(new CirclePrim(at, 0.35f * r, Palette.Own));
+                break;
+        }
+
+        list.Add(new CirclePrim(at, 0.25f * r, Palette.Helmet));
+        return Marked(list, man, at, r);
+    }
+
+    private static IReadOnlyList<Prim> Marked(List<Prim> list, SoldierView man, Pt at, float r)
+    {
         if (man.Health == HealthState.Wounded)
         {
             Cross(list, new Pt(at.X + (0.85f * r), at.Y - (0.85f * r)), r);
-        }
-        else
-        {
-            list.TrimExcess();
         }
 
         return list;
     }
 
-    /// <summary>A body on the ground: grey for the side's own (a red cross while he may yet be saved), a cross over the dead.</summary>
-    public static IReadOnlyList<Prim> Fallen(Pt at, float r, Rgb colour, bool dead)
+    /// <summary>
+    /// A body on the ground. For the side's own: grey, with a red cross while he may yet be saved, or a black cross over
+    /// the dead (<paramref name="dead"/>). An enemy seen to fall has neither (null): the side cannot tell which he is.
+    /// </summary>
+    public static IReadOnlyList<Prim> Fallen(Pt at, float r, Rgb colour, bool? dead)
     {
         Pt P(float x, float y) => new(at.X + (x * r), at.Y + (y * r));
         var list = new List<Prim>
@@ -82,12 +116,12 @@ public static class Figures
             new LinePrim(P(-0.2f, -0.55f), P(0.15f, 0.6f), colour, MathF.Max(1.5f, 0.25f * r)),
             new CirclePrim(P(0.75f, -0.3f), 0.38f * r, colour),
         };
-        if (dead)
+        if (dead == true)
         {
             list.Add(new LinePrim(P(-0.7f, -0.7f), P(0.7f, 0.7f), Palette.Shadow, 2));
             list.Add(new LinePrim(P(-0.7f, 0.7f), P(0.7f, -0.7f), Palette.Shadow, 2));
         }
-        else
+        else if (dead == false)
         {
             Cross(list, P(0.85f, -0.85f), r);
         }
@@ -160,14 +194,9 @@ public static class Figures
         list.Add(new LinePrim(new Pt(at.X, at.Y - s + 1), new Pt(at.X, at.Y + s - 1), Palette.RedCross, 2));
     }
 
-    private static Pt Unit(Pt? facing)
+    private static Pt Unit(Pt v)
     {
-        if (facing is not { } v)
-        {
-            return new Pt(0, -1);
-        }
-
         var length = MathF.Sqrt((v.X * v.X) + (v.Y * v.Y));
-        return length > 0 ? new Pt(v.X / length, v.Y / length) : new Pt(0, -1);
+        return new Pt(v.X / length, v.Y / length);
     }
 }

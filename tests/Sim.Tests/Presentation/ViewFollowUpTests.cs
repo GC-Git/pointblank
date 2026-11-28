@@ -26,25 +26,28 @@ public class ViewFollowUpTests
     [InlineData("fix-assault")]
     [InlineData("bombard-creep")]
     [InlineData("view-sandbox")]
-    public void The_opening_view_shows_every_own_man_apart_from_his_neighbours(string scenario)
+    public void The_opening_view_shows_every_own_man_readably_and_near_his_true_place(string scenario)
     {
         var c = Start(scenario);
         c.FrameOwnForces();
 
-        var men = c.Battle.View.Squads.SelectMany(q => q.Soldiers).Select(s => c.Camera.ToScreen(F(s.X), F(s.Y))).ToArray();
-        Assert.True(c.Camera.Scale >= GameController.ReadableScale, $"{c.Camera.Scale} px/m");
-        var shown = men.Count(c.Layout.Map.Contains);
-        var first = c.Battle.View.Squads[0].Soldiers.Select(s => c.Camera.ToScreen(F(s.X), F(s.Y)));
-        Assert.All(first, p => Assert.True(c.Layout.Map.Contains(p)));
-        Assert.True(shown >= men.Length / 2, $"{shown} of {men.Length} on screen");
-        var size = Math.Clamp(0.8f * c.Camera.Scale, 4, 14);
-        Assert.True(size >= 4, "a circle and a square this small look alike");
+        var men = c.Battle.View.Squads.SelectMany(q => q.Soldiers).ToArray();
+        var places = Places.Of(c.Battle.View.Squads, c.Camera);
+        Assert.All(men, m => Assert.True(c.Layout.Map.Contains(places[m.Id]), $"man {m.Id} off screen"));
+        Assert.True(FrameBuilder.Size(c.Camera) >= 8, "figures keep a readable size however far out");
+        var moved = men.Select(m =>
+        {
+            var (at, home) = (places[m.Id], c.Camera.ToScreen(F(m.X), F(m.Y)));
+            return MathF.Sqrt(((at.X - home.X) * (at.X - home.X)) + ((at.Y - home.Y) * (at.Y - home.Y)));
+        }).ToArray();
+        Assert.True(moved.Max() <= (6 * c.Camera.Scale) + 0.01f, $"a figure {moved.Max() / c.Camera.Scale:0.0} m from its man");
         for (var i = 0; i < men.Length; i++)
         {
             for (var j = i + 1; j < men.Length; j++)
             {
-                var gap = MathF.Max(MathF.Abs(men[i].X - men[j].X), MathF.Abs(men[i].Y - men[j].Y));
-                Assert.True(gap >= size, $"men {i} and {j} are {gap} px apart");
+                var (a, b) = (places[men[i].Id], places[men[j].Id]);
+                var gap = MathF.Sqrt(((a.X - b.X) * (a.X - b.X)) + ((a.Y - b.Y) * (a.Y - b.Y)));
+                Assert.True(gap >= 6, $"men {i} and {j} are {gap} px apart");
             }
         }
     }
@@ -52,11 +55,13 @@ public class ViewFollowUpTests
     [Theory]
     [InlineData("fix-assault")]
     [InlineData("view-sandbox")]
-    public void In_the_opening_view_no_two_mens_symbols_touch_in_any_posture(string scenario)
+    public void Zoomed_in_no_two_mens_symbols_touch_and_every_man_stands_on_his_place(string scenario)
     {
         var c = Start(scenario);
-        c.FrameOwnForces();
-        var men = c.Battle.View.Squads.SelectMany(q => q.Soldiers).ToArray();
+        var men = c.Battle.View.Squads[0].Soldiers;
+        c.Camera.Set(men.Average(m => F(m.X)), men.Average(m => F(m.Y)), 14);
+        var places = Places.Of(c.Battle.View.Squads, c.Camera);
+        Assert.All(men, m => Assert.Equal(c.Camera.ToScreen(F(m.X), F(m.Y)), places[m.Id]));
         foreach (var posture in Enum.GetValues<global::PointBlank.Sim.Sight.Posture>())
         {
             // The body in the side's colour; the thin weapon line may cross a neighbour's.

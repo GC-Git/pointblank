@@ -15,7 +15,7 @@ public sealed class PlayerBattle
 {
     public const string PlayerSide = "us";
 
-    private PlayerBattle(string scenarioId, ulong seed, World world)
+    internal PlayerBattle(string scenarioId, ulong seed, World world)
     {
         ScenarioId = scenarioId;
         Seed = seed;

@@ -40,10 +40,6 @@ public class GraphicsTests(ITestOutputHelper output)
         Assert.True(prone.W > prone.H * 1.5f, "prone: long along the way he faces");
         Assert.True(Body(Draw(Posture.Prone, new Pt(0, 1))).H > Body(Draw(Posture.Prone, new Pt(0, 1))).W * 1.5f, "and it turns with him");
         Assert.True(standing.W < standing.H * 1.2f, "standing: compact, shoulders across");
-        Assert.Contains(Draw(Posture.Standing, null), p => p is CirclePrim { Fill: true } k && k.Colour == Palette.Own);
-        Assert.DoesNotContain(Draw(Posture.Standing, null), p => p is PolyPrim);
-        Assert.Equal(3, Assert.Single(Draw(Posture.Kneeling, null).OfType<PolyPrim>()).Points.Count);
-        Assert.Equal(4, Assert.Single(Draw(Posture.Prone, null).OfType<PolyPrim>()).Points.Count);
         Assert.Equal(3, bodies.Distinct().Count());
 
         foreach (var posture in Enum.GetValues<Posture>())
@@ -55,8 +51,132 @@ public class GraphicsTests(ITestOutputHelper output)
                 Assert.True(((dx * way.X) + (dy * way.Y)) / MathF.Sqrt((dx * dx) + (dy * dy)) > 0.9f, $"{posture} toward {way}");
             }
 
-            Assert.DoesNotContain(Draw(posture, null), p => p.Colour == Palette.Weapon);
+            // No known direction: no weapon, and a shape that is the same turned any quarter, so it points nowhere.
+            var unknown = Draw(posture, null);
+            Assert.DoesNotContain(unknown, p => p.Colour == Palette.Weapon);
+            var points = unknown.SelectMany(p => p switch
+            {
+                CirclePrim k => [k.Centre],
+                LinePrim l => new[] { l.A, l.B },
+                PolyPrim g => g.Points,
+                _ => throw new InvalidOperationException(p.ToString()),
+            }).ToArray();
+            Assert.All(points, p => Assert.Contains(points, q =>
+                MathF.Abs(q.X - (at.X - (p.Y - at.Y))) < 0.01f && MathF.Abs(q.Y - (at.Y + (p.X - at.X))) < 0.01f));
         }
+
+        Assert.Equal(3, Enum.GetValues<Posture>().Select(p => string.Join(";", Draw(p, null).Select(s => s.GetType().Name))).Distinct().Count());
+    }
+
+    [Fact]
+    public void An_enemy_seen_to_fall_is_not_said_to_be_dead()
+    {
+        var body = Figures.Fallen(new Pt(100, 100), 10, Palette.EnemyDown, null);
+        Assert.All(body, p => Assert.Equal(Palette.EnemyDown, p.Colour));
+        var c = Start();
+        for (var i = 0; i < 1500 && c.Effects.Fallen.Count == 0; i++)
+        {
+            c.Step();
+        }
+
+        var fallen = c.Effects.Fallen.Values.First();
+        var at = c.Camera.ToScreen(F(fallen.X), F(fallen.Y));
+        var drawn = c.Frame();
+        Assert.All(
+            Figures.Fallen(at, FrameBuilder.Size(c.Camera), Palette.EnemyDown, null), p => Assert.Contains(p, drawn));
+        c.ToggleLegend();
+        var texts = c.Frame().OfType<TextPrim>().Select(t => t.Text).ToArray();
+        Assert.Contains("Enemy fallen (hurt or dead)", texts);
+    }
+
+    /// <summary>
+    /// Tracers are short streaks that move. One whose stop was not seen starts out exactly as one that flies far, so
+    /// nothing marks an own round that hit a man the side does not know.
+    /// </summary>
+    [Theory]
+    [InlineData(2.4f)]
+    [InlineData(14f)]
+    public void Tracers_are_short_moving_streaks_and_an_unseen_stop_does_not_stand_out(float scale)
+    {
+        var c = Start();
+        int unseen = 0, far = 0, moved = 0;
+        for (var i = 0; i < 1200; i++)
+        {
+            c.Step();
+            // Look where a round with no seen stop was fired, if there is one this tick.
+            var watched = c.Battle.View.SeenShots.Where(s => s.Own).OrderBy(s => s.HasEnd).Select(s => ((float X, float Y)?)(F(s.X), F(s.Y))).FirstOrDefault()
+                ?? (F(c.Battle.View.Squads[0].Soldiers[0].X), F(c.Battle.View.Squads[0].Soldiers[0].Y));
+            c.Camera.Set(watched.X, watched.Y, scale);
+            var streaks = c.Frame().OfType<LinePrim>().Where(l => l.Colour == Palette.OwnTracer || l.Colour == Palette.EnemyTracer).ToArray();
+            Assert.All(streaks, l => Assert.True(Length(l.A, l.B) <= FrameBuilder.TracerLength + 0.1f, $"{Length(l.A, l.B)} px streak"));
+            var places = Places.Of(c.Battle.View.Squads, c.Camera);
+            foreach (var shot in c.Battle.View.SeenShots.Where(s => s.Own))
+            {
+                var r = FrameBuilder.Size(c.Camera);
+                var from = places.TryGetValue(shot.FirerId, out var p) ? p : c.Camera.ToScreen(F(shot.X), F(shot.Y));
+                var muzzle = new Pt(from.X + (F(shot.DirX) * 1.6f * r), from.Y + (F(shot.DirY) * 1.6f * r));
+                var end = c.Camera.ToScreen(F(shot.EndX), F(shot.EndY));
+                var isFar = shot.HasEnd && Length(muzzle, end) > FrameBuilder.TracerReach + (2 * r);
+                if (shot.HasEnd && !isFar)
+                {
+                    continue;
+                }
+
+                var head = FrameBuilder.TracerReach * (c.Battle.View.Tick - shot.Tick + 1) / (Effects.TracerTicks(c.Clock.Speed) + 1);
+                var tip = new Pt(muzzle.X + (F(shot.DirX) * head), muzzle.Y + (F(shot.DirY) * head));
+                var inView = c.Layout.Map.Contains(muzzle) && c.Layout.Map.Contains(tip);
+                // A later round of the same man on the same tick replaces this one.
+                if (!inView || c.Battle.View.SeenShots.Count(s => s.FirerId == shot.FirerId) > 1)
+                {
+                    continue;
+                }
+
+                Assert.Contains(streaks, l => Length(l.B, tip) < 0.5f);
+                unseen += shot.HasEnd ? 0 : 1;
+                far += shot.HasEnd ? 1 : 0;
+            }
+
+            var before = streaks.Where(l => l.Colour == Palette.OwnTracer).Select(l => l.B).ToArray();
+            if (before.Length > 0 && c.Battle.View.SeenShots.Count == 0)
+            {
+                moved++;
+            }
+        }
+
+        Assert.True(unseen > 0 && (scale > 3 || far > 0) && moved > 0, $"{unseen} unseen, {far} far, {moved} later frames");
+    }
+
+    private static float Length(Pt a, Pt b) => MathF.Sqrt(((a.X - b.X) * (a.X - b.X)) + ((a.Y - b.Y) * (a.Y - b.Y)));
+
+    private static float F(Fixed v) => v.Raw / 4294967296f;
+
+    [Fact]
+    public void Off_screen_contacts_shells_missions_and_squads_under_fire_are_pointed_to_from_the_edge()
+    {
+        var c = Start();
+        for (var i = 0; i < 150; i++)
+        {
+            c.Step();
+        }
+
+        Assert.NotEmpty(c.Battle.View.KnownEnemies);
+        c.FrameOwnForces();
+        Assert.DoesNotContain(c.Frame().OfType<TextPrim>(), t => t.Text.EndsWith("(off screen)", StringComparison.Ordinal));
+        c.Camera.Set(390, 5, 20); // away from everything
+        var texts = c.Frame().OfType<TextPrim>().Select(t => t.Text).ToArray();
+        Assert.Contains("enemy (off screen)", texts);
+        Assert.Contains(texts, t => t.Contains("under fire (off screen)", StringComparison.Ordinal));
+
+        var shells = Start("bombard-creep");
+        for (var i = 0; i < 900 && !shells.Battle.View.SeenBursts.Any(); i++)
+        {
+            shells.Step();
+        }
+
+        shells.Camera.Set(390, 5, 20);
+        texts = shells.Frame().OfType<TextPrim>().Select(t => t.Text).ToArray();
+        Assert.Contains("shells (off screen)", texts);
+        Assert.Contains("fire mission (off screen)", texts);
     }
 
     [Fact]
@@ -158,59 +278,74 @@ public class GraphicsTests(ITestOutputHelper output)
     [Theory]
     [InlineData("fix-assault")]
     [InlineData("bombard-creep")]
-    public void Every_own_squad_is_on_the_opening_view_or_pointed_to_from_its_edge(string scenario)
+    public void Every_own_man_is_on_the_opening_view(string scenario)
     {
         var c = Start(scenario);
         c.FrameOwnForces();
         var frame = c.Frame();
-        Assert.All(c.Battle.View.Squads, q =>
-        {
-            var seen = q.Soldiers.Any(s => c.Layout.Map.Contains(c.Camera.ToScreen(s.X.Raw / 4294967296f, s.Y.Raw / 4294967296f)));
-            Assert.True(seen || frame.OfType<TextPrim>().Any(t => t.Text.StartsWith($"#{q.Id} ", StringComparison.Ordinal)
-                && t.Text.EndsWith("(off screen)", StringComparison.Ordinal)), $"squad {q.Id}");
-        });
+        Assert.All(c.Battle.View.Squads.SelectMany(q => q.Soldiers), s =>
+            Assert.True(c.Layout.Map.Contains(c.Camera.ToScreen(F(s.X), F(s.Y))), $"man {s.Id} off the opening view"));
+        Assert.DoesNotContain(frame.OfType<TextPrim>(), t => t.Text.EndsWith("(off screen)", StringComparison.Ordinal));
     }
 
-    /// <summary>The cost of the events and the frame with forty squads. The bound is loose: it catches a runaway only.</summary>
+    /// <summary>The cost of taking in the events and drawing the frame with forty squads firing. The bound is loose.</summary>
     [Fact]
     [Trait("Speed", "Slow")]
-    public void Forty_squads_are_taken_in_and_drawn_in_good_time()
+    public void Forty_squads_in_a_fire_fight_are_taken_in_and_drawn_in_good_time()
     {
         var map = new PointBlank.Sim.Map.GameMap("open", 300, 120);
         var data = Movement.PathFinderTests.Data;
         var org = new OrgSystem(PointBlank.Sim.Org.OrgTables.FromData(data));
-        var move = new PointBlank.Sim.Movement.MovementSystem(map, org, Movement.PathFinderTests.Rules);
-        var command = new PointBlank.Sim.Orders.CommandSystem(org, move, PointBlank.Sim.Orders.CommandRules.FromData(data));
+        var suppression = new global::PointBlank.Sim.Suppression.SuppressionSystem(
+            org, global::PointBlank.Sim.Suppression.SuppressionRules.FromData(data));
+        var move = new PointBlank.Sim.Movement.MovementSystem(map, org, Movement.PathFinderTests.Rules, suppression);
+        var sight = SightRules.FromData(data);
         var spot = new PointBlank.Sim.Spotting.SpottingSystem(
-            map, org, move, new LineOfSight(map, SightRules.FromData(data)), PointBlank.Sim.Spotting.SpottingRules.FromData(data));
-        var world = new World(1, new PointBlank.Sim.Map.MapSystem(map), org, command, move, spot);
+            map, org, move, new LineOfSight(map, sight), PointBlank.Sim.Spotting.SpottingRules.FromData(data), suppression);
+        var fire = new global::PointBlank.Sim.Fire.FireSystem(
+            map, org, sight, global::PointBlank.Sim.Fire.FireRules.FromData(data), spot, suppression);
+        var command = new PointBlank.Sim.Orders.CommandSystem(
+            org, move, PointBlank.Sim.Orders.CommandRules.FromData(data), fire, suppression);
+        var world = new World(1, new PointBlank.Sim.Map.MapSystem(map), org, command, move, spot, fire, suppression);
         for (var i = 0; i < 20; i++)
         {
-            org.SpawnSquad("us_rifle_squad", Fixed.FromInt(60), Fixed.FromInt(10 + (i * 11)));
-            org.SpawnSquad("de_gruppe", Fixed.FromInt(240), Fixed.FromInt(10 + (i * 11)));
+            org.SpawnSquad("us_rifle_squad", Fixed.FromInt(110), Fixed.FromInt(10 + (i * 11)));
+            org.SpawnSquad("de_gruppe", Fixed.FromInt(160), Fixed.FromInt(10 + (i * 11)));
         }
 
-        world.Run(100);
-        var view = world.ViewFor("us");
+        var c = new GameController(new PlayerBattle("perf", 1, world));
+        var watch = new Stopwatch();
+        var (shots, streaks, prims) = (0, 0, 0);
+        const int ticks = 300;
+        foreach (var q in c.Battle.View.Squads)
+        {
+            var man = q.Soldiers[0];
+            c.Battle.View.Issue(q.Id, new global::PointBlank.Sim.Orders.Order(
+                global::PointBlank.Sim.Orders.OrderKind.Fire, Fixed.FromInt(160), man.Y));
+        }
+
+        for (var i = 0; i < ticks; i++)
+        {
+            c.Step();
+            shots += c.Battle.View.SeenShots.Count;
+            watch.Start();
+            var frame = c.Frame();
+            watch.Stop();
+            streaks += frame.Count(p => p.Colour == Palette.OwnTracer || p.Colour == Palette.EnemyTracer);
+            prims = Math.Max(prims, frame.Count);
+        }
+
+        var draw = watch.Elapsed.TotalMilliseconds / ticks;
+        watch.Restart();
         var effects = new Effects();
-        var watch = Stopwatch.StartNew();
         for (var i = 0; i < 100; i++)
         {
-            effects.Remember(view);
+            effects.Remember(c.Battle.View);
         }
 
         var remember = watch.Elapsed.TotalMilliseconds / 100;
-        watch.Restart();
-        var camera = new Camera(new Area(0, 30, 950, 648));
-        camera.Set(150, 120, 7);
-        var prims = 0;
-        for (var i = 0; i < 100; i++)
-        {
-            prims = view.Squads.SelectMany(q => q.Soldiers).Sum(s => FrameBuilder.Man(s, camera, new Pt(1, 0)).Count);
-        }
-
-        var draw = watch.Elapsed.TotalMilliseconds / 100;
-        output.WriteLine($"40 squads: remember {remember:0.00} ms a tick; figures {draw:0.00} ms a frame, {prims} shapes");
-        Assert.True(remember < 20 && draw < 20, $"remember {remember} ms, figures {draw} ms");
+        output.WriteLine($"40 squads: {shots} rounds seen, {streaks} streaks; remember {remember:0.00} ms a tick; frame {draw:0.00} ms, {prims} shapes at most");
+        Assert.True(shots > 500 && streaks > 500, $"{shots} rounds, {streaks} streaks: no fire fight");
+        Assert.True(remember < 40 && draw < 40, $"remember {remember} ms, frame {draw} ms");
     }
 }

@@ -146,6 +146,36 @@ public class SideViewEventTests
         Assert.Empty(world.ViewFor("de").SeenBursts); // no German is there to see or feel it
     }
 
+    [Fact]
+    public void Where_an_enemy_round_stopped_is_told_only_when_the_side_could_see_it()
+    {
+        var battle = PlayerBattle.Create("fix-assault", 1, playOwnScript: true);
+        var org = battle.World.GetSystem<OrgSystem>();
+        var fire = battle.World.GetSystem<FireSystem>();
+        var own = org.Squads.Where(q => q.Side == "us").SelectMany(q => q.Soldiers).Select(s => s.Id).ToHashSet();
+        for (var t = 0; t < 1800 && !battle.View.SeenShots.Any(s => !s.Own && s.HasEnd); t++)
+        {
+            battle.Step();
+        }
+
+        Assert.Contains(battle.View.SeenShots, s => !s.Own && s.HasEnd);
+
+        // The same tick with nobody of the side left to look: it still tracks the shooters, but sees no stop.
+        foreach (var q in org.Squads.Where(q => q.Side == "us"))
+        {
+            foreach (var s in q.Soldiers.ToArray())
+            {
+                q.SetHealth(s.Id, HealthState.Incapacitated);
+            }
+        }
+
+        var after = battle.View.SeenShots.Where(s => !s.Own).ToArray();
+        Assert.NotEmpty(after);
+        var onUs = fire.Shots.Count(s => !own.Contains(s.FirerId) && own.Contains(s.HitSoldierId));
+        Assert.True(after.Count(s => s.HasEnd) <= onUs, $"{after.Count(s => s.HasEnd)} stops told, {onUs} rounds hit the side");
+        Assert.All(after.Where(s => !s.HasEnd), s => Assert.Equal((Fixed.Zero, Fixed.Zero), (s.EndX, s.EndY)));
+    }
+
     private static (World, OrgSystem, ArtillerySystem) Burst()
     {
         var data = Movement.PathFinderTests.Data;
