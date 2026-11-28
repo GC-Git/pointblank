@@ -72,9 +72,12 @@ public sealed class ArtillerySystem : ISimSystem
     /// <summary>Bursts within their battery's impact memory, oldest first. Seen by everyone.</summary>
     internal IReadOnlyList<ShellImpactView> Impacts => _impacts.Select(i => new ShellImpactView(i.Tick, i.X, i.Y)).ToArray();
 
-    /// <summary>The bursts of the last tick, with the radius over which men notice them (the suppression radius).</summary>
-    internal IReadOnlyList<(Fixed X, Fixed Y, long Tick, Fixed Radius)> LastImpacts =>
-        _last.Select(i => (i.X, i.Y, i.Tick, i.Radius)).ToArray();
+    /// <summary>
+    /// The bursts of the last tick, with the radius over which men notice them (the suppression radius) and the height of
+    /// their smoke and earth.
+    /// </summary>
+    internal IReadOnlyList<(Fixed X, Fixed Y, long Tick, Fixed Radius, Fixed Plume)> LastImpacts =>
+        _last.Select(i => (i.X, i.Y, i.Tick, i.Radius, i.Plume)).ToArray();
 
     /// <summary>The side's missions, oldest first.</summary>
     internal IReadOnlyList<FireMissionView> MissionsOf(string side, long tick) =>
@@ -215,7 +218,7 @@ public sealed class ArtillerySystem : ISimSystem
         var eps = Fixed.FromRatio(1, 1000);
         x = x < Fixed.Zero ? Fixed.Zero : x >= w ? w - eps : x;
         y = y < Fixed.Zero ? Fixed.Zero : y >= h ? h - eps : y;
-        var impact = new Impact(world.Tick, x, y, b.SuppressionRadius, b.ImpactMemoryTicks);
+        var impact = new Impact(world.Tick, x, y, b.SuppressionRadius, b.ImpactMemoryTicks, b.PlumeHeight);
         _impacts.Add(impact);
         _last.Add(impact);
 
@@ -323,7 +326,7 @@ public sealed class ArtillerySystem : ISimSystem
 
     private Building? BuildingAt(Fixed x, Fixed y) => _map.BuildingAt(TileX(x), TileY(y));
 
-    private sealed record Impact(long Tick, Fixed X, Fixed Y, Fixed Radius, int Memory);
+    private sealed record Impact(long Tick, Fixed X, Fixed Y, Fixed Radius, int Memory, Fixed Plume);
 
     private sealed class Mission
     {

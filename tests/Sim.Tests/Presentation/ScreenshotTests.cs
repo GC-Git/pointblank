@@ -133,11 +133,12 @@ public class ScreenshotTests
     /// </summary>
     private static (int Ringed, int Open) OnRing(Png frame, Pt centre, float radius, (Pt At, Posture Posture)[] men, GameController c)
     {
-        var r = Math.Clamp(0.7f * c.Camera.Scale, 3, 12);
+        var r = Math.Clamp(0.8f * c.Camera.Scale, 4, 14);
         bool Covers((Pt At, Posture Posture) man, Pt p)
         {
-            // A prone man is a long low bar; the others fit in a square.
-            var (w, h) = man.Posture == Posture.Prone ? (1.6f * r, 0.6f * r) : (r, r);
+            // Every figure, weapon included, fits within this of its man.
+            var reach = 1.9f * r;
+            var (w, h) = (reach, reach);
             return MathF.Abs(man.At.X - p.X) <= w + 1 && MathF.Abs(man.At.Y - p.Y) <= h + 1;
         }
 
@@ -247,7 +248,7 @@ public class ScreenshotTests
         c.Camera.Set(x, y, zoom);
         var frame = Png.Load(Path.Combine(out_, "fix-assault-seed1-tick0.png"));
 
-        var radius = (Math.Clamp(0.7f * zoom, 3, 12) * 1.6f) + 2;
+        var radius = (Math.Clamp(0.8f * zoom, 4, 14) * 1.6f) + 2;
         var men = Men(c, "us").Select(m => (At: ScreenOf(c, m), m.Posture)).ToArray();
         var picked = squad.Select(m => ScreenOf(c, m)).Where(c.Layout.Map.Contains).ToArray();
         Assert.True(picked.Length >= squad.Count / 2, "the selected squad is in view");
@@ -362,9 +363,11 @@ public class ScreenshotTests
         Assert.All(wanted, t => Assert.True(Shows(first, t), t.Text));
 
         // Men are drawn at the opening scale, each at his own place.
-        var men = late.OfType<RectPrim>().Where(r => r.Colour == Palette.Own && map.Contains(new Pt(r.X, r.Y))).ToArray();
-        Assert.True(men.Length >= 8, $"{men.Length} kneeling or prone men on screen");
-        Assert.All(men, r => Assert.True(fired.Near(new Pt(r.X + (r.W / 2), r.Y + (r.H / 2)), 5, p => p == Palette.Own), $"man at {r.X},{r.Y}"));
+        var men = c.Battle.View.Squads.SelectMany(q => q.Soldiers)
+            .Where(m => m.Health is HealthState.Ok or HealthState.Wounded)
+            .Select(m => c.Camera.ToScreen(F(m.X), F(m.Y))).Where(map.Contains).ToArray();
+        Assert.True(men.Length >= 8, $"{men.Length} men on screen");
+        Assert.All(men, at => Assert.True(fired.Near(at, 5, p => p == Palette.Own), $"man at {at.X},{at.Y}"));
 
         var arrows = late.OfType<LinePrim>().Where(l => l.Colour == Palette.Incoming && map.Contains(l.A) && map.Contains(l.B)).ToArray();
         Assert.NotEmpty(arrows);

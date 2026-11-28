@@ -40,12 +40,46 @@ public static class TerrainLayer
             }
         }
 
+        // Tree crowns mark woods, off the middle of each tile and the same every time.
+        if (px >= 8)
+        {
+            for (var y = y0; y <= y1; y++)
+            {
+                for (var x = x0; x <= x1; x++)
+                {
+                    if (map.Tile(x, y).Terrain != TerrainType.LightWoods)
+                    {
+                        continue;
+                    }
+
+                    var shift = ((x * 7) + (y * 13)) % 5 / 25f;
+                    list.Add(new CirclePrim(camera.ToScreen((x + 0.22f + shift) * tile, (y + 0.22f) * tile), 0.2f * px, Palette.TreeCrown));
+                    list.Add(new CirclePrim(camera.ToScreen((x + 0.76f) * tile, (y + 0.78f - shift) * tile), 0.16f * px, Palette.TreeCrown));
+                }
+            }
+        }
+
         foreach (var building in map.Buildings)
         {
             foreach (var t in building.Tiles)
             {
                 var at = camera.ToScreen(t.X * tile, t.Y * tile);
                 list.Add(new RectPrim(at.X, at.Y, px, px, Palette.Building));
+            }
+
+            // The outer walls.
+            var inside = building.Tiles.ToHashSet();
+            foreach (var t in building.Tiles)
+            {
+                foreach (var (nx, ny, ax, ay, bx, by) in new[] { (0, -1, 0, 0, 1, 0), (0, 1, 0, 1, 1, 1), (-1, 0, 0, 0, 0, 1), (1, 0, 1, 0, 1, 1) })
+                {
+                    if (!inside.Contains(new TilePos(t.X + nx, t.Y + ny)))
+                    {
+                        list.Add(new LinePrim(
+                            camera.ToScreen((t.X + ax) * tile, (t.Y + ay) * tile),
+                            camera.ToScreen((t.X + bx) * tile, (t.Y + by) * tile), Palette.Wall, 2));
+                    }
+                }
             }
 
             foreach (var o in building.Openings.Where(o => o.Floor == 0))
@@ -75,12 +109,14 @@ public static class TerrainLayer
                 {
                     var at = camera.ToScreen((x + 1) * tile, y * tile);
                     list.Add(new RectPrim(at.X - (hedge / 2), at.Y, hedge, px, Palette.Hedge));
+                    list.Add(new CirclePrim(new Pt(at.X, at.Y + (px * 0.25f)), hedge * 0.45f, Palette.HedgeLeaf));
                 }
 
                 if (t.HedgeSouth)
                 {
                     var at = camera.ToScreen(x * tile, (y + 1) * tile);
                     list.Add(new RectPrim(at.X, at.Y - (hedge / 2), px, hedge, Palette.Hedge));
+                    list.Add(new CirclePrim(new Pt(at.X + (px * 0.25f), at.Y), hedge * 0.45f, Palette.HedgeLeaf));
                 }
             }
         }

@@ -21,7 +21,7 @@ public readonly record struct Area(float X, float Y, float W, float H)
     public bool Contains(Pt p) => p.X >= X && p.Y >= Y && p.X < Right && p.Y < Bottom;
 }
 
-/// <summary>One thing to paint. The painter knows only these four.</summary>
+/// <summary>One thing to paint. The painter knows only these five.</summary>
 public abstract record Prim(Rgb Colour)
 {
     public virtual bool Filled => false;
@@ -53,6 +53,20 @@ public sealed record LinePrim(Pt A, Pt B, Rgb Colour, float Width = 1) : Prim(Co
         && p.Y >= MathF.Min(A.Y, B.Y) - slack && p.Y <= MathF.Max(A.Y, B.Y) + slack;
 }
 
+/// <summary>A filled convex polygon.</summary>
+public sealed record PolyPrim(IReadOnlyList<Pt> Points, Rgb Colour) : Prim(Colour)
+{
+    public override bool Filled => true;
+
+    public bool Equals(PolyPrim? other) => other != null && Colour == other.Colour && Points.SequenceEqual(other.Points);
+
+    public override int GetHashCode() => HashCode.Combine(Colour, Points.Count, Points.Count > 0 ? Points[0] : default);
+
+    public override bool Touches(Pt p, float slack) =>
+        p.X >= Points.Min(q => q.X) - slack && p.X <= Points.Max(q => q.X) + slack
+        && p.Y >= Points.Min(q => q.Y) - slack && p.Y <= Points.Max(q => q.Y) + slack;
+}
+
 /// <summary>Text with its baseline starting at <paramref name="At"/>, in the engine's default font.</summary>
 public sealed record TextPrim(Pt At, string Text, Rgb Colour, int Size = 13) : Prim(Colour)
 {
@@ -76,14 +90,29 @@ public static class Palette
     public static readonly Rgb DimText = new(160, 164, 168);
     public static readonly Rgb Shadow = new(10, 10, 10);
 
-    public static readonly Rgb Hedge = new(36, 74, 28);
-    public static readonly Rgb Building = new(134, 112, 98);
+    public static readonly Rgb Hedge = new(30, 62, 22);
+    public static readonly Rgb HedgeLeaf = new(58, 98, 36);
+    public static readonly Rgb TreeCrown = new(36, 70, 38);
+    public static readonly Rgb Wall = new(60, 48, 42);
+    public static readonly Rgb Building = new(158, 116, 100);
     public static readonly Rgb Door = new(70, 46, 30);
     public static readonly Rgb Window = new(172, 208, 224);
 
-    public static readonly Rgb Own = new(40, 92, 210);
+    public static readonly Rgb Own = new(36, 86, 220);
+    public static readonly Rgb Helmet = new(168, 206, 255);
+    public static readonly Rgb Weapon = new(16, 20, 30);
+    public static readonly Rgb RedCross = new(200, 24, 40);
+    public static readonly Rgb EnemyDown = new(112, 52, 44);
+
+    // Fire and shells (item 2.13).
+    public static readonly Rgb OwnTracer = new(255, 238, 110);
+    public static readonly Rgb EnemyTracer = new(255, 96, 58);
+    public static readonly Rgb Flash = new(255, 255, 214);
+    public static readonly Rgb Fireball = new(255, 150, 30);
+    public static readonly Rgb Smoke = new(176, 170, 160);
+    public static readonly Rgb Crater = new(82, 68, 46);
     public static readonly Rgb Selected = new(255, 224, 64);
-    public static readonly Rgb Down = new(72, 72, 72);
+    public static readonly Rgb Down = new(94, 98, 108);
     public static readonly Rgb Wounded = new(255, 255, 255);
 
     public static readonly Rgb EnemyTracked = new(220, 28, 28);
@@ -120,11 +149,11 @@ public static class Palette
     {
         var c = type switch
         {
-            TerrainType.Road => new Rgb(168, 152, 120),
-            TerrainType.LightWoods => new Rgb(66, 104, 58),
+            TerrainType.Road => new Rgb(188, 168, 128),
+            TerrainType.LightWoods => new Rgb(74, 108, 62),
             _ => new Rgb(118, 146, 82),
         };
-        var lift = Math.Clamp(elevationDm, -50, 50);
+        var lift = Math.Clamp(elevationDm, -50, 50) / 4;
         byte Shade(byte v) => (byte)Math.Clamp(v + lift, 0, 255);
         return new Rgb(Shade(c.R), Shade(c.G), Shade(c.B));
     }

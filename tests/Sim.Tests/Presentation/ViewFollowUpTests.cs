@@ -37,7 +37,7 @@ public class ViewFollowUpTests
         var first = c.Battle.View.Squads[0].Soldiers.Select(s => c.Camera.ToScreen(F(s.X), F(s.Y)));
         Assert.All(first, p => Assert.True(c.Layout.Map.Contains(p)));
         Assert.True(shown >= men.Length / 2, $"{shown} of {men.Length} on screen");
-        var size = Math.Clamp(0.7f * c.Camera.Scale, 3, 12);
+        var size = Math.Clamp(0.8f * c.Camera.Scale, 4, 14);
         Assert.True(size >= 4, "a circle and a square this small look alike");
         for (var i = 0; i < men.Length; i++)
         {
@@ -59,10 +59,9 @@ public class ViewFollowUpTests
         var men = c.Battle.View.Squads.SelectMany(q => q.Soldiers).ToArray();
         foreach (var posture in Enum.GetValues<global::PointBlank.Sim.Sight.Posture>())
         {
-            var boxes = men.Select(m => FrameBuilder.Man(m with { Posture = posture }, c.Camera)[0])
-                .Select(p => p is RectPrim r ? new Area(r.X, r.Y, r.W, r.H)
-                    : p is CirclePrim k ? new Area(k.Centre.X - k.Radius, k.Centre.Y - k.Radius, 2 * k.Radius, 2 * k.Radius)
-                    : throw new InvalidOperationException()).ToArray();
+            // The body in the side's colour; the thin weapon line may cross a neighbour's.
+            var boxes = men.Select(m => GraphicsTests.Body(
+                FrameBuilder.Man(m with { Posture = posture, Health = global::PointBlank.Sim.Org.HealthState.Ok }, c.Camera, new Pt(1, 0)))).ToArray();
             for (var i = 0; i < boxes.Length; i++)
             {
                 for (var j = i + 1; j < boxes.Length; j++)

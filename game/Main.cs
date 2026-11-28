@@ -175,6 +175,10 @@ public partial class Main : Node2D
         {
             game.Toggle(o);
         }
+        else if (key == Key.L)
+        {
+            game.ToggleLegend();
+        }
         else if (key == Key.Escape)
         {
             game.Select([]);

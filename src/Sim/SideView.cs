@@ -67,7 +67,7 @@ public readonly record struct SquadView(
 /// live sim object. A unit of the other side is answered exactly like a unit that does not exist.
 /// Every call reads the world afresh.
 /// </summary>
-public sealed class SideView
+public sealed partial class SideView
 {
     private readonly World _world;
     private readonly OrgSystem _org;
@@ -229,8 +229,8 @@ public sealed class SideView
     /// <summary>Fire missions the side may still call (0 without artillery or a battery).</summary>
     public int MissionsLeft => _artillery?.MissionsLeft(Side) ?? 0;
 
-    /// <summary>Recent shell bursts of either side, oldest first: loud, so everyone knows where they fell.</summary>
-    public IReadOnlyList<ShellImpactView> ShellImpacts => _artillery?.Impacts ?? [];
+    /// <summary>Recent shell bursts of either side, oldest first. The truth: UI code uses <see cref="SeenBursts"/>.</summary>
+    internal IReadOnlyList<ShellImpactView> ShellImpacts => _artillery?.Impacts ?? [];
 
     /// <summary>The order state of one of the side's own units, or null (also for an enemy unit).</summary>
     public OrderView? StatusOf(int unitId) => _command != null && Own(unitId) != null ? _command.StatusOf(unitId) : null;

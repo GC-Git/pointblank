@@ -57,12 +57,12 @@ public sealed class GameController
     private const float PickPixels = 9;
 
     /// <summary>The least pixels per metre of the opening view: below it men and postures cannot be told apart.</summary>
-    public const float ReadableScale = 6;
+    public const float ReadableScale = 10;
 
     /// <summary>The sight overlay's line-of-sight checks per frame.</summary>
     public const int SightChecksPerFrame = 150;
 
-    private const float OpeningScale = 10;
+    private const float OpeningScale = 14;
     private const float OpeningMargin = 15;
 
     /// <summary>How long an incoming-fire mark stays after the last round of its bearing (display only).</summary>
@@ -78,6 +78,7 @@ public sealed class GameController
     private readonly Dictionary<int, (long Tick, RoeMode Roe)> _queuedRoe = [];
     private readonly MapView _map;
     private readonly SightOverlay _sight = new();
+    private readonly Effects _effects = new();
 
     public GameController(PlayerBattle battle, Layout? layout = null)
     {
@@ -97,6 +98,13 @@ public sealed class GameController
     public SimClock Clock { get; } = new();
 
     public OrderMode Mode { get; set; } = OrderMode.Move;
+
+    /// <summary>Whether the key to the symbols is on the screen (item 2.13).</summary>
+    public bool ShowLegend { get; private set; }
+
+    public void ToggleLegend() => ShowLegend = !ShowLegend;
+
+    public Effects Effects => _effects;
 
     /// <summary>The selected own squads, by id.</summary>
     public IReadOnlyList<int> Selected => _selected.ToArray();
@@ -157,6 +165,7 @@ public sealed class GameController
         Battle.Step();
         RememberIncoming();
         RememberRefusals();
+        _effects.Remember(Battle.View);
     }
 
     /// <summary>Notes when each own squad's refused or impossible order was first seen to be so.</summary>
