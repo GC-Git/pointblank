@@ -21,7 +21,8 @@ namespace PointBlank.Sim.Orders;
 /// for the hesitate delay. Otherwise the order executes.</item>
 /// <item>Execution: moves start in <see cref="MovementSystem"/> and stay Executing until it finishes;
 /// Hold stops the squad; Fire starts in <see cref="FireSystem"/> (Rejected with its note if it cannot) and stays
-/// Executing until fire ends, then Done with the end note; any other delivered order stops the squad's fire;
+/// Executing until fire ends, then Done with the end note; Defend halts a move under way man by man
+/// (<see cref="MovementSystem.Halt"/>, item 2.9) and stays Executing until the last man has stopped; any other delivered order stops the squad's fire;
 /// kinds without behaviour (and Fire without a FireSystem) are Done with <see cref="OrderNote.NotImplemented"/>. SetRoe (item 2.3)
 /// sets the squad's <see cref="RoeMode"/> (<see cref="RoeOf"/>, hashed) and touches nothing else; a bad mode is Rejected
 /// (<see cref="OrderNote.InvalidRoe"/>). It travels on a ticket of its own (<see cref="RoeStatusOf"/>, item 2.5a), with
@@ -447,6 +448,15 @@ public sealed class CommandSystem(
                 MoveResult.Unreachable => OrderNote.Unreachable,
                 _ => OrderNote.None,
             };
+            return;
+        }
+
+        if (kind == OrderKind.Defend && move.IsMoving(squad.Id))
+        {
+            // Item 2.9: the squad halts man by man; the order is Done once the last man has stopped.
+            move.Halt(squad.Id, world.Tick);
+            t.Status = OrderStatus.Executing;
+            t.Note = OrderNote.NotImplemented; // as for a Defend delivered to a halted squad
             return;
         }
 

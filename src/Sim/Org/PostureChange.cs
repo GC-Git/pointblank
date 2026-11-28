@@ -146,7 +146,7 @@ internal static class PostureChange
     }
 
     /// <summary>A deterministic draw in [0, <paramref name="range"/>] from a man and a tick (SplitMix64 finaliser).</summary>
-    private static int Draw(int soldierId, long tick, int range)
+    internal static int Draw(int soldierId, long tick, int range)
     {
         if (range <= 0)
         {

@@ -542,7 +542,11 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
         {
             var isHeld = moving && (held & (1 << s.TeamIndex)) != 0;
             Posture want;
-            if (moving && !isHeld && (s.Moving || !underFire))
+            if (q.IsHalting && (s.Moving || !underFire))
+            {
+                continue; // halting for a Defend (item 2.9): MovementSystem puts each man down as he stops
+            }
+            else if (moving && !isHeld && (s.Moving || !underFire))
             {
                 want = moveRules.PostureOf(mode!.Value); // walking (or rushing) on the squad's move
             }
