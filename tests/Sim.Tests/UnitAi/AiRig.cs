@@ -1,3 +1,4 @@
+using PointBlank.Sim.Artillery;
 using PointBlank.Sim.Data;
 using PointBlank.Sim.Fire;
 using PointBlank.Sim.Map;
@@ -20,9 +21,20 @@ internal sealed record AiRig(
 {
     public static readonly DataSet Data = PathFinderTests.Data;
 
+    public ArtillerySystem? Arty { get; init; }
+
     public static Fixed M(int metres) => Fixed.FromInt(metres);
 
-    public static AiRig Create(ulong seed, GameMap map, bool ai = true, bool morale = true, bool noCasualties = false)
+    /// <summary>Takes all suppression off the squad's men (call before a step).</summary>
+    public void Calm(Squad q)
+    {
+        foreach (var s in q.Soldiers)
+        {
+            Suppression.SetLevel(s.Id, Fixed.Zero);
+        }
+    }
+
+    public static AiRig Create(ulong seed, GameMap map, bool ai = true, bool morale = true, bool noCasualties = false, bool artillery = false)
     {
         var org = new OrgSystem(OrgTables.FromData(Data));
         var suppression = new SuppressionSystem(org, SuppressionRules.FromData(Data));
@@ -47,7 +59,17 @@ internal sealed record AiRig(
         }
 
         systems.Add(watch);
-        return new AiRig(new World(seed, [.. systems]), map, org, command, move, spot, fire, suppression, unitAi, watch);
+        var arty = artillery
+            ? new ArtillerySystem(
+                map, org, new LineOfSight(map, sight), ArtilleryRules.FromData(Data), command, suppression,
+                new MoraleSystem(org, MoraleRules.FromData(Data), suppression, command, move, spot))
+            : null;
+        if (arty != null)
+        {
+            systems.Add(arty);
+        }
+
+        return new AiRig(new World(seed, [.. systems]), map, org, command, move, spot, fire, suppression, unitAi, watch) { Arty = arty };
     }
 
     /// <summary>A seeded jitter in whole millimetres, within ±<paramref name="metres"/>.</summary>

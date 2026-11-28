@@ -6,6 +6,7 @@ using PointBlank.Sim.Org;
 using PointBlank.Sim.Replays;
 using PointBlank.Sim.Sight;
 using PointBlank.Sim.Spotting;
+using PointBlank.Sim.Suppression;
 using Xunit.Abstractions;
 
 namespace PointBlank.Sim.Tests.UnitAi;
@@ -56,6 +57,7 @@ public class MaskedFireMetrics(ITestOutputHelper output)
         }
 
         var move = world.GetSystem<MovementSystem>();
+        var suppression = world.GetSystem<SuppressionSystem>();
         for (var t = 0; t < scenario.Ticks; t++)
         {
             world.Step();
@@ -111,6 +113,15 @@ public class MaskedFireMetrics(ITestOutputHelper output)
                     if (move.IsSoldierMoving(s.Id))
                     {
                         a.FirerMoving++;
+                    }
+
+                    // Item 2.4c review: why a masked man of a stationary squad may not step aside.
+                    if (!move.IsMoving(q.Id))
+                    {
+                        a.Still++;
+                        var squad = suppression.IsPinned(q.Id) || q.Morale is MoraleState.Pinned or MoraleState.Broken or MoraleState.Routing;
+                        a.SquadDown += squad ? 1 : 0;
+                        a.ManDown += !squad && suppression.StateOf(s.Id) != SuppressionState.None ? 1 : 0;
                     }
 
                     Blockers(org, q, s, f.X, f.Y, f.Ai ? fire.Rules.NearMissRadius : fire.Rules.MaskClearance, a, move);
@@ -189,7 +200,7 @@ public class MaskedFireMetrics(ITestOutputHelper output)
     private sealed class Tally
     {
         public string Side { get; init; } = "";
-        public long SquadMoving, TaskTicks, Blocked, PlayerOrder, FirerMoving, OwnOnly, OtherSquad, Abreast, Near, Wide, BlockersMoving, ProneBelow, ShotTicks, MenWithTask, MenMostlyBlocked;
+        public long Still, SquadDown, ManDown, SquadMoving, TaskTicks, Blocked, PlayerOrder, FirerMoving, OwnOnly, OtherSquad, Abreast, Near, Wide, BlockersMoving, ProneBelow, ShotTicks, MenWithTask, MenMostlyBlocked;
         public List<int> Runs { get; } = [];
 
         public override string ToString()
@@ -197,7 +208,8 @@ public class MaskedFireMetrics(ITestOutputHelper output)
             string P(long n) => Blocked == 0 ? "-" : $"{100.0 * n / Blocked:F0}%";
             Runs.Sort();
             var q = Runs.Count == 0 ? "-" : $"{Runs.Count} runs, median {Runs[Runs.Count / 2] / 10.0:F1} s, p90 {Runs[Runs.Count * 9 / 10] / 10.0:F1} s, max {Runs[^1] / 10.0:F0} s, over 10 s {Runs.Count(r => r > 100)} ({(Blocked == 0 ? 0 : 100.0 * Runs.Where(r => r > 100).Sum() / Blocked):F0}% of blocked time)";
-            return $"on-task man-ticks {TaskTicks}, blocked {Blocked} ({(TaskTicks == 0 ? 0 : 100.0 * Blocked / TaskTicks):F1}%), man-shot-ticks/seed {ShotTicks / 50.0:F0}; men with >=10 s task {MenWithTask}, blocked over half of it {MenMostlyBlocked}; "
+            string S(long n) => Still == 0 ? "-" : $"{100.0 * n / Still:F0}%";
+            return $"stationary blocked {Still}: squad pinned or broken {S(SquadDown)}, else man suppressed {S(ManDown)}; on-task man-ticks {TaskTicks}, blocked {Blocked} ({(TaskTicks == 0 ? 0 : 100.0 * Blocked / TaskTicks):F1}%), man-shot-ticks/seed {ShotTicks / 50.0:F0}; men with >=10 s task {MenWithTask}, blocked over half of it {MenMostlyBlocked}; "
                 + $"of blocked: squad on a move {P(SquadMoving)}, player order {P(PlayerOrder)}, firer moving {P(FirerMoving)}, own squad only {P(OwnOnly)}, another squad {P(OtherSquad)}, all blockers abreast {P(Abreast)}, all within 10 m {P(Near)}, all over 0.5 m off line {P(Wide)}, all blockers moving {P(BlockersMoving)}, blockers all prone below upright firer {P(ProneBelow)}; {q}";
         }
     }

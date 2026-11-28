@@ -10,6 +10,8 @@ namespace PointBlank.Sim.Tests.UnitAi;
 /// <summary>
 /// Item 2.4c: a man of a stationary squad with a fire task who is masked by friendlies steps to a clear line, on his own
 /// reaction, without advancing, without leaving a move order or a task-less squad, and without shuffling to and fro.
+/// These tests are of the drill in a calm squad, so they hold suppression at zero: in this block the squad's own rounds
+/// pass its men closely enough to pin them, and suppressed men do not shift (<see cref="MaskedGateTests"/>).
 /// </summary>
 public class MaskedSquadTests
 {
@@ -34,6 +36,7 @@ public class MaskedSquadTests
         var early = 0;
         for (var t = 0; t < Run; t++)
         {
+            rig.Calm(q);
             rig.World.Step();
             foreach (var s in q.Soldiers)
             {
@@ -107,16 +110,31 @@ public class MaskedSquadTests
     {
         var rig = Play(1, order);
         Assert.Null(rig.Rig.Fire.FireTaskOf(rig.Squad.Id));
-        Assert.All(rig.Starts.Where(_ => order == null), p => Assert.Empty(p.Value));
+        Assert.All(rig.Starts, p => Assert.Empty(p.Value)); // open ground: Defend has no hedge to send anyone to
     }
 
     [Fact]
     public void A_move_order_still_takes_every_man_after_he_has_shifted()
     {
-        var t = Play(1, OrderKind.Fire);
-        t.Rig.World.Schedule(t.Rig.World.EarliestInputTick, new IssueOrderInput(t.Squad.Side, t.Squad.Id, new Order(OrderKind.Move, AiRig.M(300), AiRig.M(60))));
-        t.Rig.World.Run(1500);
+        var rig = AiRig.Create(1, new GameMap("open", 200, 60), morale: false);
+        var q = rig.Org.SpawnSquad("us_rifle_squad", AiRig.M(250), AiRig.M(60), Posture.Kneeling);
+        rig.Order(q, OrderKind.Fire, AimX, 60);
+        for (var t = 0; t < 600 && !q.Soldiers.Any(s => rig.Move.IsSoldierMoving(s.Id)); t++)
+        {
+            rig.Calm(q);
+            rig.World.Step();
+        }
 
-        Assert.All(t.Squad.Soldiers, s => Assert.True(s.X > AiRig.M(265), $"man {s.Id} at {s.X},{s.Y}"));
+        rig.Order(q, OrderKind.Move, 300, 60); // while a man is still stepping aside
+        var midShift = false;
+        for (var t = 0; t < 1500; t++)
+        {
+            var walking = q.Soldiers.Any(s => rig.Move.IsSoldierMoving(s.Id));
+            rig.World.Step();
+            midShift |= walking && rig.Move.IsMoving(q.Id) && t < 100;
+        }
+
+        Assert.True(midShift, "the order arrived while someone was shifting");
+        Assert.All(q.Soldiers, s => Assert.True(s.X > AiRig.M(265), $"man {s.Id} at {s.X},{s.Y}"));
     }
 }

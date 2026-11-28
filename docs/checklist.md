@@ -210,17 +210,30 @@ Status: draft, awaiting owner sign-off
   friendlies are in the way realistically shifts for a clear line or the reason it stays is
   documented; no scenario reshaping and no retuning.
   Measured over seeds 1-50 (`MaskedFireMetrics`, run with `PB_MASK_REPORT=1`), share of
-  on-task man-time masked by friendlies, before then after: `fix-assault` base of fire 73% to
-  29% (it stood in ranks along its own line of fire under a Fire order, which forms no firing
-  line); `bombard-creep` stationary squads 72/70/43% to 31/34/13%; `fix-assault` assault squad
-  60% to 66% and `bombard-creep` assault squad 67% to 52%. Now: in a stationary squad with a
-  fire task, a masked man steps to a clear line after his own delay (looked at twice a second).
-  Still masked, by design
-  or for want of a decision: squads on a move (98% of the `fix-assault` assault squad's masked
-  time; whether a moving squad should spread out or hold to shoot awaits the owner); men with no
-  clear line within the search distance that costs no cover or ground; badly suppressed men;
-  distant friendly squads that a short step cannot clear (moving a whole squad without an order
-  awaits the owner). The masking test is flat (it ignores height), kept as is.
+  on-task man-time masked by friendlies, before the item then now: `fix-assault` base of fire
+  73% to 54% (it stood in ranks along its own line of fire under a Fire order, which forms no
+  firing line); `bombard-creep` stationary squads 72/70/43% to 46/47/17%. A first version
+  without the review's limits reached 29% and 31/34/13%, by moving men who were under fire,
+  suppressed or pinned. Now: in a stationary squad with a fire task, a masked man steps to a
+  clear line after his own delay, at most twice before the squad next moves, never ending more
+  than a tile nearer the target than where he began, by a way that crosses no comrade's live
+  line of fire and no ground with less cover. Over the four runner scenarios no man shifted
+  more than twice (before: up to 8, in the first version).
+  Men stay masked, by design: when their squad is pinned, broken, routing or cowering, shells
+  burst near, or it was told to Hold (a walk under way stops, each man on his own reaction, and
+  he ends low); when they are suppressed or pinned; for a few seconds after an enemy round
+  passes them; with no clear tile and safe way within the search distance; after two shifts.
+  In the `fix-assault` base of fire, 78% of stationary masked time is in a pinned or broken
+  squad and a further 10% a suppressed man, and 173 of its 178 shift walks were called off.
+  Friendly rounds suppress too: a squad firing through its own ranks can pin itself with no
+  enemy fire (suppression 86-96 after 90 s in the test block), which then keeps its men where
+  they are (whether that is right is an owner decision; not changed here). Open: because of
+  this the drill makes that base of fire fire less than with no shifting (40 against 63
+  man-shot-ticks per seed; masked 54% against 73%), and one view test fails; see
+  [progress](process/progress/item-2.4c.md).
+  Squads on a move (nearly all of the `fix-assault` assault squad's masked time) and squads
+  blocked by another squad are left to item 2.11. The masking test is flat (it ignores
+  height), kept as is.
 
 - [ ] **2.4d Posture follow-ups** (S)
   Do before 2.7 unless the owner defers it. From the 2.4b review (seeds 1-50): the posture
@@ -254,6 +267,20 @@ Status: draft, awaiting owner sign-off
   overlap (the Defend order's 'not available yet' reading was fixed in 2.5a).
   *Done when:* the owner has confirmed the behaviour, tests show it differs from Defend with
   no all-at-once opening, the view offers it, and the display follow-up is fixed.
+
+- [ ] **2.10 Drag-to-place move orders** (S)
+  After the 2.7 play-through (owner decision). Dragging a move order sets the line along which
+  the squad spreads (along hedges and walls, on the protected side) and a general facing
+  direction; men arrive individually. Placement at building windows and floors follows 4.4.
+  Fences do not exist as terrain yet, and the sim has no facing yet.
+  *Done when:* the owner has confirmed the design, tests cover the spread, cover side and
+  facing behaviour, and the view supports dragging.
+
+- [ ] **2.11 Movement when friendlies block fire** (S)
+  Postponed by the owner until after the formal play-through: whether a moving squad blocked by
+  its own men spreads out or halts a team to shoot, and whether a whole squad may shift without
+  an order when another squad blocks it.
+  *Done when:* the owner has decided, then it is implemented or documented, with tests.
 
 ## Milestone 3 — Art style
 

@@ -157,6 +157,9 @@ public sealed class MovementSystem : ISimSystem
         return true;
     }
 
+    /// <summary>Ends one man's local move where he stands.</summary>
+    internal void StopSoldier(int soldierId) => _local.Remove(soldierId);
+
     /// <summary>Whether a point (metres from the north-west corner) lies on the map.</summary>
     public bool IsOnMap(Fixed x, Fixed y) =>
         x >= Fixed.Zero && y >= Fixed.Zero

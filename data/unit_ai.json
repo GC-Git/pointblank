@@ -107,6 +107,22 @@
             "note": "Placeholder: how far from where he is a masked man looks for a clear line (item 2.4c)."
           }
         },
+        "unmask_fire_cool_off": {
+          "value": "5",
+          "unit": "s",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: a man an enemy round passed close to (or hit) this recently does not start to step aside (item 2.4c)."
+          }
+        },
+        "unmask_max_shifts": {
+          "value": "2",
+          "unit": "count",
+          "source": {
+            "kind": "placeholder",
+            "note": "Placeholder: the most times a man steps aside for a clear line before his squad next moves, so he does not keep shuffling (item 2.4c)."
+          }
+        },
         "line_spacing": {
           "value": "3",
           "unit": "m",

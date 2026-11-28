@@ -38,7 +38,7 @@ public sealed class UnitAiSystem : ISimSystem
         _move = move;
         _fire = fire;
         Rules = rules;
-        _brain = new UnitAiBrain(map, move.Rules, fire.Rules, rules);
+        _brain = new UnitAiBrain(map, move.Rules, fire.Rules, rules, move.Paths);
     }
 
     public UnitAiRules Rules { get; }
@@ -104,6 +104,14 @@ public sealed class UnitAiSystem : ISimSystem
         public bool MoveSoldier(int squadId, int soldierId, TilePos goal, bool fast) =>
             Own(squadId).Soldiers.Any(s => s.Id == soldierId)
             && ai._move.MoveSoldier(squadId, soldierId, goal, fast ? MoveMode.MoveFast : MoveMode.Move);
+
+        public void StopSoldier(int squadId, int soldierId)
+        {
+            if (Own(squadId).Soldiers.Any(s => s.Id == soldierId))
+            {
+                ai._move.StopSoldier(soldierId);
+            }
+        }
 
         public void SetHeldTeams(int squadId, int teamMask, bool rush) => ai._move.SetHeldTeams(Own(squadId).Id, teamMask, rush);
 
