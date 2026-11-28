@@ -19,6 +19,11 @@ namespace PointBlank.Sim.Tests.UnitAi;
 /// an accepted realistic reason, each man judged by his own state, so not bounded here). Quick stand/drop reversals (back
 /// to the posture left, within 1 s) are no higher than the baseline: the same count measured with the same code on commit
 /// c7f461b, before item 2.4a.
+///
+/// Item 2.4d, on the same battles, each judged by what was true when the tick began (what the decision could know). A man
+/// pinned himself never gets up, routing or not. No man gets up while his squad's morale reads Pinned. (Rises earlier
+/// counted under both were of men pinned later in the same tick, by fire that arrived after they had moved.) A calm man
+/// of a moving squad lies prone only for a reason (<c>PostureMetrics.UnexplainedProne</c>).
 /// </summary>
 public class PostureDesyncTests(ITestOutputHelper output)
 {
@@ -42,7 +47,9 @@ public class PostureDesyncTests(ITestOutputHelper output)
         var samples = string.Join("; ", m.Samples);
         Assert.True(m.All == 0, $"{m.All} whole-squad same-tick changes; large ones: {samples}");
         Assert.True(m.Most <= MaxNearSync, $"{m.Most} squad-ticks with 75% or more changing; first: {samples}");
-        Assert.True(m.UnexcusedRises == 0, $"{m.UnexcusedRises} rises in pinned squads that are not routing: {m}");
+        Assert.True(m.UnexcusedRises == 0, $"{m.UnexcusedRises} rises of pinned men, or in pinned squads that are not routing: {m}");
+        Assert.True(m.RisesFromMoralePinned == 0, $"{m.RisesFromMoralePinned} rises while morale read Pinned: {m}");
+        Assert.True(m.UnexplainedProne == 0, $"{m.UnexplainedProne} calm men of moving squads prone for no reason: {m}");
         Assert.True(m.QuickReversals <= baselineReversals, $"{m.QuickReversals} quick reversals, baseline {baselineReversals}: {m}");
     }
 

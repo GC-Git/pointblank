@@ -113,6 +113,9 @@ public sealed class MovementSystem : ISimSystem
         }
     }
 
+    /// <summary>Whether the unit AI is holding this one man (<see cref="SetHeldSoldier"/>). Read only (tests).</summary>
+    internal bool IsHeldSoldier(int soldierId) => _heldMen.Contains(soldierId);
+
     /// <summary>The teams of a moving squad held now (bit per team index). Read only (debug overlay, item 2.6).</summary>
     internal int HeldTeamsOf(int squadId) => _held.GetValueOrDefault(squadId) & ~RushFlag;
 
@@ -218,7 +221,8 @@ public sealed class MovementSystem : ISimSystem
         foreach (var s in active)
         {
             _members[s.Id] = new Member { SinceReplan = int.MaxValue / 2 };
-            PostureChange.Order(s, Rules.PostureOf(order.Mode)); // each man gets up or down on his own reaction
+            var underFire = _suppression != null && _suppression.StateOf(s.Id) != Suppression.SuppressionState.None;
+            PostureChange.Order(s, Rules.PostureOf(order.Mode), underFire); // each man gets up or down on his own reaction
         }
 
         return MoveResult.Started;
@@ -241,50 +245,84 @@ public sealed class MovementSystem : ISimSystem
     }
 
     /// <summary>
-    /// Halts the squad's move man by man (a delivered Defend order, item 2.9): the squad advances no further, and each
-    /// able man walks on along his own path until his own reaction (a hash of his id and the tick, at most
-    /// <c>order_posture_delay</c>; in a squad of 3 or more they never all stop on one tick), then stops where he is and
-    /// goes down (<see cref="Posture.Prone"/>, as at a Defend firing position). The squad counts as moving until the last
-    /// man has stopped. A new move replaces the halt; <see cref="Stop"/> ends it at once. Does nothing if the squad is
-    /// not moving or is already halting.
+    /// Halts the squad man by man (a delivered Defend order, item 2.9, or Hold, item 2.4d): the squad advances no
+    /// further, and each able man walks on along his own path until his own reaction (a hash of his id and the tick, at
+    /// most <c>order_posture_delay</c>; in a squad of 3 or more they never all stop on one tick), then stops where he is.
+    /// With <paramref name="goDown"/> (Defend) he then goes down (<see cref="Posture.Prone"/>, as at a Defend firing
+    /// position); without it (Hold) he keeps his posture, or finishes getting lower if he was about to. A rise not yet
+    /// made is dropped at once and nobody gets up while the squad is halting. The squad counts as moving until the last
+    /// man has stopped. A new move replaces the halt; <see cref="Stop"/> ends it at once. A halt on a squad already
+    /// halting keeps each man's moment and takes the newer order's posture rule. A Hold also stops, in the same way, men
+    /// of an idle squad on moves of their own; a Defend leaves those alone.
     /// </summary>
-    internal void Halt(int squadId, long tick)
+    internal void Halt(int squadId, long tick, bool goDown = true)
     {
-        if (!_guides.TryGetValue(squadId, out var guide) || guide.Halting)
+        var squad = _org.Squads.First(s => s.Id == squadId);
+        var moving = _guides.TryGetValue(squadId, out var guide);
+        if (moving)
+        {
+            var already = guide!.Halting;
+            (guide.Halting, guide.GoDown) = (true, goDown);
+            if (already)
+            {
+                return;
+            }
+
+            _held.Remove(squadId);
+        }
+        else if (goDown)
         {
             return;
         }
 
-        var squad = _org.Squads.First(s => s.Id == squadId);
-        guide.Halting = true;
-        _held.Remove(squadId);
         var able = squad.Soldiers.Where(IsAble).ToList();
+        var stopping = new List<Member>();
         foreach (var s in able)
         {
-            if (!_members.TryGetValue(s.Id, out var m))
+            Member? m;
+            if (moving)
             {
-                _members[s.Id] = m = new Member { SinceReplan = int.MaxValue / 2 };
+                _local.Remove(s.Id);
+                if (!_members.TryGetValue(s.Id, out m))
+                {
+                    _members[s.Id] = m = new Member { SinceReplan = int.MaxValue / 2 };
+                }
+            }
+            else
+            {
+                m = _local.GetValueOrDefault(s.Id)?.Member;
             }
 
-            m.StopAt = tick + PostureChange.Draw(s.Id, tick, Rules.OrderPostureDelayTicks);
+            PostureChange.CancelRise(s); // a rise decided before the halt: he does not spring up only to stop or drop
+            if (m != null)
+            {
+                m.StopAt = tick + PostureChange.Draw(s.Id, tick, Rules.OrderPostureDelayTicks);
+                stopping.Add(m);
+            }
+            else
+            {
+                s.AwaitingPosture = false; // standing where he is: nothing left to wait for
+            }
         }
 
-        if (able.Count >= 3 && Rules.OrderPostureDelayTicks > 0 && able.All(s => _members[s.Id].StopAt == _members[able[0].Id].StopAt))
+        if (stopping.Count >= 3 && Rules.OrderPostureDelayTicks > 0 && stopping.All(m => m.StopAt == stopping[0].StopAt))
         {
-            _members[able[^1].Id].StopAt++;
+            stopping[^1].StopAt++;
         }
     }
 
     /// <summary>
-    /// Whether fire keeps a man from getting up (items 2.4a and 2.4b): he is pinned himself, or his squad is pinned. The
+    /// Whether a man is kept from getting up: his squad is halting, or fire keeps him down (items 2.4a and
+    /// 2.4b): he is pinned himself, or his squad is pinned. The
     /// one exception is a routing squad: its men who are not pinned themselves still get up to run, rushing and dropping
     /// (UnitAiBrain.Flee). Owner decision, item 2.4b: this is an accepted realistic reason for a rise in a pinned squad,
     /// because each man is judged by his own state, as when pinned men drop one by one.
     /// </summary>
     private bool HeldDown(Squad q, Soldier s) =>
-        _suppression != null
-        && (_suppression.StateOf(s.Id) == Suppression.SuppressionState.Pinned
-            || (q.Morale != MoraleState.Routing && _suppression.IsPinned(q.Id)));
+        IsHalting(q.Id) // item 2.4d: nobody gets up while his squad is halting (Defend or Hold)
+        || (_suppression != null
+            && (_suppression.StateOf(s.Id) == Suppression.SuppressionState.Pinned
+                || (q.Morale != MoraleState.Routing && _suppression.IsPinned(q.Id))));
 
     public void Tick(World world)
     {
@@ -296,6 +334,13 @@ public sealed class MovementSystem : ISimSystem
             foreach (var id in _local.Keys.ToArray())
             {
                 var l = _local[id];
+                if (l.Member.StopAt > 0 && world.Tick >= l.Member.StopAt) // a Hold: his moment to stop (item 2.4d)
+                {
+                    _local.Remove(id);
+                    PostureChange.Halt(l.Soldier);
+                    continue;
+                }
+
                 if (IsAble(l.Soldier) && !l.Soldier.AwaitingPosture)
                 {
                     MoveMember(l.Member, l.Soldier, l.Mode);
@@ -352,6 +397,7 @@ public sealed class MovementSystem : ISimSystem
                 hasher.Add(g.P);
                 hasher.Add(g.Done);
                 hasher.Add(g.Halting);
+                hasher.Add(g.GoDown);
                 hasher.Add(_held.GetValueOrDefault(squad.Id));
             }
 
@@ -394,6 +440,7 @@ public sealed class MovementSystem : ISimSystem
         {
             hasher.Add(id);
             hasher.Add((byte)l.Mode);
+            hasher.Add(l.Member.StopAt);
             HashMember(hasher, l.Member);
         }
     }
@@ -514,7 +561,7 @@ public sealed class MovementSystem : ISimSystem
         }
     }
 
-    /// <summary>A halting squad: each man walks his own path (no new goals) until his reaction, then stops and goes down.</summary>
+    /// <summary>A halting squad: each man walks his own path (no new goals) until his reaction, then stops (and, for a Defend, goes down).</summary>
     private void StepHalt(Squad squad, Guide guide, List<Soldier> active, long tick)
     {
         var walking = false;
@@ -529,8 +576,16 @@ public sealed class MovementSystem : ISimSystem
             {
                 _members.Remove(s.Id);
                 _heldMen.Remove(s.Id);
-                PostureChange.Cancel(s); // whatever he was about to do for the move
-                PostureChange.Request(s, Posture.Prone, tick, 0);
+                if (guide.GoDown)
+                {
+                    PostureChange.Cancel(s); // whatever he was about to do for the move
+                    PostureChange.Request(s, Posture.Prone, tick, 0);
+                }
+                else
+                {
+                    PostureChange.Halt(s); // a Hold: he stays as he is, or finishes getting lower
+                }
+
                 continue;
             }
 
@@ -830,6 +885,9 @@ public sealed class MovementSystem : ISimSystem
 
         /// <summary>The move is being halted (item 2.9): the guide stays and each man stops at his own tick.</summary>
         public bool Halting { get; set; }
+
+        /// <summary>A halting man goes down as he stops (Defend); otherwise he keeps his posture (Hold).</summary>
+        public bool GoDown { get; set; }
     }
 
     private sealed class Member
@@ -845,7 +903,7 @@ public sealed class MovementSystem : ISimSystem
         /// <summary>His team is held this tick (item 2.3).</summary>
         public bool Held { get; set; }
 
-        /// <summary>On a halting move: the tick he stops (item 2.9).</summary>
+        /// <summary>The tick he stops, on a halting move or a held local move (items 2.9, 2.4d); 0 for none.</summary>
         public long StopAt { get; set; }
 
         /// <summary>The man's own path, or null when he is idle. He walks from his start point to <c>Path[Seg]</c>.</summary>

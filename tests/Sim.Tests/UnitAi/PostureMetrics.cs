@@ -1,4 +1,5 @@
 using PointBlank.Sim.Morale;
+using PointBlank.Sim.Movement;
 using PointBlank.Sim.Org;
 using PointBlank.Sim.Sight;
 using PointBlank.Sim.Suppression;
@@ -21,8 +22,22 @@ internal sealed class PostureMetrics
     /// when the tick began (what the decision could know). After: it was pinned when the tick ended.</summary>
     public int RisesSeenPinned, RisesAfterPinned, RisesMoralePinned;
 
-    /// <summary>Of <see cref="RisesSeenPinned"/>, those of squads that are not routing: the ones nothing excuses.</summary>
+    /// <summary>The rises nothing excuses: of a man pinned himself when the tick began (routing or not, item 2.4d), or in a
+    /// squad pinned then that is not routing.</summary>
     public int UnexcusedRises;
+
+    /// <summary>Item 2.4d: rises of men whose squad's morale read Pinned when the tick began.</summary>
+    public int RisesFromMoralePinned;
+
+    /// <summary>
+    /// Item 2.4d: a calm man (neither he nor his squad suppressed enough to count) of a moving squad who lay prone for
+    /// over <see cref="UnexplainedSeconds"/> with no reason. The reasons: a Sneak move, his team held to cover the
+    /// others, a routing squad, or enemy fire at his squad within the last <see cref="FireMemorySeconds"/>.
+    /// </summary>
+    public int UnexplainedProne;
+
+    private const int UnexplainedSeconds = 1;
+    private const int FireMemorySeconds = 6; // under_fire_memory (5 s) and a man's own jitter
 
     public SortedDictionary<string, int> RiseKinds { get; } = [];
 
@@ -31,7 +46,7 @@ internal sealed class PostureMetrics
     public List<string> Samples { get; } = [];
 
     public override string ToString() =>
-        $"all {All}, >=75% {Most}, all-but-one {AllButOne}, stand-ups while pinned {PinnedStandUps}, quick reversals {QuickReversals}, changes {Changes}, rises in pinned squad {RisesSeenPinned} (at tick end {RisesAfterPinned}, morale Pinned {RisesMoralePinned})"
+        $"unexcused {UnexcusedRises}, from morale Pinned {RisesFromMoralePinned}, unexplained prone {UnexplainedProne}, all {All}, >=75% {Most}, all-but-one {AllButOne}, stand-ups while pinned {PinnedStandUps}, quick reversals {QuickReversals}, changes {Changes}, rises in pinned squad {RisesSeenPinned} (at tick end {RisesAfterPinned}, morale Pinned {RisesMoralePinned})"
         + " [" + string.Join(", ", RiseKinds.Select(k => $"{k.Key}={k.Value}")) + "] reversals ["
         + string.Join(", ", ReversalKinds.Select(k => $"{k.Key}={k.Value}")) + "]";
 
@@ -59,6 +74,8 @@ internal sealed class PostureMetrics
         RisesAfterPinned += o.RisesAfterPinned;
         RisesMoralePinned += o.RisesMoralePinned;
         UnexcusedRises += o.UnexcusedRises;
+        RisesFromMoralePinned += o.RisesFromMoralePinned;
+        UnexplainedProne += o.UnexplainedProne;
         foreach (var (key, n) in o.RiseKinds)
         {
             RiseKinds[key] = RiseKinds.GetValueOrDefault(key) + n;
@@ -82,11 +99,19 @@ internal sealed class PostureMetrics
         var last = new Dictionary<int, Posture>();
         var left = new Dictionary<int, (Posture From, long Tick)>();
         var pinnedBefore = new HashSet<int>();
+        var pinnedMen = new HashSet<int>();
+        var moralePinned = new HashSet<int>();
+        var move = world.GetSystem<MovementSystem>();
+        var shotAt = new Dictionary<int, long>();
+        var unexplained = new Dictionary<int, int>();
         for (var i = 0; i <= ticks; i++)
         {
             if (i > 0)
             {
                 pinnedBefore = org.Squads.Where(q => suppression.IsPinned(q.Id)).Select(q => q.Id).ToHashSet();
+                pinnedMen = org.Squads.SelectMany(q => q.Soldiers)
+                    .Where(s => suppression.StateOf(s.Id) == SuppressionState.Pinned).Select(s => s.Id).ToHashSet();
+                moralePinned = org.Squads.Where(q => q.Morale == MoraleState.Pinned).Select(q => q.Id).ToHashSet();
                 world.Step();
             }
 
@@ -94,6 +119,14 @@ internal sealed class PostureMetrics
             {
                 var able = 0;
                 var changed = 0;
+                foreach (var e in world.ViewFor(q.Side).IncomingFire)
+                {
+                    if (!e.Friendly && q.Soldiers.Any(s => s.Id == e.SoldierId))
+                    {
+                        shotAt[q.Id] = Math.Max(e.Tick, shotAt.GetValueOrDefault(q.Id));
+                    }
+                }
+
                 foreach (var s in q.Soldiers)
                 {
                     var had = last.TryGetValue(s.Id, out var was);
@@ -104,6 +137,12 @@ internal sealed class PostureMetrics
                     }
 
                     able++;
+                    var unexplainedNow = s.Posture == Posture.Prone && move.IsMoving(q.Id) && !suppression.IsPinned(q.Id)
+                        && suppression.StateOf(s.Id) == SuppressionState.None && move.ModeOf(q.Id) != MoveMode.Sneak
+                        && q.Morale != MoraleState.Routing && (move.HeldTeamsOf(q.Id) & (1 << s.TeamIndex)) == 0
+                        && !(shotAt.TryGetValue(q.Id, out var at) && world.Tick - at <= FireMemorySeconds * World.TicksPerSecond);
+                    var run = unexplained[s.Id] = unexplainedNow ? unexplained.GetValueOrDefault(s.Id) + 1 : 0;
+                    r.UnexplainedProne += run == (UnexplainedSeconds * World.TicksPerSecond) + 1 ? 1 : 0;
                     if (!had || was == s.Posture)
                     {
                         continue;
@@ -115,12 +154,13 @@ internal sealed class PostureMetrics
                     {
                         var seen = pinnedBefore.Contains(q.Id);
                         var after = suppression.IsPinned(q.Id);
+                        r.UnexcusedRises += pinnedMen.Contains(s.Id) || (seen && q.Morale != MoraleState.Routing) ? 1 : 0;
+                        r.RisesFromMoralePinned += moralePinned.Contains(q.Id) ? 1 : 0;
                         r.RisesSeenPinned += seen ? 1 : 0;
                         r.RisesAfterPinned += after ? 1 : 0;
                         r.RisesMoralePinned += q.Morale == MoraleState.Pinned ? 1 : 0;
                         if (seen)
                         {
-                            r.UnexcusedRises += q.Morale != MoraleState.Routing ? 1 : 0;
                             var key = $"{q.Morale}{(suppression.StateOf(s.Id) == SuppressionState.Pinned ? "/manPinned" : "")}/{was}>{s.Posture}";
                             r.RiseKinds[key] = r.RiseKinds.GetValueOrDefault(key) + 1;
                         }

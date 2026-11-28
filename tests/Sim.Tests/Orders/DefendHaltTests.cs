@@ -61,6 +61,7 @@ public class DefendHaltTests
             var prone = men.ToDictionary(s => s.Id, s => s.Posture == Posture.Prone ? delivered : -1L);
             var last = men.ToDictionary(s => s.Id, s => (s.X, s.Y));
             var stoppedAt = new Dictionary<int, long>();
+            var posture = men.ToDictionary(s => s.Id, s => s.Posture);
             while (Status(rig, q).Status != OrderStatus.Done)
             {
                 Assert.Equal(OrderStatus.Executing, Status(rig, q).Status);
@@ -74,7 +75,8 @@ public class DefendHaltTests
                         last[s.Id] = (s.X, s.Y);
                     }
 
-                    Assert.True(s.Posture >= Posture.Standing);
+                    Assert.True(s.Posture >= posture[s.Id], $"seed {seed}: man {s.Id} rose to {s.Posture} while halting");
+                    posture[s.Id] = s.Posture;
                 }
             }
 

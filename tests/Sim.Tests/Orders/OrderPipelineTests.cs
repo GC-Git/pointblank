@@ -216,8 +216,10 @@ public class OrderPipelineTests(ITestOutputHelper output)
         r.World.Run(20);
         Assert.True(r.Move.IsMoving(s.Id));
         var hold = RunToDelivery(r, s, new Order(OrderKind.Hold, Fixed.Zero, Fixed.Zero));
-        Assert.Equal(OrderStatus.Done, hold.Status);
+        Assert.Equal(OrderStatus.Executing, hold.Status); // item 2.4d: the men stop one by one
         Assert.Equal(OrderNote.None, hold.Note);
+        r.World.Run(r.Move.Rules.OrderPostureDelayTicks + 2);
+        Assert.Equal(OrderStatus.Done, r.Command.StatusOf(s.Id).Status);
         Assert.False(r.Move.IsMoving(s.Id));
         var x = s.Leader!.X;
         r.World.Run(50);

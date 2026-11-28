@@ -17,10 +17,18 @@ internal static class PostureChange
 
     /// <summary>
     /// A new movement order: replaces anything pending (an older decision never overrides it), and the man waits where
-    /// he is until he has taken the order's posture.
+    /// he is until he has taken the order's posture. One exception (item 2.4d): a man <paramref name="underFire"/>
+    /// (suppressed or pinned) who is on his way lower than the order wants finishes getting down, in his own time; he
+    /// waits until he has, and the unit AI decides when he comes up again.
     /// </summary>
-    public static void Order(Soldier s, Posture posture)
+    public static void Order(Soldier s, Posture posture, bool underFire = false)
     {
+        if (underFire && s.PendingPosture > s.Posture && s.PendingPosture > posture) // lower is higher in the enum
+        {
+            s.AwaitingPosture = true;
+            return;
+        }
+
         Cancel(s);
         if (s.Posture != posture)
         {
@@ -69,6 +77,18 @@ internal static class PostureChange
         }
 
         s.AwaitingPosture = false;
+    }
+
+    /// <summary>
+    /// A halt (item 2.9) as it is delivered: drops a pending rise at once. A man who was waiting for it before setting
+    /// off stays where he is. A pending change lower is kept.
+    /// </summary>
+    public static void CancelRise(Soldier s)
+    {
+        if (s.PendingPosture < s.Posture) // a rise (Standing is lowest in the enum)
+        {
+            (s.PendingPosture, s.PostureDueAt) = (null, 0);
+        }
     }
 
     /// <summary>Drops a pending decision (not a pin drop).</summary>
