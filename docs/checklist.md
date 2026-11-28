@@ -174,7 +174,7 @@ Status: draft, awaiting owner sign-off
   criterion: each man is judged by his own state, consistent with pinned men dropping
   individually.
 
-- [ ] **2.5a View and control follow-ups** (S)
+- [x] **2.5a View and control follow-ups** (S)
   Do before 2.7. From the 2.5 review: the rules-of-engagement key pressed just after a move
   silently cancels the pending move (needs an owner decision on whether it should); at default
   zoom squads are tiny blobs and men and postures can't be told apart; with several squads
@@ -209,6 +209,56 @@ Status: draft, awaiting owner sign-off
   *Done when:* the cause is measured over seeds 1-50, and a squad that cannot fire because
   friendlies are in the way realistically shifts for a clear line or the reason it stays is
   documented; no scenario reshaping and no retuning.
+  **Masked squads stay where they are (owner decision).** Measured over seeds 1-50
+  (`MaskedFireMetrics`, run with `PB_MASK_REPORT=1`), share of on-task man-time masked by
+  friendlies: `fix-assault` base of fire 73%; `bombard-creep` stationary squads 71/70/43%.
+  Cause: the `fix-assault` base of fire stands in ranks along its own line of fire under a
+  Fire order, which forms no firing line (all its masked time is behind its own men); in
+  `bombard-creep` the first two of those squads are masked entirely by another squad, the
+  third by another squad for 55%; moving squads are blocked by their own men while they move
+  (nearly all of the `fix-assault` assault squad's masked time).
+  A major cause of masking is the hold-fire distance: AI fire already holds for a comrade
+  within 2 m of the line, short of the target (the larger of `near_miss_radius`, 2 m, and
+  `mask_clearance`, 0.5 m); only player-ordered fire uses `mask_clearance` alone. An
+  independent re-measurement over seeds 1-50 found base of fire masked 73% and
+  `bombard-creep` squads 71/70/43% (another squad blocking for 100/100/55%); all three
+  `bombard-creep` squads are on AI fire, and in 60-75% of their masked time every blocker is
+  more than 0.5 m off the line.
+  Tried (seeds 1-50): in a stationary squad with a fire task, each masked man stepped to a
+  clear line. Without limits this reached 29% and 31/34/13%, by moving men who were under
+  fire, suppressed or pinned. With gates and limits it reached 54% and 46/47/17%, but the
+  `fix-assault` base of fire passed its own men closely, pinned itself and fired less: 40
+  against 63 man-shot-ticks per seed, and the share of stationary masked time spent pinned or
+  broken rose from 27% to 78%.
+  The drill figures (the 29% and 54% results with their per-squad shares, 40 against 63
+  shot-ticks, 27% to 78%) were measured with code since removed and can't be reproduced from
+  the repo.
+  Removed for that reason: the owner decided to take the drill out and let masked squads stay.
+  Suspected cause of the side-stepping squad pinning itself, not proven: under player-ordered
+  fire a man holds only for a comrade within `mask_clearance` (0.5 m) of his line, so friendly
+  near misses within `near_miss_radius` (2 m) can still suppress. Friendly near misses already
+  occur without the drill. Both the drill and a safe friendly firing distance are in item 2.11.
+  The masking test is flat (it ignores height), kept as is.
+  Kept from the item, independent of the drill: a routing man who has reached the end of his
+  run while others of his squad are still running gets down under fire and stays down until he
+  has somewhere to run (`RoutingNoRouteTests`). Over seeds 1-50, before its state was added to
+  the hash, it changed the final hash in 4 `fix-assault`, 4 `fix-assault-nobase`, 6
+  `bombard-creep` and no `pin-open` battles.
+
+- [ ] **2.12 Faster tests** (S)
+  Do next after 2.4c. A full test run takes about 13 minutes and every build and review
+  repeats it.
+  *Done when:* a documented quick test command for everyday work runs much faster (report
+  timings) while the full suite still runs every existing test and is required before
+  merging; no test is weakened, skipped from the full run, or given fewer seeds in the full
+  run.
+
+- [ ] **2.9 Defend halts a move** (S)
+  Do before 2.7 (owner decision). From the 2.5a review: a delivered Defend order does not stop
+  a move already under way (4 of 4 squads still moving 3 s later; same on main before 2.5a),
+  and the panel then shows 'Defend: Done' while the squad marches.
+  *Done when:* a delivered Defend halts the move through the chain of command with per-man
+  reactions, with tests.
 
 - [ ] **2.4d Posture follow-ups** (S)
   Do before 2.7 unless the owner defers it. From the 2.4b review (seeds 1-50): the posture
@@ -216,9 +266,20 @@ Status: draft, awaiting owner sign-off
   equal-fire and fix-assault); a new movement order replaces a pending AI get-down with a
   higher posture (34 of 1054 man-orders in fix-assault); calm men in unpinned moving squads
   lie prone over 5 s (240 cases in fix-assault, same before 2.4b); a few men rise while
-  morale says Pinned but suppression does not.
-  *Done when:* each is measured, then fixed or documented as realistic, with tests; no
-  retuning or scenario reshaping.
+  morale says Pinned but suppression does not. From the 2.4c review: the routing no-route
+  get-down test (`RoutingNoRouteTests`) asserts only "no rises"; removing the reaction delay
+  still passes it.
+  *Done when:* each is measured, then fixed or documented as realistic, with tests; the
+  no-route test also asserts that the man gets down, and tests per-man timing (no
+  synchrony; it fails without the reaction delay); no retuning or scenario reshaping.
+
+- [ ] **2.13 Readable placeholder graphics** (S)
+  Do before 2.7: the owner could not tell what was happening when playing. Plain placeholder
+  shapes; pixel art stays milestone 3.
+  *Done when:* soldier shapes clearly show standing, kneeling and prone and which way each man
+  is working; tracers and muzzle flashes are drawn only for fire the player's side could see;
+  shell explosions, wounded and dead are visible; spotted-enemy markers are clearer; the
+  starting zoom is sensible; screenshot tests cover each and the fog-of-war boundary holds.
 
 - [ ] **2.7 First playable scenarios** (S) ⛳
   Two scenarios: *fix and assault* (US platoon + tank vs German MG position) and
@@ -235,6 +296,23 @@ Status: draft, awaiting owner sign-off
   overlap (the Defend order's 'not available yet' reading was fixed in 2.5a).
   *Done when:* the owner has confirmed the behaviour, tests show it differs from Defend with
   no all-at-once opening, the view offers it, and the display follow-up is fixed.
+
+- [ ] **2.10 Drag-to-place move orders** (S)
+  After the 2.7 play-through (owner decision). Dragging a move order sets the line along which
+  the squad spreads (along hedges and walls, on the protected side) and a general facing
+  direction; men arrive individually. Placement at building windows and floors follows 4.4.
+  Fences do not exist as terrain yet, and the sim has no facing yet.
+  *Done when:* the owner has confirmed the design, tests cover the spread, cover side and
+  facing behaviour, and the view supports dragging.
+
+- [ ] **2.11 Movement when friendlies block fire** (S)
+  Postponed by the owner until after the formal play-through: whether a moving squad blocked by
+  its own men spreads out or halts a team to shoot, and whether a whole squad may shift without
+  an order when another squad blocks it. Also revisits, from 2.4c, the side-stepping drill
+  (masked men of a stationary squad stepping to a clear line) and a safe friendly firing
+  distance (how close to a comrade a man may fire: today AI fire holds within 2 m of the line,
+  player-ordered fire within 0.5 m).
+  *Done when:* the owner has decided, then it is implemented or documented, with tests.
 
 ## Milestone 3 — Art style
 
@@ -374,3 +452,5 @@ Status: draft, awaiting owner sign-off
 - [ ] **8.3 Credits, attributions, licences** (S)
 - [ ] **8.4 Windows build and installer** (S) ⛳
   **Owner signs off on the release candidate.**
+  Note: Release-configuration test runs currently show 13 failures (9 predate 2.5a); mostly
+  debug-only overlays being inert, two game boundary failures undiagnosed. Resolve here.

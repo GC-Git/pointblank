@@ -173,6 +173,19 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
             hasher.Add(m.BoltStart);
             hasher.Add(m.CowerStart);
             hasher.Add(m.StoppedSince);
+            hasher.Add(m.StillSince.Count);
+            foreach (var (sid, at) in m.StillSince)
+            {
+                hasher.Add(sid);
+                hasher.Add(at);
+            }
+
+            hasher.Add(m.Waiting.Count);
+            foreach (var sid in m.Waiting)
+            {
+                hasher.Add(sid);
+            }
+
             hasher.Add(m.BoltAt.Count);
             foreach (var (sid, at) in m.BoltAt)
             {
@@ -705,7 +718,28 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
             var rise = start + Draw(s.Id, m.BoltStart, 5, rules.RushJitterTicks);
             var down = tick < rise || (underFire && (tick - rise) % period >= rules.RushTicks);
             fx.SetHeldSoldier(q.Id, s.Id, down);
-            var want = down ? rules.PostureOpen : moveRules.PostureOf(MoveMode.MoveFast);
+
+            // A man who has run out of route (he waits for the others' way to open) does not stand about under fire: once he
+            // has stood still for his reaction time he gets down, until he has somewhere to run again.
+            if (s.Moving)
+            {
+                m.StillSince.Remove(s.Id);
+                m.Waiting.Remove(s.Id);
+            }
+            else if (down || s.Posture != Posture.Standing || s.PendingPosture != null)
+            {
+                m.StillSince.Remove(s.Id);
+            }
+            else if (!m.StillSince.TryGetValue(s.Id, out var still))
+            {
+                m.StillSince[s.Id] = tick;
+            }
+            else if (underFire && tick - still >= rules.ReactionTicks)
+            {
+                m.Waiting.Add(s.Id);
+            }
+
+            var want = down || m.Waiting.Contains(s.Id) ? rules.PostureOpen : moveRules.PostureOf(MoveMode.MoveFast);
             // Dropping out of a rush is already offset man by man. Getting up (a new rush, or the fire lifting) and the drop
             // of a man still waiting to bolt take his own reaction, as every other decision does: men whose timers happen
             // to end together do not get up together.
@@ -736,6 +770,8 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
     /// <summary>Frees every man the per-man flee held and forgets its start (the squad is no longer fleeing).</summary>
     private void ClearBolt(IAiEffects fx, SquadView q, Mind m)
     {
+        m.StillSince.Clear();
+        m.Waiting.Clear();
         if (m.BoltStart < 0)
         {
             return;
@@ -1148,6 +1184,11 @@ internal sealed class UnitAiBrain(GameMap map, MovementRules moveRules, FireRule
 
         /// <summary>The tick each man of a fleeing squad gets up (drawn once, when the flee starts).</summary>
         public SortedDictionary<int, long> BoltAt { get; } = [];
+
+        /// <summary>Since when each man of a fleeing squad has stood still, and the men who got down because of it.</summary>
+        public SortedDictionary<int, long> StillSince { get; } = [];
+
+        public SortedSet<int> Waiting { get; } = [];
 
         public bool Firing { get; set; }
 
