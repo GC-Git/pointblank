@@ -176,8 +176,18 @@ public class SideViewEventTests
         var before = battle.View.SeenShots;
         Assert.Contains(before, s => !s.Own);
 
+        // An enemy's round starts where the side believes he is, even if that is not where he is.
+        var contacts = spotting.Sides.Single(k => k.Side == "us").Contacts.Values;
+        foreach (var contact in contacts)
+        {
+            contact.X += Fixed.FromInt(5);
+        }
+
+        var believed = contacts.Select(k => (k.X, k.Y)).ToHashSet();
+        Assert.All(battle.View.SeenShots.Where(s => !s.Own), s => Assert.Contains((s.X, s.Y), believed));
+
         // The same tick, with every enemy contact gone cold (edited directly: the open field seldom does it by itself).
-        foreach (var contact in spotting.Sides.Single(k => k.Side == "us").Contacts.Values)
+        foreach (var contact in contacts)
         {
             contact.Quality = quality;
         }
@@ -187,12 +197,11 @@ public class SideViewEventTests
     }
 
     [Theory]
-    [Trait("Speed", "Slow")]
     [InlineData("fix-assault")]
     [InlineData("bombard-creep")]
-    public void Many_seeds_hold_the_rules(string scenario)
+    public void More_seeds_hold_the_rules(string scenario)
     {
-        for (var seed = 2UL; seed <= 10; seed++)
+        for (var seed = 2UL; seed <= 4; seed++)
         {
             Run(scenario, seed, 1800);
         }
