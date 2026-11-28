@@ -5,6 +5,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>PointBlank.Sim</RootNamespace>
+    <!-- Item 2.12: compile the sim optimised in every configuration. Test runs are almost all sim code, and the sim is
+         integer fixed point, so results are the same. DEBUG and Debug.Assert are unaffected. Pass -p:Optimize=false to
+         step through it in a debugger. -->
+    <Optimize>true</Optimize>
   </PropertyGroup>
 
   <!-- The fog-of-war boundary: raw state of both sides is internal. Only the tests and the headless

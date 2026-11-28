@@ -203,7 +203,7 @@ Status: draft, awaiting owner sign-off
   sim currently treats Ambush exactly like Defend, so it is not offered; the owner deferred
   the Ambush order to item 2.8.
 
-- [ ] **2.4c Squad masked by friendlies** (S)
+- [x] **2.4c Squad masked by friendlies** (S)
   Do before 2.7. From the 2.6 review: in `fix-assault` seed 1 the second squad was mostly
   masked by friendlies and never fired (not yet verified).
   *Done when:* the cause is measured over seeds 1-50, and a squad that cannot fire because

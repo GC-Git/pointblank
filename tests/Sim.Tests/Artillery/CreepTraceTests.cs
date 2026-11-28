@@ -15,11 +15,11 @@ namespace PointBlank.Sim.Tests.Artillery;
 /// defenders are still at the hedge unknown. A diagnostic: it prints, and asserts only that some battle closes that far.
 /// See the PR for the findings.
 /// </summary>
-[Collection(TimingCollection.Name)]
 public class CreepTraceTests(ITestOutputHelper output)
 {
     private const int HedgeBand = 3; // a man within 3 m behind the hedge line is at it
 
+    [Trait(Speed.Name, Speed.Slow)]
     [Fact]
     public void Trace_of_the_barrage_battles_that_close_to_50m()
     {
@@ -27,7 +27,7 @@ public class CreepTraceTests(ITestOutputHelper output)
         var traced = false;
         var closing = 0;
         var hiddenTotal = 0;
-        for (ulong seed = 1; seed <= 30; seed++)
+        var traces = SeedRuns.Map(30, seed =>
         {
             var w = scenario.CreateWorld(seed);
             foreach (var o in scenario.ScriptedOrders)
@@ -72,6 +72,12 @@ public class CreepTraceTests(ITestOutputHelper output)
                 }
             }
 
+            return (Lines: lines, HiddenAtHedge: hiddenAtHedge);
+        });
+
+        for (var seed = 1; seed <= traces.Count; seed++)
+        {
+            var (lines, hiddenAtHedge) = traces[seed - 1];
             if (hiddenAtHedge == null)
             {
                 continue;

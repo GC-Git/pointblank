@@ -37,7 +37,10 @@ builder's reasoning.
 **What to do**
 
 1. Run the build and tests yourself, from a clean state, with the commands in
-   `CLAUDE.md`. Don't trust any output you were not the one to produce. If the item
+   `CLAUDE.md`. Don't trust any output you were not the one to produce. Use the quick tests
+   (`dotnet test PointBlank.sln --filter "Speed!=Slow"`) for probes and sabotage checks, and run the full suite,
+   `dotnet test PointBlank.sln`, once. A merge requires that full run to be green; a quick
+   run does not count. If the item
    touches `game/`, run both headless Godot commands and read the output for `ERROR`
    lines.
 2. Check each "Done when" criterion separately. Where a claim can be tested, test it:

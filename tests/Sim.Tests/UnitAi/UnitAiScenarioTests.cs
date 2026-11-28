@@ -48,17 +48,19 @@ public class UnitAiScenarioTests(ITestOutputHelper output)
 
     private static bool Able(Soldier s) => s.CanLead;
 
+    [Trait(Speed.Name, Speed.Slow)]
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void An_idle_squad_that_comes_under_fire_takes_cover_or_returns_fire_within_2_s(bool hidden)
     {
         int underFire = 0, reacted = 0, allDown = 0, returned = 0;
-        for (ulong seed = 1; seed <= Seeds; seed++)
+        var runs = SeedRuns.Map(Seeds, seed =>
         {
             var (rig, us, _) = Contact(seed, hidden);
             long t0 = -1;
             var ok = false;
+            bool down = false, fired = false;
             for (var i = 0; i < 300 && !ok; i++)
             {
                 rig.World.Step();
@@ -69,17 +71,21 @@ public class UnitAiScenarioTests(ITestOutputHelper output)
 
                 if (t0 >= 0 && rig.World.Tick > t0 + (2 * World.TicksPerSecond))
                 {
-                    var down = us.Soldiers.Where(Able).All(s => s.Posture != Posture.Standing);
-                    var fired = rig.Watch.FirstShot.TryGetValue("us", out var f) && f <= t0 + (2 * World.TicksPerSecond);
-                    allDown += down ? 1 : 0;
-                    returned += fired ? 1 : 0;
-                    reacted += down || fired ? 1 : 0;
+                    down = us.Soldiers.Where(Able).All(s => s.Posture != Posture.Standing);
+                    fired = rig.Watch.FirstShot.TryGetValue("us", out var f) && f <= t0 + (2 * World.TicksPerSecond);
                     ok = true;
                 }
             }
 
-            underFire += t0 >= 0 ? 1 : 0;
             Assert.True(t0 < 0 || ok, $"seed {seed}: under fire at {t0} but not checked");
+            return (UnderFire: t0 >= 0, Down: down, Fired: fired);
+        });
+        foreach (var r in runs)
+        {
+            underFire += r.UnderFire ? 1 : 0;
+            allDown += r.Down ? 1 : 0;
+            returned += r.Fired ? 1 : 0;
+            reacted += r.Down || r.Fired ? 1 : 0;
         }
 
         output.WriteLine($"hidden={hidden}: under fire in {underFire}/{Seeds}; reacted within 2 s {reacted}/{underFire} (all down {allDown}, returned fire {returned})");
@@ -122,10 +128,11 @@ public class UnitAiScenarioTests(ITestOutputHelper output)
         return riflemen.Count(s => rig.Fire.LastFiredTick(s.Id) >= engaged) / (double)riflemen.Count;
     }
 
+    [Trait(Speed.Name, Speed.Slow)]
     [Fact]
     public void When_an_idle_squad_engages_the_leader_forms_a_firing_line_and_most_riflemen_fire_within_10_s()
     {
-        var shares = Enumerable.Range(1, Seeds).Select(s => FiringLine((ulong)s)).ToList();
+        var shares = SeedRuns.Map(Seeds, FiringLine);
         output.WriteLine($"riflemen firing within 10 s: mean {shares.Average():P0}, min {shares.Min():P0}, seeds >= 75%: {shares.Count(x => x >= 0.75)}/{Seeds}");
         Assert.All(shares, s => Assert.True(s >= 0.75, $"{s:P0}"));
     }
@@ -179,13 +186,14 @@ public class UnitAiScenarioTests(ITestOutputHelper output)
             (pinned + (900 - ticks)) / (double)window);
     }
 
+    [Trait(Speed.Name, Speed.Slow)]
     [Fact]
     public void Fire_and_movement_makes_progress_in_contact_and_a_lone_squad_is_pinned_under_equal_fire()
     {
-        var free = Enumerable.Range(1, Seeds).Select(s => Advance((ulong)s, 0).Advance).Average();
+        var free = SeedRuns.Map(Seeds, s => Advance(s, 0).Advance).Average();
         foreach (var enemy in new[] { 1, 2 })
         {
-            var runs = Enumerable.Range(1, Seeds).Select(s => Advance((ulong)s, enemy)).ToList();
+            var runs = SeedRuns.Map(Seeds, s => Advance(s, enemy));
             var mean = runs.Average(r => r.Advance);
             var slow = runs.Where(r => r.Advance < 0.6 * free).ToList();
             output.WriteLine(
@@ -212,8 +220,7 @@ public class UnitAiScenarioTests(ITestOutputHelper output)
     [Fact]
     public void The_leader_sends_the_BAR_team_to_a_hedge_on_the_flank_facing_the_threat()
     {
-        var hits = 0;
-        for (ulong seed = 1; seed <= 20; seed++)
+        var hits = SeedRuns.Map(20, seed =>
         {
             var map = new GameMap("task", 200, 60);
             for (var ty = 12; ty < 24; ty++)
@@ -229,13 +236,14 @@ public class UnitAiScenarioTests(ITestOutputHelper output)
             var bar = us.Soldiers.First(s => s.Role == Role.BarGunner);
             var tx = (bar.X / map.TileSize).ToInt();
             var ty2 = (bar.Y / map.TileSize).ToInt();
-            hits += map.HasHedge(tx - 1, ty2, EdgeSide.East) ? 1 : 0;
-        }
+            return map.HasHedge(tx - 1, ty2, EdgeSide.East);
+        }).Count(hit => hit);
 
         output.WriteLine($"BAR at the flank hedge in {hits}/20 seeds");
         Assert.True(hits >= 18, $"{hits}/20");
     }
 
+    [Trait(Speed.Name, Speed.Slow)]
     [Fact]
     public void The_AI_for_40_squads_stays_within_its_budget()
     {
@@ -263,4 +271,23 @@ public class UnitAiScenarioTests(ITestOutputHelper output)
         output.WriteLine($"unit AI, 40 squads: {ms:F2} ms per tick");
         Assert.True(ms < 10, $"{ms:F2} ms per tick (budget 10 ms, a tenth of the 100 ms tick)");
     }
+
+    /// <summary>The quick set's smaller check (item 2.12): the first 5 seeds of the two idle-squad criteria.</summary>
+    [Fact]
+    public void Quick_check_an_idle_squad_reacts_to_fire_and_forms_a_firing_line() => SeedRuns.ForEach(5, seed =>
+    {
+        var (rig, us, _) = Contact(seed, hidden: false);
+        for (var i = 0; i < 300 && !rig.Watch.FirstUnderFire.ContainsKey("us"); i++)
+        {
+            rig.World.Step();
+        }
+
+        Assert.True(rig.Watch.FirstUnderFire.TryGetValue("us", out var t0), "never under fire");
+        rig.World.Run((2 * World.TicksPerSecond) + 1);
+        var down = us.Soldiers.Where(Able).All(s => s.Posture != Posture.Standing);
+        var fired = rig.Watch.FirstShot.TryGetValue("us", out var f) && f <= t0 + (2 * World.TicksPerSecond);
+        Assert.True(down || fired, "neither took cover nor returned fire within 2 s");
+        var share = FiringLine(seed);
+        Assert.True(share >= 0.75, $"{share:P0} of riflemen fired");
+    });
 }

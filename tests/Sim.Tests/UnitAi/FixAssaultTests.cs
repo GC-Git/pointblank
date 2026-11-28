@@ -15,16 +15,14 @@ public class FixAssaultTests(ITestOutputHelper output)
     private static List<Dictionary<string, double>> Run(string id)
     {
         var scenario = ScenarioCatalog.Find(id)!;
-        var runs = new List<Dictionary<string, double>>();
-        for (ulong seed = 1; seed <= Seeds; seed++)
+        return SeedRuns.Map(Seeds, seed =>
         {
             var world = Battle.Run(scenario, seed).World;
-            runs.Add(scenario.Measure(world).ToDictionary(m => m.Name, m => m.Value.ToInt() + ((m.Value - Fixed.FromInt(m.Value.ToInt())).Raw / 4294967296.0)));
-        }
-
-        return runs;
+            return scenario.Measure(world).ToDictionary(m => m.Name, m => m.Value.ToInt() + ((m.Value - Fixed.FromInt(m.Value.ToInt())).Raw / 4294967296.0));
+        });
     }
 
+    [Trait(Speed.Name, Speed.Slow)]
     [Fact]
     public void A_base_of_fire_suppresses_the_enemy_and_lets_the_assault_squad_get_on()
     {
@@ -50,5 +48,19 @@ public class FixAssaultTests(ITestOutputHelper output)
         var scenario = ScenarioCatalog.Find("fix-assault")!;
         var result = Battle.Run(scenario, 7);
         Assert.Equal(result.Replay.FinalHash, Battle.Play(scenario, result.Replay).ComputeStateHash());
+    }
+
+    /// <summary>The quick set's smaller check (item 2.12): 8 seeds, direction only; the 100-seed bars are above.</summary>
+    [Fact]
+    public void Quick_check_a_base_of_fire_gets_the_assault_squad_further()
+    {
+        var results = SeedRuns.Map(8, seed => new[] { "fix-assault", "fix-assault-nobase" }.Select(id =>
+        {
+            var scenario = ScenarioCatalog.Find(id)!;
+            var world = Battle.Run(scenario, seed).World;
+            return scenario.Measure(world).Single(m => m.Name == "advance").Value.ToInt();
+        }).ToArray());
+        Assert.True(results.Average(r => r[0]) > results.Average(r => r[1]),
+            $"mean advance {results.Average(r => r[0]):F0} m with a base of fire, {results.Average(r => r[1]):F0} m without");
     }
 }

@@ -18,7 +18,6 @@ namespace PointBlank.Sim.Tests.Artillery;
 /// The checklist bar "in at least 30% of seeds the attacker has not spotted every surviving defender" is asserted (fog at the
 /// creep start), and so is suppression against the control.
 /// </summary>
-[Collection(TimingCollection.Name)]
 public class BombardCreepTests(ITestOutputHelper output)
 {
     private const int Seeds = 200;
@@ -26,13 +25,11 @@ public class BombardCreepTests(ITestOutputHelper output)
     private static Dictionary<string, double>[] Run(string id)
     {
         var scenario = ScenarioCatalog.Find(id)!;
-        var results = new Dictionary<string, double>[Seeds];
-        Parallel.For(0, Seeds, i =>
+        return [.. SeedRuns.Map(Seeds, seed =>
         {
-            var world = Battle.Run(scenario, (ulong)(i + 1)).World;
-            results[i] = scenario.Measure(world).ToDictionary(m => m.Name, m => m.Value.Raw / 4294967296.0);
-        });
-        return results;
+            var world = Battle.Run(scenario, seed).World;
+            return scenario.Measure(world).ToDictionary(m => m.Name, m => m.Value.Raw / 4294967296.0);
+        })];
     }
 
     private static double Mean(IEnumerable<Dictionary<string, double>> runs, string name) =>
@@ -44,6 +41,7 @@ public class BombardCreepTests(ITestOutputHelper output)
         return a.Length == 0 ? double.NaN : a[a.Length / 2];
     }
 
+    [Trait(Speed.Name, Speed.Slow)]
     [Fact]
     public void The_creep_finds_the_survivors_one_by_one_and_the_barrage_pays_for_itself()
     {
@@ -108,5 +106,21 @@ public class BombardCreepTests(ITestOutputHelper output)
         var scenario = ScenarioCatalog.Find(id)!;
         var result = Battle.Run(scenario, 11);
         Assert.Equal(result.Replay.FinalHash, Battle.Play(scenario, result.Replay).ComputeStateHash());
+    }
+
+    /// <summary>The quick set's smaller check (item 2.12): 6 seeds, direction only; the 200-seed bars are above.</summary>
+    [Fact]
+    public void Quick_check_the_barrage_leaves_fewer_defenders_than_the_control()
+    {
+        double Survivors(string id)
+        {
+            var scenario = ScenarioCatalog.Find(id)!;
+            return SeedRuns.Map(6, seed => scenario.Measure(Battle.Run(scenario, seed).World)
+                .Single(m => m.Name == "survivors").Value.ToInt()).Average();
+        }
+
+        var barrage = Survivors("bombard-creep");
+        var control = Survivors("bombard-creep-control");
+        Assert.True(barrage < control, $"able defenders at the creep start: barrage {barrage:F2}, control {control:F2}");
     }
 }

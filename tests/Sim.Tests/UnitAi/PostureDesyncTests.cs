@@ -25,6 +25,7 @@ public class PostureDesyncTests(ITestOutputHelper output)
     private const int Seeds = 50;
     private const int MaxNearSync = 5;
 
+    [Trait(Speed.Name, Speed.Slow)]
     [Theory]
     [InlineData("bombard-creep", 3062)]
     [InlineData("pin-open", 249)]
@@ -43,5 +44,16 @@ public class PostureDesyncTests(ITestOutputHelper output)
         Assert.True(m.Most <= MaxNearSync, $"{m.Most} squad-ticks with 75% or more changing; first: {samples}");
         Assert.True(m.UnexcusedRises == 0, $"{m.UnexcusedRises} rises in pinned squads that are not routing: {m}");
         Assert.True(m.QuickReversals <= baselineReversals, $"{m.QuickReversals} quick reversals, baseline {baselineReversals}: {m}");
+    }
+
+    /// <summary>The quick set's smaller check (item 2.12): the zero-tolerance counts over the first 3 seeds.</summary>
+    [Theory]
+    [InlineData("pin-open")]
+    [InlineData("equal-fire")]
+    public void Quick_check_no_whole_squad_changes_posture_at_once_or_rises_while_pinned(string id)
+    {
+        var m = PostureMetrics.Measure(id, 3);
+        Assert.True(m.Changes > 0, "no posture changed at all");
+        Assert.True(m.All == 0 && m.Most <= MaxNearSync && m.UnexcusedRises == 0, m.ToString());
     }
 }

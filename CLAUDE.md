@@ -34,11 +34,25 @@ Build:
 dotnet build PointBlank.sln
 ```
 
-Test:
+Quick tests, for everyday work (leaves out only the tests marked `[Trait("Speed", "Slow")]`, the
+many-seed runs):
+
+```powershell
+dotnet test PointBlank.sln --filter "Speed!=Slow"
+```
+
+Full tests, every test and seed. Run them once before opening a pull request and once in review;
+**a merge requires a green full run** (a quick run never counts):
 
 ```powershell
 dotnet test PointBlank.sln
 ```
+
+Mark a new test slow when it takes more than a few seconds, and keep a smaller check of the same
+behaviour in the quick set (`tests/Sim.Tests/TestSpeedTests.cs` guards this). Tests that run many
+independent seeds use `SeedRuns` to spread them over the cores; wall-clock budget tests go in
+`TimingCollection`, which runs alone. `Sim` compiles optimised in all configurations; add
+`-p:Optimize=false` to step through it in a debugger.
 
 Run battles headless and save their stats (add `--replays <directory>` to keep one
 replay file per seed):

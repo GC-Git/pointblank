@@ -18,7 +18,9 @@ namespace PointBlank.Sim.Fire;
 /// <item>Cadence: a shot credit grows at the weapon's rate of fire (its start phase is one RNG draw
 /// when the order starts); a weapon with <c>burst_length</c> &gt; 1 pauses <c>burst_pause</c> after each
 /// burst. A soldier fires only within his weapon's max range, and holds fire while a friendly stands
-/// within <see cref="FireRules.MaskClearance"/> of his line of fire short of the target; while holding, his shot credit
+/// within a clearance of his line of fire short of the target: <see cref="FireRules.MaskClearance"/> under a player
+/// fire order, and the larger of that and <see cref="FireRules.NearMissRadius"/> (2 m with the current data) for AI
+/// fire; while holding, his shot credit
 /// still grows to one round, so he fires as soon as the line clears (item 2.3).</item>
 /// <item>Aim: a contact target (an enemy soldier his side knows) is aimed at live while the side tracks
 /// him; a contact not Tracked is area fire at his last-known point; area fire aims at the point. The order
